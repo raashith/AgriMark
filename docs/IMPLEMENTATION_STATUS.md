@@ -7,7 +7,7 @@ This document provides an audit of all components across the AgriMark Unified Na
 | Component | Status | Evidence | Missing Work | Risk |
 |---|---|---|---|---|
 | **Core FastAPI Backend** | **EXISTING** | Mounted at `/api/v1/` with 24 domain routers in `backend/app/api/v1/router.py`. | None. Fully functional. | Low |
-| **MySQL Database & Alembic** | **EXISTING** | 20 Alembic migrations (`001` through `020`) verified clean from zero state and upgrade states. | None. Schema finalized. | Low |
+| **PostgreSQL / Supabase Database** | **IMPLEMENTED** | Canonical DDL in `database/schema_postgresql.sql` with RLS, triggers, indexes, and 21 Alembic migrations (`001` through `021`). | None. Schema & migrations complete. | Low |
 | **Auth & Security (JWT & RBAC)** | **EXISTING** | `backend/app/api/v1/auth.py` with OAuth2 JWT flow and IDOR/BOLA checks. | None. Fully functional. | Low |
 | **Atomic Inventory Reservation** | **EXISTING** | Verified lock protection in `backend/app/services/inventory_reservation_service.py`. | None. | Low |
 | **Farmer Marketplace Workflow** | **EXISTING** | Complete flow tested: Farm -> Crop -> Harvest -> Lot -> Listing -> Match -> Order -> Settlement. | None. | Low |
