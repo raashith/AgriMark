@@ -39,8 +39,11 @@ def list_crops(search: str | None = Query(default=None, max_length=100)) -> Crop
 
 @router.post("/profiles", response_model=ProfileResponse, status_code=201)
 def create_profile(request: ProfileCreate) -> ProfileResponse:
-    result = get_supabase().table("profiles").insert(request.model_dump(exclude_none=True)).execute()
-    return ProfileResponse(**_single(result))
+    try:
+        result = get_supabase().table("profiles").insert(request.model_dump(exclude_none=True)).execute()
+        return ProfileResponse(**_single(result))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Unable to create profile") from exc
 
 
 @router.get("/profiles/{profile_id}", response_model=ProfileResponse)
@@ -53,8 +56,11 @@ def get_profile(profile_id: UUID) -> ProfileResponse:
 def create_farm(profile_id: UUID, request: FarmCreate) -> FarmResponse:
     payload = request.model_dump(exclude_none=True)
     payload["owner_id"] = str(profile_id)
-    result = get_supabase().table("farms").insert(payload).execute()
-    return FarmResponse(**_single(result))
+    try:
+        result = get_supabase().table("farms").insert(payload).execute()
+        return FarmResponse(**_single(result))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Unable to create farm") from exc
 
 
 @router.get("/profiles/{profile_id}/farms", response_model=list[FarmResponse])
@@ -65,8 +71,11 @@ def list_farms(profile_id: UUID) -> list[FarmResponse]:
 
 @router.post("/cultivations", response_model=CultivationResponse, status_code=201)
 def create_cultivation(request: CultivationCreate) -> CultivationResponse:
-    result = get_supabase().table("cultivations").insert(request.model_dump(exclude_none=True, mode="json")).execute()
-    return CultivationResponse(**_single(result))
+    try:
+        result = get_supabase().table("cultivations").insert(request.model_dump(exclude_none=True, mode="json")).execute()
+        return CultivationResponse(**_single(result))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Unable to create cultivation") from exc
 
 
 @router.get("/cultivations", response_model=list[CultivationResponse])
@@ -86,16 +95,22 @@ def create_produce_lot(request: ProduceLotCreate, owner_id: UUID) -> ProduceLotR
     payload["owner_id"] = str(owner_id)
     if "available_quantity" not in payload:
         payload["available_quantity"] = payload["quantity"]
-    result = get_supabase().table("produce_lots").insert(payload).execute()
-    return ProduceLotResponse(**_single(result))
+    try:
+        result = get_supabase().table("produce_lots").insert(payload).execute()
+        return ProduceLotResponse(**_single(result))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Unable to create produce lot") from exc
 
 
 @router.post("/listings", response_model=ListingResponse, status_code=201)
 def create_listing(request: ListingCreate, seller_id: UUID) -> ListingResponse:
     payload = request.model_dump(mode="json")
     payload["seller_id"] = str(seller_id)
-    result = get_supabase().table("listings").insert(payload).execute()
-    return ListingResponse(**_single(result))
+    try:
+        result = get_supabase().table("listings").insert(payload).execute()
+        return ListingResponse(**_single(result))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Unable to create listing") from exc
 
 
 @router.get("/listings", response_model=list[ListingResponse])
