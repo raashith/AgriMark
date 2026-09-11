@@ -10,10 +10,11 @@ class Settings(BaseSettings):
     ENV: str = "development"
     DEBUG: bool = True
 
-    # Database Standard: PostgreSQL / Supabase (with SQLite fallback for local testing)
-    DATABASE_URL: str = "postgresql://postgres:postgres_pass@localhost:5432/agrimark_db"
-    SUPABASE_URL: str = "https://your-supabase-project.supabase.co"
+    # Database Standard: PostgreSQL / Supabase (xrcqzpnstdbbtafhcwbb)
+    DATABASE_URL: str = "postgresql://postgres:postgres_pass@db.xrcqzpnstdbbtafhcwbb.supabase.co:5432/postgres"
+    SUPABASE_URL: str = "https://xrcqzpnstdbbtafhcwbb.supabase.co"
     SUPABASE_ANON_KEY: str = "your-supabase-anon-key-here"
+    SUPABASE_SERVICE_ROLE_KEY: str = "your-supabase-service-role-key-here"
     TEST_DATABASE_URL: str = "sqlite:///:memory:"
 
     # JWT Security
