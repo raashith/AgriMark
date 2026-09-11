@@ -15,23 +15,25 @@ def test_marketplace_routes_require_authentication():
 
 def test_order_rejects_below_minimum(monkeypatch):
     user_id = uuid4()
+    listing_id = uuid4()
+    seller_id = uuid4()
+    lot_id = uuid4()
 
     def fake_user():
         return type("User", (), {"id": user_id})()
 
     monkeypatch.setattr(marketplace, "get_current_user", fake_user)
-    listing_id = uuid4()
     monkeypatch.setattr(
         marketplace,
         "_single",
         lambda result, not_found="Resource not found": {
             "id": str(listing_id),
-            "seller_id": str(uuid4()),
-            "lot_id": str(uuid4()),
+            "seller_id": str(seller_id),
+            "lot_id": str(lot_id),
             "price_per_unit": "20",
             "min_order_quantity": "50",
             "status": "active",
         },
     )
-    # This test documents the validation contract without touching production data.
+
     assert Decimal("10") < Decimal("50")
