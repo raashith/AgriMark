@@ -12,6 +12,8 @@ class AIRequest(BaseModel):
 
 class AIResponse(BaseModel):
     answer: str
+    model: str = AIService.model
+    status: str = "ok"
 
 
 @router.post("/answer", response_model=AIResponse)
