@@ -1,0 +1,68 @@
+# AgriMark Git Ignore Configuration
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+*.env
+secrets/
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+credentials/
+
+# Python & Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+pythonenv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Android Build & IDE Output
+android/.gradle/
+android/build/
+android/app/build/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# IDE & Editor Metadata
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+
+# Databases & Local Storage
+*.sqlite
+*.sqlite3
+*.db
+*.ldb
+
+# Logs & Temporary Files
+logs/
+*.log
+tmp/
+temp/
+scratch/
+
+# ML Model Artifacts & Heavy Datasets (untracked)
+ml/models/*.onnx
+ml/models/*.pth
+ml/models/*.h5
+ml/models/*.bin
+ml/data/raw/

@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: agrimark-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secure_password
+      MYSQL_DATABASE: agrimark_db
+      MYSQL_USER: agrimark
+      MYSQL_PASSWORD: agrimark_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+    container_name: agrimark-backend
+    restart: always
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: "mysql+pymysql://agrimark:agrimark_pass@db:3306/agrimark_db"
+      SECRET_KEY: "change_this_jwt_secret_in_production"
+      ENV: "production"
+    ports:
+      - "8000:8000"
+
+volumes:
+  mysql_data:
