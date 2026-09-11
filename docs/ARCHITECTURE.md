@@ -1,0 +1,164 @@
+# AgriMark Architecture
+
+## 1. System Boundary
+
+AgriMark is a layered agricultural platform. Clients communicate with backend APIs; backend services enforce authorization, transactional rules, integrations and AI tool permissions. PostgreSQL/Supabase is the canonical data layer.
+
+```text
+Farmer Android / Web / FPO / Buyer / Admin
+                    |
+                 REST API
+                    |
+               FastAPI Backend
+        /          |          |          \
+ Domain      AI/Agents      Data/ML    Integrations
+ Services      Layer        Pipeline     Providers
+        \          |          |          /
+             PostgreSQL / Supabase
+```
+
+## 2. Canonical Components
+
+### Backend
+
+Python/FastAPI application containing authentication, authorization, domain services, API routers, validation, transactional business rules, integrations, audit logging and AI tool gateway.
+
+### Database
+
+PostgreSQL provided by the existing AgriMark Supabase project. Database schema and migrations are source-controlled. Supabase-native capabilities may be used where appropriate, but the backend remains the application business-logic boundary.
+
+### ML
+
+Python data ingestion, normalization, feature engineering, dataset construction, model training/evaluation, registry, inference and monitoring. Forecasting requires chronological validation and leakage prevention.
+
+### AI Agents
+
+Server-side agents consume explicitly approved backend tools. They produce structured recommendations/decisions with evidence, confidence/uncertainty and trace metadata. The database and physical systems are not directly reachable from an LLM.
+
+### Web
+
+Responsive web clients for farmer, FPO, buyer, operations, administration and control-tower workflows.
+
+### Android
+
+Native Kotlin/Compose client with offline-first synchronization. It communicates only with authenticated backend APIs.
+
+## 3. Data Flow
+
+1. Official/authorized sources are ingested into immutable raw records.
+2. Data is validated, normalized and mapped to canonical agricultural entities.
+3. Quality and provenance metadata are attached.
+4. Features/datasets are generated with version identifiers.
+5. Models are trained/evaluated using time-aware validation.
+6. Approved models are registered and used for inference.
+7. Predictions and recommendations are returned through APIs with model/version/evidence metadata.
+8. Farmer/FPO/buyer actions pass through authorization, validation and transaction controls.
+9. Outcomes are captured for evaluation and learning.
+
+## 4. AI Control Boundary
+
+The required path is:
+
+```text
+User request
+   ↓
+Supervisor / specialized agent
+   ↓
+Policy + scope + risk checks
+   ↓
+Backend tool gateway
+   ↓
+Validated domain operation
+   ↓
+Human approval when required
+   ↓
+Transaction / external provider
+   ↓
+Audit + outcome
+```
+
+Never:
+
+```text
+LLM → direct SQL
+LLM → privileged secret
+LLM → payment movement
+LLM → unrestricted device command
+```
+
+## 5. Physical AI Boundary
+
+Physical systems use a provider-neutral command gateway. Device commands require capability checks, authorization, safety policy, idempotency, emergency-stop support, telemetry and execution verification. LLM output alone cannot actuate production hardware.
+
+## 6. Simulation Boundary
+
+Digital twins and simulations maintain separate state spaces:
+
+- REAL: observed/operational state
+- FORECAST: model projection
+- SCENARIO: user-defined hypothetical
+- SIMULATION: engine-generated hypothetical
+
+Simulation code cannot silently mutate REAL state.
+
+## 7. Security Model
+
+Security requirements include authenticated APIs, role/permission enforcement, least privilege, input validation, output validation, rate limits, audit logs, secrets outside source control, secure uploads, data retention controls and environment separation.
+
+High-risk domains such as payments, insurance, biological products, policy approvals and physical operations use human approval and additional guardrails.
+
+## 8. Data Trust Model
+
+Every important AI/data decision should be attributable to:
+
+- source/provider
+- dataset/version
+- transformation/version
+- model/version
+- prompt/agent/tool context where applicable
+- timestamp
+- confidence/uncertainty
+- human approval when applicable
+- final outcome
+
+## 9. Deployment Environments
+
+```text
+DEV → STAGING → PRODUCTION
+```
+
+Production credentials and data must remain isolated from development. Database schema changes travel through controlled migrations.
+
+## 10. Operational Reliability
+
+The system should support:
+
+- structured logs
+- health/readiness checks
+- metrics/traces
+- background jobs
+- retries with bounded backoff
+- idempotency keys
+- circuit breakers/provider health
+- dead-letter handling where needed
+- backup/restore validation
+- disaster recovery procedures
+- incident runbooks
+- rollback/safe-state procedures
+
+## 11. API Contract
+
+Canonical API namespace is `/api/v1`. OpenAPI generated by FastAPI is authoritative for routes and schemas. Domain names in roadmap documentation are architectural targets and not evidence that every endpoint currently exists.
+
+## 12. Source-of-Truth Rules
+
+- Code: validated repository implementation
+- DB schema: PostgreSQL/Supabase migrations and live schema after verification
+- API: generated OpenAPI contract
+- AI behavior: versioned prompts/tools/policies/tests
+- Model behavior: model registry/evaluation records
+- Production state: deployed environment telemetry and audited database state
+
+## 13. Architectural Guardrails
+
+AgriMark must not claim live external integration, official government authority, certification, continuous historic data availability or production hardware control unless the specific integration is actually configured, authorized and tested.
