@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .api.v1.ai import router as ai_router
 from .api.v1.health import router as health_router
+from .api.v1.readiness import router as readiness_router
 from .core.config import get_settings
 
 settings = get_settings()
@@ -16,6 +17,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(health_router, prefix="/api/v1")
+app.include_router(readiness_router, prefix="/api/v1")
 app.include_router(ai_router, prefix="/api/v1")
 
 
