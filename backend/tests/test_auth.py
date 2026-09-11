@@ -15,3 +15,13 @@ def test_auth_requires_bearer_credentials():
 def test_profile_owner_identity_is_uuid():
     user_id = uuid4()
     assert user_id.version == 4
+
+
+def test_auth_rejects_non_bearer_scheme():
+    class Credentials:
+        scheme = "Basic"
+        credentials = "not-a-token"
+
+    with pytest.raises(HTTPException) as exc:
+        get_current_user(Credentials())
+    assert exc.value.status_code == 401
