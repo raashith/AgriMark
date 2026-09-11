@@ -10,8 +10,10 @@ class Settings(BaseSettings):
     ENV: str = "development"
     DEBUG: bool = True
 
-    # Database
-    DATABASE_URL: str = "mysql+pymysql://agrimark:agrimark_pass@localhost:3306/agrimark_db"
+    # Database Standard: PostgreSQL / Supabase (with SQLite fallback for local testing)
+    DATABASE_URL: str = "postgresql://postgres:postgres_pass@localhost:5432/agrimark_db"
+    SUPABASE_URL: str = "https://your-supabase-project.supabase.co"
+    SUPABASE_ANON_KEY: str = "your-supabase-anon-key-here"
     TEST_DATABASE_URL: str = "sqlite:///:memory:"
 
     # JWT Security
