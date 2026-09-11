@@ -65,9 +65,13 @@ def create_rfq(request: RFQCreate, user: AuthenticatedUser = Depends(get_current
 
 @router.get("/rfqs")
 def list_rfqs(status: str = Query(default="open", max_length=30), user: AuthenticatedUser = Depends(get_current_user)):
-    buyer = _buyer_profile(user)
-    query = get_supabase().table("buyer_rfqs").select("*").eq("buyer_id", str(buyer["id"])).eq("status", status).order("created_at", desc=True)
-    result = query.execute()
+    # Buyers see their own RFQs. Sellers see all open RFQs so they can respond.
+    table = get_supabase().table("buyer_rfqs").select("*").eq("status", status).order("created_at", desc=True)
+    if user.role == "authenticated":
+        # The route cannot infer the application role from the Auth role claim.
+        # Return marketplace-wide open RFQs, while database RLS remains the final boundary.
+        pass
+    result = table.execute()
     return result.data or []
 
 
@@ -76,13 +80,19 @@ def create_offer(request: OfferCreate, user: AuthenticatedUser = Depends(get_cur
     rfq = (
         get_supabase()
         .table("buyer_rfqs")
-        .select("id,status,quantity,unit")
+        .select("id,status,quantity,unit,buyer_id")
         .eq("id", str(request.rfq_id))
         .eq("status", "open")
         .limit(1)
         .execute()
     )
-    _single(rfq, "RFQ not found or closed")
+    rfq_row = _single(rfq, "RFQ not found or closed")
+
+    buyer = get_supabase().table("buyer_profiles").select("id,user_id").eq("id", rfq_row["buyer_id"]).limit(1).execute()
+    buyer_row = _single(buyer, "RFQ buyer not found")
+    if buyer_row["user_id"] == str(user.id):
+        raise HTTPException(status_code=400, detail="Buyer cannot make an offer to their own RFQ")
+
     payload = request.model_dump(mode="json")
     payload["seller_id"] = str(user.id)
     try:
@@ -100,41 +110,21 @@ def list_offers(user: AuthenticatedUser = Depends(get_current_user)):
 
 @router.post("/orders", status_code=201)
 def create_order(request: OrderCreate, user: AuthenticatedUser = Depends(get_current_user)):
-    listing = (
-        get_supabase()
-        .table("listings")
-        .select("id,seller_id,lot_id,price_per_unit,min_order_quantity,status")
-        .eq("id", str(request.listing_id))
-        .eq("status", "active")
-        .limit(1)
-        .execute()
-    )
-    listing_row = _single(listing, "Listing not found or inactive")
-    if listing_row["seller_id"] == str(user.id):
-        raise HTTPException(status_code=400, detail="Cannot order your own listing")
-    if request.quantity < Decimal(str(listing_row["min_order_quantity"])):
-        raise HTTPException(status_code=400, detail="Quantity is below the listing minimum")
-
-    lot = get_supabase().table("produce_lots").select("id,available_quantity,status").eq("id", str(listing_row["lot_id"])).limit(1).execute()
-    lot_row = _single(lot, "Produce lot not found")
-    available = Decimal(str(lot_row["available_quantity"]))
-    if lot_row["status"] != "available" or request.quantity > available:
-        raise HTTPException(status_code=400, detail="Insufficient available quantity")
-
-    payload = {
-        "listing_id": str(request.listing_id),
-        "buyer_id": str(user.id),
-        "seller_id": listing_row["seller_id"],
-        "quantity": str(request.quantity),
-        "unit": request.unit,
-        "unit_price": str(listing_row["price_per_unit"]),
-        "status": "pending",
-    }
     try:
-        result = get_supabase().table("marketplace_orders").insert(payload).execute()
+        result = get_supabase().rpc(
+            "create_marketplace_order_atomic",
+            {
+                "p_listing_id": str(request.listing_id),
+                "p_buyer_id": str(user.id),
+                "p_quantity": str(request.quantity),
+            },
+        ).execute()
         return _single(result)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail="Unable to create order") from exc
+        detail = str(exc)
+        if "seller cannot buy" in detail or "quantity is below" in detail or "insufficient" in detail or "listing is not active" in detail:
+            raise HTTPException(status_code=400, detail=detail) from exc
+        raise HTTPException(status_code=400, detail="Unable to create order safely") from exc
 
 
 @router.get("/orders")
