@@ -3,3 +3,4 @@ uvicorn[standard]==0.34.2
 pydantic-settings==2.10.1
 supabase==2.31.0
 openai==1.109.1
+httpx==0.28.1
