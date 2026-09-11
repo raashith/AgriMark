@@ -8,6 +8,7 @@ from .api.v1.core import router as core_router
 from .api.v1.health import router as health_router
 from .api.v1.marketplace import router as marketplace_router
 from .api.v1.readiness import router as readiness_router
+from .api.v1.tracking import router as tracking_router
 from .core.config import get_settings
 
 settings = get_settings()
@@ -27,6 +28,7 @@ app.include_router(ai_chat_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(core_router, prefix="/api/v1")
 app.include_router(marketplace_router, prefix="/api/v1")
+app.include_router(tracking_router, prefix="/api/v1")
 
 
 @app.get("/")
