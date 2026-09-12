@@ -31,8 +31,16 @@ def get_engine():
                 conn.execute(text("SELECT 1"))
         return engine
     except Exception as e:
+        if settings.ENV.lower() == "production" or settings.DATABASE_ENV.lower() == "production":
+            logger.error(
+                f"FATAL: Production DB Connection Failed ({db_url}): {e}. SQLite fallback is strictly prohibited in production."
+            )
+            raise RuntimeError(
+                f"FATAL: Production PostgreSQL connection to {db_url} failed: {e}. SQLite fallback is disabled in production."
+            ) from e
+
         logger.warning(
-            f"Failed connecting to primary DB ({db_url}): {e}. Falling back to SQLite in-memory DB."
+            f"Failed connecting to primary DB ({db_url}): {e}. Falling back to SQLite in-memory DB for local development/testing."
         )
         fallback_engine = create_engine(
             settings.TEST_DATABASE_URL,

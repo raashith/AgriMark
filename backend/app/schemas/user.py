@@ -11,6 +11,27 @@ class RoleSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class FarmerProfileSummary(BaseModel):
+    id: str
+    fpo_member_id: Optional[str] = None
+    experience_years: int = 0
+    primary_crops: Optional[str] = None
+    verification_status: str = "unverified"
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BuyerProfileSummary(BaseModel):
+    id: str
+    business_name: Optional[str] = None
+    buyer_type: str = "individual"
+    gstin: Optional[str] = None
+    delivery_address: Optional[str] = None
+    verification_status: str = "unverified"
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class UserBase(BaseModel):
     phone: str = Field(..., min_length=10, max_length=15)
     email: Optional[EmailStr] = None
@@ -25,8 +46,26 @@ class UserCreate(UserBase):
 
 class UserResponse(UserBase):
     id: str
+    auth_user_id: Optional[str] = None
+    profile_id: Optional[str] = None
     role: RoleSchema
     status: str
     created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserMeResponse(BaseModel):
+    auth_user_id: Optional[str]
+    application_user_id: str
+    profile_id: Optional[str]
+    email: Optional[str]
+    phone: str
+    full_name: str
+    role: str
+    status: str
+    preferred_language: Optional[str] = "en"
+    farmer_profile: Optional[FarmerProfileSummary] = None
+    buyer_profile: Optional[BuyerProfileSummary] = None
 
     model_config = ConfigDict(from_attributes=True)

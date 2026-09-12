@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgriMark — Sign In & Production Onboarding</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #09130e;
+            --card-bg: rgba(18, 34, 24, 0.85);
+            --card-border: rgba(46, 125, 82, 0.25);
+            --primary: #10b981;
+            --primary-hover: #059669;
+            --accent: #34d399;
+            --text-main: #ecfdf5;
+            --text-muted: #9ca3af;
+            --error-bg: rgba(220, 38, 38, 0.15);
+            --error-border: rgba(239, 68, 68, 0.4);
+            --error-text: #fca5a5;
+            --success-bg: rgba(16, 185, 129, 0.15);
+            --success-border: rgba(52, 211, 153, 0.4);
+            --success-text: #a7f3d0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            background-image: 
+                radial-gradient(circle at 15% 20%, rgba(16, 185, 129, 0.08) 0%, transparent 45%),
+                radial-gradient(circle at 85% 80%, rgba(5, 150, 105, 0.08) 0%, transparent 45%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+
+        .auth-container {
+            width: 100%;
+            max-width: 440px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            backdrop-filter: blur(16px);
+            padding: 2.5rem 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .brand-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .brand-logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: -0.02em;
+        }
+
+        .brand-logo svg {
+            width: 32px;
+            height: 32px;
+            fill: var(--primary);
+        }
+
+        .brand-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        .tab-buttons {
+            display: flex;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px;
+            border-radius: 10px;
+            margin-bottom: 1.75rem;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 0.625rem;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.9rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.825rem;
+            font-weight: 500;
+            color: var(--text-main);
+            margin-bottom: 0.375rem;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 0.95rem;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .role-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        .role-card {
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 0.75rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .role-card.selected {
+            border-color: var(--primary);
+            background: rgba(16, 185, 129, 0.12);
+            color: var(--accent);
+        }
+
+        .role-card input {
+            display: none;
+        }
+
+        .role-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .role-desc {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.2rem;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 0.875rem;
+            background: var(--primary);
+            border: none;
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            margin-top: 0.5rem;
+        }
+
+        .btn-submit:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .alert-box {
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 1.25rem;
+            display: none;
+        }
+
+        .alert-box.error {
+            display: block;
+            background: var(--error-bg);
+            border: 1px solid var(--error-border);
+            color: var(--error-text);
+        }
+
+        .alert-box.success {
+            display: block;
+            background: var(--success-bg);
+            border: 1px solid var(--success-border);
+            color: var(--success-text);
+        }
+
+        .forgot-link {
+            display: block;
+            text-align: right;
+            font-size: 0.8rem;
+            color: var(--accent);
+            text-decoration: none;
+            margin-top: 0.5rem;
+        }
+
+        .forgot-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="brand-header">
+            <div class="brand-logo">
+                <svg viewBox="0 0 24 24"><path d="M12 2L3 9v11a2 2 0 002 2h14a2 2 0 002-2V9l-9-7zm0 3.8l6 4.67V19H6v-8.53l6-4.67zM12 11a2.5 2.5 0 100 5 2.5 2.5 0 000-5z"/></svg>
+                AgriMark
+            </div>
+            <p class="brand-subtitle">Farm Intelligence & Production Agricultural OS</p>
+        </div>
+
+        <div class="tab-buttons">
+            <button id="tab-login" class="tab-btn active" onclick="switchTab('login')">Sign In</button>
+            <button id="tab-register" class="tab-btn" onclick="switchTab('register')">Create Account</button>
+        </div>
+
+        <div id="alert-msg" class="alert-box"></div>
+
+        <!-- LOGIN FORM -->
+        <form id="form-login" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label for="login-id">Phone Number or Email</label>
+                <input type="text" id="login-id" class="form-control" placeholder="+919876543210 or farmer@example.com" required>
+            </div>
+            <div class="form-group">
+                <label for="login-pass">Password</label>
+                <div class="input-wrapper">
+                    <input type="password" id="login-pass" class="form-control" placeholder="••••••••" required>
+                    <button type="button" class="toggle-password" onclick="togglePass('login-pass', this)">Show</button>
+                </div>
+                <a href="#" class="forgot-link" onclick="handleForgot(event)">Forgot password?</a>
+            </div>
+            <button type="submit" id="btn-login-submit" class="btn-submit">Sign In to Dashboard</button>
+        </form>
+
+        <!-- REGISTER FORM -->
+        <form id="form-register" style="display: none;" onsubmit="handleRegister(event)">
+            <div class="form-group">
+                <label for="reg-name">Full Name</label>
+                <input type="text" id="reg-name" class="form-control" placeholder="Ramesh Kumar" required>
+            </div>
+            <div class="form-group">
+                <label for="reg-phone">Phone Number</label>
+                <input type="tel" id="reg-phone" class="form-control" placeholder="+919876543210" required>
+            </div>
+            <div class="form-group">
+                <label for="reg-email">Email Address (Optional)</label>
+                <input type="email" id="reg-email" class="form-control" placeholder="farmer@agrimark.org">
+            </div>
+            <div class="form-group">
+                <label>Account Role</label>
+                <div class="role-selector">
+                    <div class="role-card selected" id="role-card-farmer" onclick="selectRole('farmer')">
+                        <input type="radio" name="reg-role" value="farmer" checked>
+                        <div class="role-title">🌾 Farmer</div>
+                        <div class="role-desc">Crops, Farms & Sales</div>
+                    </div>
+                    <div class="role-card" id="role-card-buyer" onclick="selectRole('buyer')">
+                        <input type="radio" name="reg-role" value="buyer">
+                        <div class="role-title">🛒 Buyer</div>
+                        <div class="role-desc">Marketplace & Orders</div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="reg-pass">Password</label>
+                <div class="input-wrapper">
+                    <input type="password" id="reg-pass" class="form-control" placeholder="At least 6 characters" minlength="6" required>
+                    <button type="button" class="toggle-password" onclick="togglePass('reg-pass', this)">Show</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="reg-pass-confirm">Confirm Password</label>
+                <input type="password" id="reg-pass-confirm" class="form-control" placeholder="Repeat password" required>
+            </div>
+            <button type="submit" id="btn-reg-submit" class="btn-submit">Register Account</button>
+        </form>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script>
+        let currentRole = 'farmer';
+
+        function switchTab(tab) {
+            document.getElementById('alert-msg').style.display = 'none';
+            if (tab === 'login') {
+                document.getElementById('tab-login').classList.add('active');
+                document.getElementById('tab-register').classList.remove('active');
+                document.getElementById('form-login').style.display = 'block';
+                document.getElementById('form-register').style.display = 'none';
+            } else {
+                document.getElementById('tab-register').classList.add('active');
+                document.getElementById('tab-login').classList.remove('active');
+                document.getElementById('form-register').style.display = 'block';
+                document.getElementById('form-login').style.display = 'none';
+            }
+        }
+
+        function selectRole(role) {
+            currentRole = role;
+            document.getElementById('role-card-farmer').classList.toggle('selected', role === 'farmer');
+            document.getElementById('role-card-buyer').classList.toggle('selected', role === 'buyer');
+        }
+
+        function togglePass(inputId, btn) {
+            const input = document.getElementById(inputId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = 'Hide';
+            } else {
+                input.type = 'password';
+                btn.textContent = 'Show';
+            }
+        }
+
+        function showAlert(msg, type = 'error') {
+            const alertBox = document.getElementById('alert-msg');
+            alertBox.textContent = msg;
+            alertBox.className = `alert-box ${type}`;
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const id = document.getElementById('login-id').value.trim();
+            const pass = document.getElementById('login-pass').value;
+            const btn = document.getElementById('btn-login-submit');
+
+            try {
+                btn.disabled = true;
+                btn.textContent = 'Authenticating...';
+                const data = await AgriMarkAuth.login(id, pass);
+                showAlert('Login successful! Redirecting...', 'success');
+                setTimeout(() => AgriMarkAuth.redirectForUser(data.user), 600);
+            } catch (err) {
+                showAlert(err.message, 'error');
+                btn.disabled = false;
+                btn.textContent = 'Sign In to Dashboard';
+            }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const name = document.getElementById('reg-name').value.trim();
+            const phone = document.getElementById('reg-phone').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const pass = document.getElementById('reg-pass').value;
+            const confirmPass = document.getElementById('reg-pass-confirm').value;
+            const btn = document.getElementById('btn-reg-submit');
+
+            if (pass !== confirmPass) {
+                showAlert('Passwords do not match.', 'error');
+                return;
+            }
+
+            try {
+                btn.disabled = true;
+                btn.textContent = 'Creating Account...';
+                const data = await AgriMarkAuth.register({
+                    full_name: name,
+                    phone: phone,
+                    email: email || null,
+                    password: pass,
+                    role_name: currentRole
+                });
+                showAlert('Registration successful! Redirecting...', 'success');
+                setTimeout(() => AgriMarkAuth.redirectForUser(data.user), 600);
+            } catch (err) {
+                showAlert(err.message, 'error');
+                btn.disabled = false;
+                btn.textContent = 'Register Account';
+            }
+        }
+
+        async function handleForgot(e) {
+            e.preventDefault();
+            const email = prompt('Enter your registered email address for password recovery:');
+            if (!email) return;
+
+            try {
+                const res = await fetch('/api/v1/auth/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await res.json();
+                alert(data.message || 'Password reset request sent.');
+            } catch (err) {
+                alert('Failed to send reset request.');
+            }
+        }
+
+        // On page load, check existing session
+        window.addEventListener('DOMContentLoaded', async () => {
+            const user = await AgriMarkAuth.fetchMe();
+            if (user) {
+                AgriMarkAuth.redirectForUser(user);
+            }
+        });
+    </script>
+</body>
+</html>

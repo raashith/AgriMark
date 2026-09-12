@@ -10,10 +10,12 @@ def test_farmer_registration_and_login(client):
     }
     response = client.post("/api/v1/auth/register", json=reg_payload)
     assert response.status_code == 201
-    user_data = response.json()
+    token_resp = response.json()
+    assert "access_token" in token_resp
+    user_data = token_resp["user"]
     assert user_data["phone"] == "9876543210"
     assert user_data["full_name"] == "Ramesh Kumar"
-    assert user_data["role"]["name"] == "farmer"
+    assert user_data["role"] == "farmer"
 
     # 2. Login Farmer
     login_payload = {
@@ -32,7 +34,7 @@ def test_farmer_registration_and_login(client):
     assert me_resp.status_code == 200
     me_data = me_resp.json()
     assert me_data["phone"] == "9876543210"
-    assert me_data["role"]["name"] == "farmer"
+    assert me_data["role"] == "farmer"
 
 
 def test_buyer_registration(client):
@@ -47,7 +49,7 @@ def test_buyer_registration(client):
     response = client.post("/api/v1/auth/register", json=reg_payload)
     assert response.status_code == 201
     data = response.json()
-    assert data["role"]["name"] == "buyer"
+    assert data["user"]["role"] == "buyer"
 
 
 def test_duplicate_registration_rejected(client):

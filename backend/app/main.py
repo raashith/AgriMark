@@ -30,6 +30,19 @@ if settings.CORS_ORIGINS:
         allow_headers=["*"],
     )
 
+
+@app.middleware("http")
+async def add_correlation_id_and_timing(request, call_next):
+    import uuid
+    import time
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Process-Time"] = f"{process_time:.4f}s"
+    return response
+
 app.include_router(api_v1_router, prefix=settings.API_V1_STR)
 
 

@@ -1,6 +1,8 @@
 from fastapi import APIRouter
 from backend.app.api.v1.health import router as health_router
 from backend.app.api.v1.auth import router as auth_router
+from backend.app.api.v1.farms_api import router as farms_router
+from backend.app.api.v1.marketplace_api import router as marketplace_router
 from backend.app.api.v1.data_catalog_api import router as data_catalog_router
 from backend.app.api.v1.data_contracts_api import router as data_contracts_router
 from backend.app.api.v1.data_consent_api import router as data_consent_router
@@ -24,10 +26,22 @@ from backend.app.api.v1.logistics_processing_api import router as logistics_proc
 from backend.app.api.v1.finance_allied_api import router as finance_allied_router
 from backend.app.api.v1.trade_climate_resilience_api import router as trade_climate_resilience_router
 from backend.app.api.v1.unified_os_api import router as unified_os_router
+from backend.app.api.v1.farmer_api import router as farmer_router
+from backend.app.api.v1.market_api import router as market_router
+from backend.app.api.v1.weather_api import router as weather_router
+from backend.app.api.v1.agri_ai_api import router as agri_ai_router
+from backend.app.api.v1.pilot_api import router as pilot_router
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(health_router)
 api_v1_router.include_router(auth_router)
+api_v1_router.include_router(pilot_router)
+api_v1_router.include_router(farmer_router)
+api_v1_router.include_router(farms_router)
+api_v1_router.include_router(marketplace_router)
+api_v1_router.include_router(market_router)
+api_v1_router.include_router(weather_router)
+api_v1_router.include_router(agri_ai_router)
 api_v1_router.include_router(data_catalog_router)
 api_v1_router.include_router(data_contracts_router)
 api_v1_router.include_router(data_consent_router)
@@ -51,8 +65,4 @@ api_v1_router.include_router(logistics_processing_router)
 api_v1_router.include_router(finance_allied_router)
 api_v1_router.include_router(trade_climate_resilience_router)
 api_v1_router.include_router(unified_os_router)
-
-
-
-
 
