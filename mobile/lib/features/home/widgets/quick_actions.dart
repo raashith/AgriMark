@@ -19,49 +19,87 @@ class QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final actions = <_ActionData>[
+      _ActionData(Icons.grass_outlined, 'Add Crop', AppColors.primary, onAddCrop),
+      _ActionData(Icons.sell_outlined, 'Sell Produce', AppColors.accent, onSellProduce),
+      _ActionData(Icons.storefront_outlined, 'Market', AppColors.statusInfo, onViewMarket),
+      _ActionData(Icons.local_shipping_outlined, 'Pickup', AppColors.statusWarning, onBookPickup),
+      _ActionData(Icons.auto_awesome, 'Ask AgriAI', AppColors.primaryDark, onAskAi),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Quick Farmer Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const Text(
+          'What do you want to do?',
+          style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.textMain),
+        ),
         const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildActionItem(Icons.grass, 'Add Crop', AppColors.primary, onAddCrop),
-            _buildActionItem(Icons.sell, 'Sell Produce', AppColors.accent, onSellProduce),
-            _buildActionItem(Icons.storefront, 'View Market', AppColors.statusInfo, onViewMarket),
-            _buildActionItem(Icons.local_shipping, 'Book Pickup', AppColors.statusWarning, onBookPickup),
-            _buildActionItem(Icons.psychology, 'Ask AgriAI', AppColors.primary, onAskAi),
-          ],
+        SizedBox(
+          height: 96,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            itemCount: actions.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final action = actions[index];
+              return Semantics(
+                button: true,
+                label: action.label,
+                child: InkWell(
+                  onTap: action.onTap,
+                  borderRadius: BorderRadius.circular(18),
+                  child: Container(
+                    width: 92,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: AppColors.cardBorder),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: action.color.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(action.icon, color: action.color, size: 27),
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          action.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textMain,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
         ),
       ],
     );
   }
+}
 
-  Widget _buildActionItem(IconData icon, String label, Color color, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Column(
-        children: [
-          Container(
-            width: 56,
-            height: 56, // 56px touch target
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: color.withOpacity(0.4)),
-            ),
-            child: Icon(icon, color: color, size: 26),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMain),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
+class _ActionData {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ActionData(this.icon, this.label, this.color, this.onTap);
 }
