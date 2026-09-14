@@ -36,10 +36,7 @@ function getValidPublishableKey(): string {
     return isPublishable || isLegacyJwt;
   });
 
-  if (!valid) {
-    return candidates[0] || '';
-  }
-
+  if (!valid) return candidates[0] || '';
   if (valid.startsWith('sb_publishable_')) return valid;
 
   try {
@@ -47,9 +44,7 @@ function getValidPublishableKey(): string {
     if (parts.length === 3) {
       const payloadStr = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
       const payload = JSON.parse(payloadStr);
-      if (payload.ref && payload.ref !== EXPECTED_SUPABASE_REF) {
-        return '';
-      }
+      if (payload.ref && payload.ref !== EXPECTED_SUPABASE_REF) return '';
     }
   } catch {}
 
@@ -59,7 +54,19 @@ function getValidPublishableKey(): string {
 export const SUPABASE_URL = getValidSupabaseUrl();
 export const SUPABASE_PUBLISHABLE_KEY = getValidPublishableKey();
 
-export const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY || 'unconfigured_key');
+export const supabase = createBrowserClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY || 'unconfigured_key',
+  {
+    auth: {
+      flowType: 'pkce',
+      detectSessionInUrl: false,
+      experimental: {
+        appendPkceFlowIdToRedirects: true,
+      },
+    },
+  },
+);
 
 export function getSupabaseDiagnostic() {
   let supabaseHost = '';
