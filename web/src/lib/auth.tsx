@@ -64,7 +64,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           logSupabaseDiagnostic('getSession', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/session', 401, sessionErr.message);
           const msg = (sessionErr.message || '').toLowerCase();
           if (msg.includes('invalid api key') || msg.includes('invalid') || msg.includes('jwt')) {
-            console.warn('Supabase session reset because the stored session was invalid.');
             await supabase.auth.signOut().catch(() => {});
             if (typeof window !== 'undefined') {
               localStorage.removeItem('agrimark_token');
@@ -77,7 +76,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (data?.session?.access_token) {
           const profile = await syncProfile(data.session.access_token);
           if (!profile) {
-            console.warn('Supabase session reset because the stored session was invalid.');
             await supabase.auth.signOut().catch(() => {});
             if (typeof window !== 'undefined') {
               localStorage.removeItem('agrimark_token');
@@ -87,7 +85,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
       } catch {
-        console.warn('Supabase session reset because the stored session was invalid.');
         await supabase.auth.signOut().catch(() => {});
         if (typeof window !== 'undefined') {
           localStorage.removeItem('agrimark_token');
@@ -175,11 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Incorrect OTP. Please check the 6-digit code and try again.');
     }
 
-    const { data, error } = await supabase.auth.verifyOtp({
-      phone: normalized,
-      token: code,
-      type: 'sms',
-    });
+    const { data, error } = await supabase.auth.verifyOtp({ phone: normalized, token: code, type: 'sms' });
     if (error) {
       logSupabaseDiagnostic('verifyOtp', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/verify', 400, error.message);
       throw new Error(formatAuthError(error.message));
@@ -204,25 +197,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithGoogle = async (): Promise<void> => {
-    let redirectUrl = PRODUCTION_AUTH_CALLBACK;
-    if (typeof window !== 'undefined') {
-      const origin = window.location.origin;
-      const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1');
-      if (isLocal) {
-        redirectUrl = `${origin}/auth/callback`;
-      } else if (origin === PRODUCTION_SITE_URL) {
-        redirectUrl = PRODUCTION_AUTH_CALLBACK;
-      }
-    }
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1');
+    const redirectUrl = isLocal ? `${origin}/auth/callback` : PRODUCTION_AUTH_CALLBACK;
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'select_account',
-        },
+        queryParams: { prompt: 'select_account' },
       },
     });
 
@@ -234,32 +217,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!data?.url) {
       throw new Error('Google Sign-In could not start. Please try again.');
     }
+
+    if (typeof window !== 'undefined') {
+      window.location.assign(data.url);
+    }
   };
 
   const register = async (data: any): Promise<UserProfile> => {
     setIsLoading(true);
     try {
-      if (data.role === 'admin') {
-        throw new Error('Self-registration as admin is prohibited.');
-      }
-
+      if (data.role === 'admin') throw new Error('Self-registration as admin is prohibited.');
       const email = data.email?.trim();
       const password = data.password;
-      if (!email || !password) {
-        throw new Error('Email and password are required to create an account.');
-      }
+      if (!email || !password) throw new Error('Email and password are required to create an account.');
 
       const { data: sbData, error: sbError } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            full_name: data.full_name,
-            phone: data.phone || data.phone_number,
-            location: data.location,
-            requested_role: data.role,
-          },
-        },
+        options: { data: { full_name: data.full_name, phone: data.phone || data.phone_number, location: data.location, requested_role: data.role } },
       });
 
       if (sbError) {
@@ -276,7 +251,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (profile) return profile;
         throw new Error('Your account was created, but profile setup is still completing. Please log in.');
       }
-
       throw new Error('Account created. Please check your email and confirm your address before logging in.');
     } finally {
       setIsLoading(false);
@@ -284,12 +258,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async (): Promise<void> => {
-    try {
-      await supabase.auth.signOut();
-    } catch {}
-    try {
-      await api.logout();
-    } catch {}
+    try { await supabase.auth.signOut(); } catch {}
+    try { await api.logout(); } catch {}
     if (typeof window !== 'undefined') {
       localStorage.removeItem('agrimark_token');
       localStorage.removeItem('agrimark_user');
@@ -298,19 +268,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      isLoading,
-      login,
-      sendPhoneOtp,
-      loginWithPhoneOtp,
-      verifyPhoneOtp,
-      loginWithGoogle,
-      register,
-      logout,
-      isAuthenticated: !!user,
-      role: user?.role || null,
-    }}>
+    <AuthContext.Provider value={{ user, isLoading, login, sendPhoneOtp, loginWithPhoneOtp, verifyPhoneOtp, loginWithGoogle, register, logout, isAuthenticated: !!user, role: user?.role || null }}>
       {children}
     </AuthContext.Provider>
   );
@@ -321,63 +279,30 @@ export function normalizePhone(phone: string): string {
   const raw = phone.trim();
   if (raw.startsWith('+')) {
     const digits = raw.replace(/\D/g, '');
-    if (digits.length < 8 || digits.length > 15) {
-      throw new Error('Enter a valid mobile number.');
-    }
+    if (digits.length < 8 || digits.length > 15) throw new Error('Enter a valid mobile number.');
     return `+${digits}`;
   }
   const digits = raw.replace(/\D/g, '');
-  if (digits.length === 10) {
-    return `+91${digits}`;
-  }
-  if (digits.length === 11 && digits.startsWith('0')) {
-    return `+91${digits.slice(1)}`;
-  }
-  if (digits.length === 12 && digits.startsWith('91')) {
-    return `+${digits}`;
-  }
-  if (digits.length >= 8 && digits.length <= 15) {
-    return `+${digits}`;
-  }
+  if (digits.length === 10) return `+91${digits}`;
+  if (digits.length === 11 && digits.startsWith('0')) return `+91${digits.slice(1)}`;
+  if (digits.length === 12 && digits.startsWith('91')) return `+${digits}`;
+  if (digits.length >= 8 && digits.length <= 15) return `+${digits}`;
   throw new Error('Enter a valid mobile number.');
 }
 
 export function formatAuthError(message: string): string {
   const normalized = (message || '').toLowerCase();
-  if (normalized.includes('invalid api key') || normalized.includes('api key is invalid') || normalized.includes('invalid_api_key')) {
-    return 'AgriMark authentication is temporarily unavailable. Please try again.';
-  }
-  if (normalized.includes('unsupported provider') || normalized.includes('provider is not enabled') || normalized.includes('google provider disabled')) {
-    return 'Google Sign-In is temporarily unavailable. Please try another login method.';
-  }
-  if (normalized.includes('redirect_uri_mismatch') || normalized.includes('redirect not allowed') || normalized.includes('invalid redirect')) {
-    return 'Google Sign-In configuration needs attention. Please try again later.';
-  }
-  if (normalized.includes('access_denied') || normalized.includes('cancelled') || normalized.includes('canceled') || normalized.includes('user_cancelled')) {
-    return 'Google Sign-In was cancelled.';
-  }
-  if (normalized.includes('code exchange') || normalized.includes('invalid_grant') || normalized.includes('pkce')) {
-    return "We couldn't complete Google Sign-In. Please try again.";
-  }
-  if (normalized.includes('rate limit') || normalized.includes('too many') || normalized.includes('over_email_send_rate_limit') || normalized.includes('over_sms_send_rate_limit')) {
-    return 'Too many OTP requests. Please wait before trying again.';
-  }
-  if (normalized.includes('unsupported phone provider') || normalized.includes('sms provider not configured') || normalized.includes('phone provider disabled')) {
-    return 'SMS login is temporarily unavailable. Please try again later or use Google / Email sign-in.';
-  }
-  if (normalized.includes('sms') || normalized.includes('unavailable') || normalized.includes('service_unavailable') || normalized.includes('sms_send_failed')) {
-    return "We couldn't send the OTP right now. Please try again shortly.";
-  }
-  if (normalized.includes('invalid otp') || normalized.includes('invalid token') || normalized.includes('token is invalid') || normalized.includes('otp_expired') || normalized.includes('expired')) {
-    if (normalized.includes('expired')) return 'This OTP has expired. Request a new OTP.';
-    return 'Incorrect OTP. Please check the 6-digit code and try again.';
-  }
-  if (normalized.includes('invalid phone') || normalized.includes('phone number') || normalized.includes('invalid number') || normalized.includes('e.164')) {
-    return 'Enter a valid mobile number.';
-  }
-  if (normalized.includes('phone') && normalized.includes('disabled')) {
-    return 'Phone authentication is not enabled yet. Please try another login method.';
-  }
+  if (normalized.includes('invalid api key') || normalized.includes('api key is invalid') || normalized.includes('invalid_api_key')) return 'AgriMark authentication is temporarily unavailable. Please try again.';
+  if (normalized.includes('unsupported provider') || normalized.includes('provider is not enabled') || normalized.includes('google provider disabled')) return 'Google Sign-In is temporarily unavailable. Please try another login method.';
+  if (normalized.includes('redirect_uri_mismatch') || normalized.includes('redirect not allowed') || normalized.includes('invalid redirect')) return 'Google Sign-In configuration needs attention. Please try again later.';
+  if (normalized.includes('access_denied') || normalized.includes('cancelled') || normalized.includes('canceled') || normalized.includes('user_cancelled')) return 'Google Sign-In was cancelled.';
+  if (normalized.includes('code exchange') || normalized.includes('invalid_grant') || normalized.includes('pkce')) return "We couldn't complete Google Sign-In. Please try again.";
+  if (normalized.includes('rate limit') || normalized.includes('too many') || normalized.includes('over_email_send_rate_limit') || normalized.includes('over_sms_send_rate_limit')) return 'Too many OTP requests. Please wait before trying again.';
+  if (normalized.includes('unsupported phone provider') || normalized.includes('sms provider not configured') || normalized.includes('phone provider disabled')) return 'SMS login is temporarily unavailable. Please try again later or use Google / Email sign-in.';
+  if (normalized.includes('sms') || normalized.includes('unavailable') || normalized.includes('service_unavailable') || normalized.includes('sms_send_failed')) return "We couldn't send the OTP right now. Please try again shortly.";
+  if (normalized.includes('invalid otp') || normalized.includes('invalid token') || normalized.includes('token is invalid') || normalized.includes('otp_expired') || normalized.includes('expired')) return normalized.includes('expired') ? 'This OTP has expired. Request a new OTP.' : 'Incorrect OTP. Please check the 6-digit code and try again.';
+  if (normalized.includes('invalid phone') || normalized.includes('phone number') || normalized.includes('invalid number') || normalized.includes('e.164')) return 'Enter a valid mobile number.';
+  if (normalized.includes('phone') && normalized.includes('disabled')) return 'Phone authentication is not enabled yet. Please try another login method.';
   return message || 'Unable to authenticate. Please try again.';
 }
 
