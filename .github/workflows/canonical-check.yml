@@ -24,6 +24,7 @@ jobs:
           if [ -d ml ]; then python -m compileall ml; fi
       - name: Run backend tests when present
         env:
+          PYTHONPATH: "."
           SUPABASE_URL: "https://xrcqzpnstdbbtafhcwbb.supabase.co"
           DATABASE_URL: "sqlite:///:memory:"
           SECRET_KEY: "ci-secret-key-testing"
