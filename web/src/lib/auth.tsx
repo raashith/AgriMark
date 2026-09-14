@@ -33,6 +33,9 @@ const AuthContext = createContext<AuthContextType>({
   role: null,
 });
 
+const PRODUCTION_SITE_URL = 'https://agrimark-six.vercel.app';
+const PRODUCTION_AUTH_CALLBACK = `${PRODUCTION_SITE_URL}/auth/callback`;
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -201,22 +204,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithGoogle = async (): Promise<void> => {
-    let redirectUrl = 'https://agrimark-six.vercel.app/auth/callback';
+    let redirectUrl = PRODUCTION_AUTH_CALLBACK;
     if (typeof window !== 'undefined') {
       const origin = window.location.origin;
-      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1');
+      if (isLocal) {
         redirectUrl = `${origin}/auth/callback`;
+      } else if (origin === PRODUCTION_SITE_URL) {
+        redirectUrl = PRODUCTION_AUTH_CALLBACK;
       }
     }
-    const { error } = await supabase.auth.signInWithOAuth({
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'select_account',
+        },
       },
     });
+
     if (error) {
       logSupabaseDiagnostic('signInWithOAuth', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/authorize', 400, error.message);
       throw new Error(formatAuthError(error.message));
+    }
+
+    if (!data?.url) {
+      throw new Error('Google Sign-In could not start. Please try again.');
     }
   };
 
