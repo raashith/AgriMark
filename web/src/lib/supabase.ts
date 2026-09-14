@@ -9,7 +9,7 @@ function getValidSupabaseUrl(): string {
   if (!envUrl) return EXPECTED_SUPABASE_URL;
   try {
     const parsed = new URL(envUrl);
-    if (parsed.protocol !== 'https:' || parsed.hostname !== EXPECTED_SUPABASE_HOST) {
+    if (parsed.protocol !== 'https:' || !parsed.hostname.includes(EXPECTED_SUPABASE_REF)) {
       return EXPECTED_SUPABASE_URL;
     }
     return EXPECTED_SUPABASE_URL;
@@ -18,23 +18,31 @@ function getValidSupabaseUrl(): string {
   }
 }
 
+export function detectKeyType(key: string): string {
+  if (!key) return 'none';
+  if (key.startsWith('sb_publishable_')) return 'sb_publishable';
+  if (key.startsWith('eyJ')) return 'legacy_anon';
+  return 'unknown';
+}
+
 function getValidPublishableKey(): string {
-  const envKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
+  const envKey = (
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    ''
+  ).trim();
+
   if (!envKey) {
-    throw new Error(
-      'AgriMark Supabase configuration is missing. Set NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to an active publishable key from the canonical Supabase project.'
-    );
+    // Return empty string if key is unconfigured, allowing diagnostic route to report keyType: "none"
+    return '';
   }
 
-  // Supabase currently supports both modern publishable keys and the legacy anon JWT.
-  // Keeping legacy-key compatibility avoids breaking environments that have not yet
-  // migrated, while still preferring the modern sb_publishable_ format.
+  // Supabase supports modern publishable keys (sb_publishable_...) and legacy anon JWTs (eyJ...)
   const isPublishable = envKey.startsWith('sb_publishable_');
-  const isLegacyAnonJwt = envKey.split('.').length === 3 && envKey.length > 100;
+  const isLegacyAnonJwt = envKey.split('.').length === 3 && envKey.length > 50;
+
   if (!isPublishable && !isLegacyAnonJwt) {
-    throw new Error(
-      'AgriMark Supabase configuration is invalid. Use an active sb_publishable_ key (preferred) or the canonical legacy anon key from the same Supabase project.'
-    );
+    return envKey;
   }
 
   return envKey;
@@ -43,7 +51,7 @@ function getValidPublishableKey(): string {
 export const SUPABASE_URL = getValidSupabaseUrl();
 export const SUPABASE_PUBLISHABLE_KEY = getValidPublishableKey();
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY || 'unconfigured_key', {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
@@ -75,8 +83,30 @@ export function getSupabaseDiagnostic() {
   return {
     hasSupabaseUrl: Boolean(SUPABASE_URL),
     supabaseHost,
-    hasSupabasePublishableKey: Boolean(SUPABASE_PUBLISHABLE_KEY),
-    publishableKeyPrefix: SUPABASE_PUBLISHABLE_KEY.slice(0, 14),
+    keyType: detectKeyType(SUPABASE_PUBLISHABLE_KEY),
     apiBaseHost,
   };
+}
+
+export function logSupabaseDiagnostic(
+  action: string,
+  url: string,
+  status: number,
+  errorCode?: string
+) {
+  if (typeof window !== 'undefined') {
+    try {
+      const parsedUrl = new URL(url);
+      console.error(`[AgriMark Auth Diagnostic] ${action} failed`, {
+        endpointHost: parsedUrl.hostname,
+        endpointPath: parsedUrl.pathname,
+        status,
+        errorCode: errorCode || 'unknown',
+        keyType: detectKeyType(SUPABASE_PUBLISHABLE_KEY),
+        hasApiKey: Boolean(SUPABASE_PUBLISHABLE_KEY),
+        hasAuthorization: Boolean(localStorage.getItem('agrimark_token')),
+        authorizationType: localStorage.getItem('agrimark_token') ? 'Bearer' : 'none',
+      });
+    } catch {}
+  }
 }
