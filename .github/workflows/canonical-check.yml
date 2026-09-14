@@ -2,9 +2,13 @@ name: AgriMark canonical checks
 
 on:
   push:
-    branches: [main, integration/agri-canonical, 'web-production-*']
+    branches:
+      - main
+      - integration/agri-canonical
+      - 'web-production-*'
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   verify:
