@@ -201,15 +201,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithGoogle = async (): Promise<void> => {
-    const redirectUrl = `${window.location.origin}/auth/callback`;
+    let redirectUrl = 'https://agrimark-six.vercel.app/auth/callback';
+    if (typeof window !== 'undefined') {
+      const origin = window.location.origin;
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        redirectUrl = `${origin}/auth/callback`;
+      }
+    }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'select_account',
-        },
       },
     });
     if (error) {

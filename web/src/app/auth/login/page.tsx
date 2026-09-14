@@ -8,7 +8,7 @@ import Link from 'next/link';
 import { LogIn, AlertCircle, Smartphone, Lock, ShieldCheck } from 'lucide-react';
 
 export default function LoginPage() {
-  const { login, sendPhoneOtp, verifyPhoneOtp, loginWithGoogle } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, login, sendPhoneOtp, verifyPhoneOtp, loginWithGoogle } = useAuth();
   const { t } = useI18n();
   const router = useRouter();
 
@@ -32,6 +32,22 @@ export default function LoginPage() {
 
   // OTP Box refs for auto-focus & backspace navigation
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const urlError = searchParams.get('error') || searchParams.get('error_description');
+      if (urlError) {
+        setError(formatAuthError(urlError));
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading && user && isAuthenticated) {
+      goToRole(user);
+    }
+  }, [authLoading, user, isAuthenticated]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
