@@ -5,7 +5,6 @@ import { UserProfile, UserRole } from '@/types';
 import { api } from './api';
 import { supabase } from './supabase';
 
-
 interface AuthContextType {
   user: UserProfile | null;
   isLoading: boolean;
@@ -54,11 +53,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { data } = await supabase.auth.getSession();
         if (data?.session?.access_token) {
           await syncProfile(data.session.access_token);
-        } else {
-          const storedToken = localStorage.getItem('agrimark_token');
-          if (storedToken) {
-            await syncProfile(storedToken);
-          }
         }
       } catch {
         setUser(null);
@@ -69,10 +63,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     void initAuth();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.access_token) {
         await syncProfile(session.access_token);
-      } else if (event === 'SIGNED_OUT') {
+      } else if (_event === 'SIGNED_OUT') {
         setUser(null);
         if (typeof window !== 'undefined') {
           localStorage.removeItem('agrimark_token');
@@ -94,7 +88,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Please enter a valid email or phone number and password.');
       }
 
-      // 1. Try Supabase Auth JS SDK
       let sessionToken: string | null = null;
       if (emailOrPhone.includes('@')) {
         const { data: sbData, error: sbError } = await supabase.auth.signInWithPassword({
@@ -106,7 +99,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // 2. Fallback to API login if client auth did not return sessionToken
       if (!sessionToken) {
         const res = await api.login(credentials);
         if (!res?.access_token) {
@@ -145,46 +137,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Self-registration as admin is prohibited.');
       }
 
-      const email = data.email;
+      const email = data.email?.trim();
       const password = data.password;
+      if (!email || !password) {
+        throw new Error('Email and password are required to create an account.');
+      }
 
-      let clientSignupSucceeded = false;
-      if (email && password) {
-        const { data: sbData, error: sbError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: data.full_name,
-              phone: data.phone || data.phone_number,
-            },
+      const { data: sbData, error: sbError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: data.full_name,
+            phone: data.phone || data.phone_number,
+            location: data.location,
+            requested_role: data.role,
           },
-        });
-        if (sbError && !sbError.message.toLowerCase().includes('already registered')) {
-          throw new Error(sbError.message);
-        }
-        clientSignupSucceeded = !sbError;
-        if (sbData?.session?.access_token) {
-          const profile = await syncProfile(sbData.session.access_token);
-          if (profile) return profile;
-        }
-      }
-
-      if (!clientSignupSucceeded) {
-        await api.register(data);
-      }
-
-
-      const identifier = data.email || data.phone || data.phone_number;
-      if (!identifier) {
-        throw new Error('Registration submitted. Please log in with your account.');
-      }
-
-      return await login({
-        email: data.email,
-        phone_or_email: identifier,
-        password: data.password,
+        },
       });
+
+      if (sbError) {
+        const normalized = sbError.message.toLowerCase();
+        if (normalized.includes('already registered') || normalized.includes('user already registered')) {
+          throw new Error('An account with this email already exists. Please log in instead.');
+        }
+        throw new Error(sbError.message || 'Unable to create your account.');
+      }
+
+      if (sbData.session?.access_token) {
+        const profile = await syncProfile(sbData.session.access_token);
+        if (profile) return profile;
+        throw new Error('Your account was created, but profile setup is still completing. Please log in.');
+      }
+
+      // Email confirmation is enabled: signup succeeds without a session.
+      // Do not immediately call login, because the account cannot authenticate until confirmed.
+      throw new Error('Account created. Please check your email and confirm your address before logging in.');
     } finally {
       setIsLoading(false);
     }
@@ -221,4 +209,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 };
 
 export const useAuth = () => useContext(AuthContext);
-
