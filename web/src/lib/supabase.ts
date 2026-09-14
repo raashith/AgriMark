@@ -18,30 +18,43 @@ function getValidSupabaseUrl(): string {
   }
 }
 
-function getValidPublishableKey(): string {
-  const envKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
-  if (!envKey) {
+function getValidSupabaseKey(): string {
+  const preferred = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
+  const legacy = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+
+  // Prefer the modern browser-safe publishable key, but accept the legacy anon
+  // key during Supabase's migration period. Never fall back to a fabricated key.
+  const candidates = [preferred, legacy].filter(Boolean) as string[];
+  const valid = candidates.find((key) => {
+    const isPublishable = key.startsWith('sb_publishable_');
+    const isLegacyJwt = key.split('.').length === 3 && key.length > 100;
+    return isPublishable || isLegacyJwt;
+  });
+
+  if (!valid) {
     throw new Error(
-      'AgriMark Supabase configuration is missing. Set NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to an active publishable key from the canonical Supabase project.'
+      'AgriMark Supabase configuration is missing or invalid. Configure NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (preferred) or NEXT_PUBLIC_SUPABASE_ANON_KEY for the canonical project.'
     );
   }
 
-  // Supabase currently supports both modern publishable keys and the legacy anon JWT.
-  // Keeping legacy-key compatibility avoids breaking environments that have not yet
-  // migrated, while still preferring the modern sb_publishable_ format.
-  const isPublishable = envKey.startsWith('sb_publishable_');
-  const isLegacyAnonJwt = envKey.split('.').length === 3 && envKey.length > 100;
-  if (!isPublishable && !isLegacyAnonJwt) {
-    throw new Error(
-      'AgriMark Supabase configuration is invalid. Use an active sb_publishable_ key (preferred) or the canonical legacy anon key from the same Supabase project.'
-    );
+  if (valid.includes(EXPECTED_SUPABASE_REF)) return valid;
+  if (valid.startsWith('sb_publishable_')) return valid;
+
+  try {
+    const payload = JSON.parse(Buffer.from(valid.split('.')[1], 'base64url').toString('utf8')) as { ref?: string };
+    if (payload.ref && payload.ref !== EXPECTED_SUPABASE_REF) {
+      throw new Error('AgriMark Supabase API key belongs to a different project.');
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('different project')) throw error;
+    // A publishable key is intentionally not a JWT and cannot expose the ref.
   }
 
-  return envKey;
+  return valid;
 }
 
 export const SUPABASE_URL = getValidSupabaseUrl();
-export const SUPABASE_PUBLISHABLE_KEY = getValidPublishableKey();
+export const SUPABASE_PUBLISHABLE_KEY = getValidSupabaseKey();
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
@@ -76,7 +89,9 @@ export function getSupabaseDiagnostic() {
     hasSupabaseUrl: Boolean(SUPABASE_URL),
     supabaseHost,
     hasSupabasePublishableKey: Boolean(SUPABASE_PUBLISHABLE_KEY),
-    publishableKeyPrefix: SUPABASE_PUBLISHABLE_KEY.slice(0, 14),
+    publishableKeyPrefix: SUPABASE_PUBLISHABLE_KEY.startsWith('sb_publishable_')
+      ? 'sb_publishable_'
+      : 'legacy_anon_jwt',
     apiBaseHost,
   };
 }
