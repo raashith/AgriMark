@@ -19,9 +19,8 @@ class ApiEndpoints {
   static const String listings = '$baseUrl/core/listings';
 
   // Marketplace
-  static const String marketplaceSearch = '$baseUrl/marketplace/search';
-  static const String marketplaceListings = '$baseUrl/marketplace/listings';
   static const String marketplaceRfqs = '$baseUrl/marketplace/rfqs';
+  static const String marketplaceOffers = '$baseUrl/marketplace/offers';
   static const String marketplaceOrders = '$baseUrl/marketplace/orders';
 
   // AgriAI and intelligence
