@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
@@ -21,23 +21,23 @@ function SellForm() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    if (!user?.id) { setLoading(false); return; }
-    fetchLots();
-  }, [user?.id]);
-
-  const fetchLots = async () => {
+  const fetchLots = useCallback(async () => {
     try {
       const res = await api.getProduceLots();
-      const unlisted = res.filter((l) => !l.is_listed);
+      const unlisted = res.filter((l) => !l.is_listed && (l.status ?? 'available') === 'available');
       setLots(unlisted);
-      if (unlisted.length > 0 && !selectedLotId) setSelectedLotId(unlisted[0].id);
+      setSelectedLotId((current) => current || unlisted[0]?.id || '');
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) { setLoading(false); return; }
+    void fetchLots();
+  }, [user?.id, fetchLots]);
 
   const selectedLot = lots.find((l) => l.id === selectedLotId);
 
@@ -79,8 +79,8 @@ function SellForm() {
         <div className="p-6 bg-[#0a0f0d] border border-dashed border-[#1e2d26] rounded-xl text-center space-y-3 text-gray-400"><p>No available unlisted produce lots found.</p><p className="text-xs">Record a harvest first before creating a marketplace listing.</p><button onClick={() => router.push('/farmer/harvest')} className="px-4 py-2 bg-amber-600 text-white font-bold text-xs rounded-lg">+ Go Record Harvest</button></div>
       ) : (
         <form onSubmit={handleCreateListing} className="space-y-4">
-          <div><label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Select Available Produce Lot</label><select value={selectedLotId} onChange={(e) => setSelectedLotId(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white">{lots.map((lot) => <option key={lot.id} value={lot.id}>Lot {lot.id.slice(0, 8)} — {lot.quantity_kg} KG ({lot.quality_grade})</option>)}</select></div>
-          {selectedLot && <div className="p-3 bg-[#0a0f0d] border border-emerald-950 rounded-xl text-xs text-emerald-300 space-y-1 font-mono"><p><strong>Lot ID:</strong> {selectedLot.id}</p><p><strong>Quantity:</strong> {selectedLot.quantity_kg} KG</p><p><strong>Quality:</strong> {selectedLot.quality_grade}</p></div>}
+          <div><label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Select Available Produce Lot</label><select value={selectedLotId} onChange={(e) => setSelectedLotId(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white">{lots.map((lot) => <option key={lot.id} value={lot.id}>Lot {lot.id.slice(0, 8)} — {lot.quantity_kg ?? lot.quantity} KG ({lot.quality_grade})</option>)}</select></div>
+          {selectedLot && <div className="p-3 bg-[#0a0f0d] border border-emerald-950 rounded-xl text-xs text-emerald-300 space-y-1 font-mono"><p><strong>Lot ID:</strong> {selectedLot.id}</p><p><strong>Quantity:</strong> {selectedLot.quantity_kg ?? selectedLot.quantity} KG</p><p><strong>Quality:</strong> {selectedLot.quality_grade}</p></div>}
           <div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-semibold uppercase text-gray-400 mb-1">{t('askingPrice')} (₹ / KG)</label><input type="number" min="0" step="0.01" required value={askingPrice} onChange={(e) => setAskingPrice(e.target.value)} placeholder="26.50" className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white" /></div><div><label className="block text-xs font-semibold uppercase text-gray-400 mb-1">{t('minOrderQty')} (KG)</label><input type="number" min="0.01" step="0.01" required value={minOrderQty} onChange={(e) => setMinOrderQty(e.target.value)} placeholder="50" className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white" /></div></div>
           <button type="submit" disabled={submitting} className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-950 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2"><ShoppingCart className="w-5 h-5" /><span>{submitting ? t('loading') : t('sellProduce')}</span></button>
         </form>
