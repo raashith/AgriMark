@@ -12,6 +12,7 @@ function getSafeNext(value: string | null): string {
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
+  const flowId = requestUrl.searchParams.get('sb_flow_id');
   const error = requestUrl.searchParams.get('error');
   const errorDescription = requestUrl.searchParams.get('error_description');
   const rawNext = requestUrl.searchParams.get('next');
@@ -53,7 +54,11 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+  const exchangeResult = flowId
+    ? await supabase.auth.exchangeCodeForSession(code, { flowId })
+    : await supabase.auth.exchangeCodeForSession(code);
+
+  const { error: exchangeError } = exchangeResult;
   if (exchangeError) {
     const loginUrl = new URL('/auth/login', baseUrl);
     loginUrl.searchParams.set('error', exchangeError.message || 'oauth_code_exchange_failed');
