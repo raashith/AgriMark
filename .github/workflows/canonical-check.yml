@@ -24,7 +24,7 @@ jobs:
         shell: bash
         run: |
           if [ -d backend/tests ]; then
-            pytest -q backend/tests
+            PYTHONPATH="$GITHUB_WORKSPACE" pytest -q backend/tests
           else
             echo "No backend/tests directory; skipping pytest"
           fi
