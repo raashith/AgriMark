@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { UserRole } from '@/types';
 import Link from 'next/link';
-import { UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { UserPlus, AlertCircle, CheckCircle2, Mail, RefreshCw } from 'lucide-react';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -22,8 +22,11 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const isRateLimited = /rate limit|too many requests|email.*limit/i.test(error);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setError('');
 
     if (role === 'admin') {
@@ -51,11 +54,18 @@ export default function RegisterPage() {
         router.push('/');
       }
     } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.');
+      const raw = String(err?.message || 'Registration failed. Please try again.').trim();
+      if (/rate limit|too many requests|email.*limit/i.test(raw)) {
+        setError('Email signup is temporarily rate-limited by Supabase. Please wait before trying again, or continue with Google Sign-In from the login page.');
+      } else {
+        setError(raw);
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  const goToLogin = () => router.push('/auth/login');
 
   return (
     <div className="max-w-xl mx-auto my-8 p-6 bg-[#121a16] border border-[#1e2d26] rounded-2xl shadow-xl">
@@ -68,9 +78,31 @@ export default function RegisterPage() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-950/50 border border-red-800/50 rounded-xl text-red-300 text-sm flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 shrink-0" />
-          <span>{error}</span>
+        <div className="mb-4 p-4 bg-red-950/50 border border-red-800/50 rounded-xl text-red-300 text-sm space-y-3">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+          {isRateLimited && (
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={goToLogin}
+                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-semibold"
+              >
+                <Mail className="w-4 h-4" />
+                Continue to Login
+              </button>
+              <button
+                type="button"
+                onClick={() => setError('')}
+                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-[#2a3a31] text-gray-300 hover:bg-[#172019]"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Try Later
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -104,79 +136,38 @@ export default function RegisterPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">{t('fullName')}</label>
-            <input
-              type="text"
-              required
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none"
-              placeholder="Ramachandran"
-            />
+            <input type="text" required value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" placeholder="Ramachandran" />
           </div>
-
           <div>
             <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">{t('email')}</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none"
-              placeholder="farmer@agrimark.org"
-            />
+            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" placeholder="farmer@agrimark.org" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">{t('location')}</label>
-            <input
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none"
-              placeholder="Dindigul, Tamil Nadu"
-            />
+            <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" placeholder="Dindigul, Tamil Nadu" />
           </div>
-
           <div>
             <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">{t('phoneNumber')}</label>
-            <input
-              type="text"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none"
-              placeholder="+91 9876543210"
-            />
+            <input type="text" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" placeholder="+91 9876543210" />
           </div>
         </div>
 
         <div>
           <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">{t('password')}</label>
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none"
-            placeholder="••••••••"
-          />
+          <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" placeholder="••••••••" />
         </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2"
-        >
+        <button type="submit" disabled={loading} className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2">
           {loading ? t('loading') : t('register')}
         </button>
       </form>
 
       <div className="mt-6 text-center text-sm text-gray-400">
         <span>Already have an account? </span>
-        <Link href="/auth/login" className="text-emerald-400 hover:underline font-semibold">
-          {t('login')}
-        </Link>
+        <Link href="/auth/login" className="text-emerald-400 hover:underline font-semibold">{t('login')}</Link>
       </div>
     </div>
   );
