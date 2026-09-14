@@ -17,10 +17,13 @@ def test_core_crops_requires_database_credentials(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "")
     monkeypatch.setenv("SUPABASE_PUBLISHABLE_KEY", "")
-    with pytest.raises(RuntimeError, match="No Supabase server credential configured"):
-        client.get("/api/v1/core/crops")
-    get_settings.cache_clear()
-    get_supabase.cache_clear()
+    try:
+        with pytest.raises(RuntimeError, match="No Supabase server credential configured"):
+            client.get("/api/v1/core/crops")
+    finally:
+        get_settings.cache_clear()
+        get_supabase.cache_clear()
+
 
 
 
