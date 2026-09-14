@@ -13,33 +13,57 @@ export class ApiError extends Error {
   }
 }
 
+async function parseResponseBody(response: Response): Promise<any> {
+  const text = await response.text();
+  const contentType = response.headers.get('content-type') || '';
+
+  if (!text) return {};
+
+  if (contentType.includes('application/json')) {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { detail: 'The server returned invalid JSON.' };
+    }
+  }
+
+  const compact = text.replace(/\s+/g, ' ').trim();
+  return {
+    detail: compact.startsWith('<!DOCTYPE') || compact.startsWith('<html')
+      ? 'The API endpoint returned an HTML page instead of JSON. Check the API URL and backend deployment.'
+      : compact.slice(0, 500),
+  };
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('agrimark_token') : null;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     Accept: 'application/json',
+    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers as Record<string, string>),
   };
   if (token) headers.Authorization = `Bearer ${token}`;
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
-    const text = await response.text();
-    let data: any = {};
-    if (text) {
-      try { data = JSON.parse(text); } catch { data = { detail: text }; }
-    }
+    const data = await parseResponseBody(response);
+
     if (!response.ok) {
       if (response.status === 401 && typeof window !== 'undefined') {
         localStorage.removeItem('agrimark_token');
         localStorage.removeItem('agrimark_user');
       }
-      throw new ApiError(data.detail || `Request failed with status ${response.status}`, response.status, data.detail || '');
+      throw new ApiError(
+        data.detail || `Request failed with status ${response.status}`,
+        response.status,
+        data.detail || ''
+      );
     }
+
     return data as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    throw new ApiError('Network connection error. Please check your network.', 0, (error as Error).message);
+    throw new ApiError('Unable to reach AgriMark services. Please check your connection and try again.', 0, (error as Error).message);
   }
 }
 
