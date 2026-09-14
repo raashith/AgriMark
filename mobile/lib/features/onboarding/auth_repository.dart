@@ -46,6 +46,15 @@ class AuthRepository {
     return null;
   }
 
+  Future<Map<String, dynamic>> requireProfile() async {
+    final response = await _apiClient.get(ApiEndpoints.me);
+    if (response is Map<String, dynamic>) {
+      await _storage.saveUserJson(jsonEncode(response));
+      return response;
+    }
+    throw StateError('Invalid authenticated user response.');
+  }
+
   Future<void> logout() async {
     try {
       await _apiClient.post(ApiEndpoints.logout);
