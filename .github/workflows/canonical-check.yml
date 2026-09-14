@@ -2,7 +2,7 @@ name: AgriMark canonical checks
 
 on:
   push:
-    branches: [main, integration/agri-canonical]
+    branches: [main, integration/agri-canonical, web-production-*]
   pull_request:
     branches: [main]
 
@@ -17,12 +17,18 @@ jobs:
       - name: Install backend dependencies
         run: pip install -r backend/requirements.txt
       - name: Compile Python sources
-        run: python -m compileall backend agents ml
+        shell: bash
+        run: |
+          python -m compileall backend
+          if [ -d agents ]; then python -m compileall agents; fi
+          if [ -d ml ]; then python -m compileall ml; fi
       - name: Run backend tests when present
         shell: bash
         run: |
-          if [ -d backend/tests ]; then
+          if [ -d tests ]; then
+            pytest -q tests
+          elif [ -d backend/tests ]; then
             pytest -q backend/tests
           else
-            echo "No backend/tests directory; skipping pytest"
+            echo "No tests directory; skipping pytest"
           fi
