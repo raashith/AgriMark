@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgriMark - National Agri-AI Data Commons & Interoperability OS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0a0f1d;
+            --panel-bg: rgba(18, 26, 47, 0.85);
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border-glow: rgba(59, 130, 246, 0.3);
+        }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: var(--panel-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-glow);
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            background: linear-gradient(90deg, #3b82f6, #10b981);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .badge {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            border: 1px solid rgba(52, 211, 153, 0.4);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: var(--panel-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .card h3 {
+            margin-top: 0;
+            color: var(--accent-blue);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 10px;
+        }
+        .status-tag {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-simulated { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .status-connected { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            text-align: left;
+            padding: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.9rem;
+        }
+        th { color: var(--text-muted); }
+        .btn {
+            background: linear-gradient(90deg, #3b82f6, #2563eb);
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .btn:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>NATIONAL AGRI-AI DATA COMMONS</h1>
+            <div style="color: var(--text-muted); font-size: 0.9rem; margin-top: 4px;">Federated, Consent-Aware, Purpose-Limited Interoperability OS</div>
+        </div>
+        <div class="badge">Stage 23 Operational</div>
+    </div>
+
+    <div class="grid">
+        <!-- Card 1: Data Catalog & Search -->
+        <div class="card">
+            <h3>National Data Catalog</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Explore registered agricultural datasets and providers</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Dataset</th>
+                        <th>Domain</th>
+                        <th>Quality</th>
+                        <th>Access</th>
+                    </tr>
+                </thead>
+                <tbody id="catalog-table">
+                    <tr>
+                        <td>Tamil Nadu Crop Acreage</td>
+                        <td>CROP</td>
+                        <td>98.5%</td>
+                        <td><span class="status-tag status-connected">RESTRICTED</span></td>
+                    </tr>
+                    <tr>
+                        <td>ICAR Soil & Pest Database</td>
+                        <td>SOIL</td>
+                        <td>96.0%</td>
+                        <td><span class="status-tag status-connected">PUBLIC</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Card 2: Consent & Purpose Policy -->
+        <div class="card">
+            <h3>Consent & Purpose Policy Engine</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Strict purpose scoping and consent verification</p>
+            <div style="margin-bottom: 10px;">
+                <strong>Active Purposes:</strong> ADVISORY, CREDIT, INSURANCE, RESEARCH, MODEL_TRAINING
+            </div>
+            <div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; font-size: 0.85rem;">
+                <div><strong>Farmer Ref:</strong> farmer-001 (Murugan K.)</div>
+                <div><strong>Consumer:</strong> AgriMark Advisory Engine</div>
+                <div><strong>Scope:</strong> [CROP, WEATHER, SOIL]</div>
+                <div><strong>Status:</strong> <span class="status-tag status-connected">GRANTED</span></div>
+            </div>
+        </div>
+
+        <!-- Card 3: Data Lineage & Provenance -->
+        <div class="card">
+            <h3>Data Lineage Graph</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Forward and reverse traceability from source to recommendation</p>
+            <div style="font-family: monospace; font-size: 0.85rem; background: rgba(0,0,0,0.4); padding: 10px; border-radius: 6px;">
+                Weather Observation (IMD)<br>
+                ↳ Normalized Weather Payload<br>
+                ↳ Crop Stress Feature Model<br>
+                ↳ Yield Model (v2.1)<br>
+                ↳ Irrigation Advisory → Executed Drip Action
+            </div>
+        </div>
+
+        <!-- Card 4: External Interoperability Connectors -->
+        <div class="card">
+            <h3>Interoperability Connectors</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Federated connector state tracking (No unauthorized claims)</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>System</th>
+                        <th>Connector Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>AgriStack DPI</td><td><span class="status-tag status-simulated">SIMULATED</span></td></tr>
+                    <tr><td>ADeX Data Exchange</td><td><span class="status-tag status-simulated">SIMULATED</span></td></tr>
+                    <tr><td>Bharat-VISTAAR</td><td><span class="status-tag status-simulated">SIMULATED</span></td></tr>
+                    <tr><td>e-NAM Markets</td><td><span class="status-tag status-simulated">SIMULATED</span></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="js/commons_app.js"></script>
+</body>
+</html>

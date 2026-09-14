@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgriMark - Farmer Outcome Economics & AI Impact Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0a0f1d;
+            --panel-bg: rgba(18, 26, 47, 0.85);
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --accent-gold: #f59e0b;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border-glow: rgba(16, 185, 129, 0.3);
+        }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: var(--panel-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-glow);
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            background: linear-gradient(90deg, #10b981, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .badge {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            border: 1px solid rgba(52, 211, 153, 0.4);
+        }
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .kpi-card {
+            background: var(--panel-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
+        .kpi-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent-green);
+            margin: 5px 0;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: var(--panel-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .card h3 {
+            margin-top: 0;
+            color: var(--accent-green);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 10px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-verified { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .badge-estimated { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .badge-simulated { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            text-align: left;
+            padding: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.9rem;
+        }
+        th { color: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>FARMER OUTCOME ECONOMICS & AI IMPACT OS</h1>
+            <div style="color: var(--text-muted); font-size: 0.9rem; margin-top: 4px;">Verified Economic Benefits, Resource Efficiency & Causal Attribution</div>
+        </div>
+        <div class="badge">Stage 25 Operational</div>
+    </div>
+
+    <!-- National KPI Overview -->
+    <div class="kpi-row">
+        <div class="kpi-card">
+            <div style="color: var(--text-muted); font-size: 0.85rem;">Farmers Impacted</div>
+            <div class="kpi-value">12,500</div>
+            <div style="font-size: 0.75rem; color: #34d399;"><span class="status-badge badge-verified">VERIFIED_OBSERVED</span></div>
+        </div>
+        <div class="kpi-card">
+            <div style="color: var(--text-muted); font-size: 0.85rem;">Net Income Gain</div>
+            <div class="kpi-value">₹18.75 Cr</div>
+            <div style="font-size: 0.75rem; color: #34d399;"><span class="status-badge badge-verified">OBSERVED</span></div>
+        </div>
+        <div class="kpi-card">
+            <div style="color: var(--text-muted); font-size: 0.85rem;">Water Saved</div>
+            <div class="kpi-value">4.5 Cr L</div>
+            <div style="font-size: 0.75rem; color: #60a5fa;"><span class="status-badge badge-estimated">ESTIMATED</span></div>
+        </div>
+        <div class="kpi-card">
+            <div style="color: var(--text-muted); font-size: 0.85rem;">Platform ROI</div>
+            <div class="kpi-value">24.5:1</div>
+            <div style="font-size: 0.75rem; color: #34d399;"><span class="status-badge badge-verified">NET_BENEFIT</span></div>
+        </div>
+    </div>
+
+    <div class="grid">
+        <!-- Card 1: Causal Counterfactual Evaluation -->
+        <div class="card">
+            <h3>Counterfactual Causal Evaluation</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Difference-in-Differences & Matched Control Cohort Analysis</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Cohort</th>
+                        <th>Before Net</th>
+                        <th>After Net</th>
+                        <th>Difference</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Treatment (Advisory)</td>
+                        <td>₹45,000</td>
+                        <td>₹62,500</td>
+                        <td>+₹17,500</td>
+                    </tr>
+                    <tr>
+                        <td>Control (No Advisory)</td>
+                        <td>₹44,000</td>
+                        <td>₹45,000</td>
+                        <td>+₹1,000</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div style="margin-top: 10px; font-weight: 600; color: #34d399;">
+                ★ Valid Causal Effect: +₹16,500 net gain per farmer
+            </div>
+        </div>
+
+        <!-- Card 2: AI Model Economic Link & Champion Selection -->
+        <div class="card">
+            <h3>AI Model Economic Champions</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Connecting Stage 22 AI models to observed income impact</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Accuracy</th>
+                        <th>Observed Income Impact</th>
+                        <th>Champion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>MOD_CROP_YIELD_TN</td>
+                        <td>96.5%</td>
+                        <td>₹14,500 / farmer</td>
+                        <td><span class="status-badge badge-verified">CHAMPION</span></td>
+                    </tr>
+                    <tr>
+                        <td>MOD_PEST_VISION_V2</td>
+                        <td>98.0%</td>
+                        <td>₹11,200 / farmer</td>
+                        <td><span class="status-badge badge-estimated">CHALLENGER</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Card 3: Smallholder Disparity & Anomaly Audit -->
+        <div class="card">
+            <h3>Fairness Disparity & Fraud Control</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Monitoring smallholder outcome gaps & flagging suspicious claims</p>
+            <div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; font-size: 0.85rem;">
+                <div><strong>Smallholder Equity Ratio:</strong> 0.82 (Passes >= 0.75 threshold)</div>
+                <div><strong>Anomalies Flagged:</strong> 0 Fraudulent Claims</div>
+                <div><strong>Evidence Rule:</strong> SIMULATED values isolated from reality</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/outcomes_dashboard_app.js"></script>
+</body>
+</html>
