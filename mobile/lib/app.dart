@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'core/auth/secure_storage.dart';
 import 'core/localization/app_localizations.dart';
 import 'core/routing/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -25,23 +24,30 @@ class _AgriMarkAppState extends State<AgriMarkApp> {
   }
 
   Future<void> _checkAuthSession() async {
-    final user = await _authRepo.fetchMe();
-    setState(() {
-      _isAuthenticated = user != null;
-      _isLoading = false;
-    });
+    try {
+      final user = await _authRepo.fetchMe();
+      if (!mounted) return;
+      setState(() {
+        _isAuthenticated = user != null;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isAuthenticated = false;
+        _isLoading = false;
+      });
+    }
   }
 
   void _onLoginSuccess() {
-    setState(() {
-      _isAuthenticated = true;
-    });
+    if (!mounted) return;
+    setState(() => _isAuthenticated = true);
   }
 
   void _onLogout() {
-    setState(() {
-      _isAuthenticated = false;
-    });
+    if (!mounted) return;
+    setState(() => _isAuthenticated = false);
   }
 
   @override
