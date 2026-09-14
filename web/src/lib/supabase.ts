@@ -3,40 +3,27 @@ import { createClient } from '@supabase/supabase-js';
 const EXPECTED_SUPABASE_REF = 'xrcqzpnstdbbtafhcwbb';
 const EXPECTED_SUPABASE_HOST = 'xrcqzpnstdbbtafhcwbb.supabase.co';
 const EXPECTED_SUPABASE_URL = `https://${EXPECTED_SUPABASE_HOST}`;
-const FALLBACK_PUBLISHABLE_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhyY3F6cG5zdGRiYnRhZmhjd2JiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEzMTIwMDAsImV4cCI6MjA1Njg4ODAwMH0.dummy_publishable_key';
 
 function getValidSupabaseUrl(): string {
-  const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   if (!envUrl) return EXPECTED_SUPABASE_URL;
   try {
     const parsed = new URL(envUrl);
-    if (parsed.hostname.includes('tsd') || !parsed.hostname.includes(EXPECTED_SUPABASE_REF)) {
+    if (parsed.protocol !== 'https:' || parsed.hostname !== EXPECTED_SUPABASE_HOST) {
       return EXPECTED_SUPABASE_URL;
     }
-    return envUrl;
+    return EXPECTED_SUPABASE_URL;
   } catch {
     return EXPECTED_SUPABASE_URL;
   }
 }
 
 function getValidPublishableKey(): string {
-  const envKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!envKey) return FALLBACK_PUBLISHABLE_KEY;
-
-  try {
-    const parts = envKey.split('.');
-    if (parts.length === 3) {
-      const payloadStr = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
-      const payload = JSON.parse(payloadStr);
-      if (payload.ref && payload.ref !== EXPECTED_SUPABASE_REF) {
-        return FALLBACK_PUBLISHABLE_KEY;
-      }
-    }
-  } catch {
-    return FALLBACK_PUBLISHABLE_KEY;
+  const envKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
+  if (!envKey || !envKey.startsWith('sb_publishable_')) {
+    throw new Error(
+      'AgriMark Supabase configuration is invalid. Set NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to the publishable key from the canonical Supabase project.'
+    );
   }
   return envKey;
 }
@@ -77,7 +64,7 @@ export function getSupabaseDiagnostic() {
     hasSupabaseUrl: Boolean(SUPABASE_URL),
     supabaseHost,
     hasSupabasePublishableKey: Boolean(SUPABASE_PUBLISHABLE_KEY),
+    publishableKeyPrefix: SUPABASE_PUBLISHABLE_KEY.slice(0, 14),
     apiBaseHost,
   };
 }
-
