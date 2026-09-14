@@ -14,20 +14,20 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _phoneController = TextEditingController();
+  final _identityController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authRepo = AuthRepository();
 
   bool _isLoading = false;
-  String? _errorMessage;
   bool _obscurePassword = true;
+  String? _errorMessage;
 
   Future<void> _handleLogin() async {
-    final phoneOrEmail = _phoneController.text.trim();
+    final identity = _identityController.text.trim();
     final password = _passwordController.text;
 
-    if (phoneOrEmail.isEmpty || password.isEmpty) {
-      setState(() => _errorMessage = 'Please enter phone/email and password.');
+    if (identity.isEmpty || password.isEmpty) {
+      setState(() => _errorMessage = 'Enter your phone number or email and password.');
       return;
     }
 
@@ -37,9 +37,11 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await _authRepo.login(phoneOrEmail, password);
+      await _authRepo.login(identity, password);
+      if (!mounted) return;
       widget.onLoginSuccess();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = e.toString();
         _isLoading = false;
@@ -48,135 +50,179 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
+  void dispose() {
+    _identityController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.fromLTRB(24, 36, 24, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 40),
               Center(
                 child: Column(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      width: 76,
+                      height: 76,
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.15),
-                        shape: BoxShape.circle,
+                        color: AppColors.primary.withOpacity(0.14),
+                        borderRadius: BorderRadius.circular(24),
                       ),
-                      child: const Icon(Icons.agriculture, size: 48, color: AppColors.primary),
+                      child: const Icon(Icons.agriculture_rounded, size: 42, color: AppColors.primary),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     const Text(
                       'AgriMark',
                       style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
                         color: AppColors.accent,
-                        letterSpacing: -0.5,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     const Text(
-                      'Production Agricultural OS',
-                      style: TextStyle(fontSize: 14, color: AppColors.textMuted),
+                      'Sell directly. See the market. Keep more value.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, color: AppColors.textMuted, height: 1.35),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 34),
+
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBackground,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.storefront_outlined, color: AppColors.primary),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'AgriMark connects farmers with buyers while showing market prices and useful selling guidance in one place.',
+                        style: TextStyle(fontSize: 13, color: AppColors.textMain, height: 1.35),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
 
               if (_errorMessage != null) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.statusError.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.statusError.withOpacity(0.4)),
+                    color: AppColors.statusError.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.statusError.withOpacity(0.35)),
                   ),
                   child: Row(
                     children: [
                       const Icon(Icons.error_outline, color: AppColors.statusError, size: 20),
                       const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: AppColors.statusError, fontSize: 13),
-                        ),
-                      ),
+                      Expanded(child: Text(_errorMessage!, style: const TextStyle(color: AppColors.statusError, fontSize: 13))),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
               ],
 
-              const Text('Phone Number or Email', style: TextStyle(fontWeight: FontWeight.w600)),
+              const Text('Phone number or email', style: TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               TextField(
-                controller: _phoneController,
+                controller: _identityController,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
                 style: const TextStyle(color: AppColors.textMain),
                 decoration: InputDecoration(
-                  hintText: '+919876543210 or farmer@agrimark.org',
+                  hintText: '+91 98765 43210 or farmer@example.com',
                   hintStyle: const TextStyle(color: AppColors.textSubtle),
                   filled: true,
                   fillColor: AppColors.cardBackground,
+                  prefixIcon: const Icon(Icons.person_outline, color: AppColors.textMuted),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: AppColors.cardBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
                     borderSide: const BorderSide(color: AppColors.cardBorder),
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
-              const Text('Password', style: TextStyle(fontWeight: FontWeight.w600)),
+
+              const Text('Password', style: TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               TextField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
+                onSubmitted: (_) => _isLoading ? null : _handleLogin(),
                 style: const TextStyle(color: AppColors.textMain),
                 decoration: InputDecoration(
-                  hintText: '••••••••',
+                  hintText: 'Enter your password',
                   hintStyle: const TextStyle(color: AppColors.textSubtle),
                   filled: true,
                   fillColor: AppColors.cardBackground,
+                  prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textMuted),
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, color: AppColors.textMuted),
+                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     borderSide: const BorderSide(color: AppColors.cardBorder),
                   ),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                      color: AppColors.textSubtle,
-                    ),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: AppColors.cardBorder),
                   ),
                 ),
               ),
+              const SizedBox(height: 22),
 
-              const SizedBox(height: 24),
               CustomButton(
-                text: 'Sign In to Dashboard',
+                text: 'Continue to AgriMark',
                 isLoading: _isLoading,
                 onPressed: _handleLogin,
               ),
+              const SizedBox(height: 14),
 
-              const SizedBox(height: 16),
               Center(
                 child: TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => RegisterScreen(onRegisterSuccess: widget.onLoginSuccess),
-                      ),
-                    );
-                  },
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => RegisterScreen(onRegisterSuccess: widget.onLoginSuccess),
+                            ),
+                          );
+                        },
                   child: const Text(
-                    "Don't have an account? Register",
-                    style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w600),
+                    'New to AgriMark? Create your account',
+                    style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700),
                   ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Center(
+                child: Text(
+                  'Tamil + English • Farmer-first • Mobile-friendly',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: AppColors.textSubtle),
                 ),
               ),
             ],
