@@ -7,6 +7,12 @@ class FarmRepository {
 
   FarmRepository({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
 
+  Future<Map<String, dynamic>> fetchProfile() async {
+    final response = await _apiClient.get(ApiEndpoints.me);
+    if (response is Map<String, dynamic>) return response;
+    throw const ServerFailure('Invalid profile response format.');
+  }
+
   Future<List<dynamic>> fetchCrops({String? search}) async {
     final path = search == null || search.trim().isEmpty
         ? ApiEndpoints.crops
