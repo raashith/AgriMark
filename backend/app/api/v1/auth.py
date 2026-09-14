@@ -35,7 +35,9 @@ def me(user: AuthenticatedUser = Depends(get_current_user)) -> ProfileResponse:
         .execute()
     )
     if result.data:
-        return ProfileResponse(**result.data[0])
+        prof = result.data[0]
+        has_name = bool(prof.get("full_name") and str(prof.get("full_name")).strip())
+        return ProfileResponse(**prof, needs_onboarding=not has_name)
 
     default_profile = {
         "id": str(user.id),
@@ -47,7 +49,7 @@ def me(user: AuthenticatedUser = Depends(get_current_user)) -> ProfileResponse:
         get_supabase().table("profiles").upsert(default_profile).execute()
     except Exception:
         pass
-    return ProfileResponse(**default_profile)
+    return ProfileResponse(**default_profile, needs_onboarding=True)
 
 
 @router.post("/login")

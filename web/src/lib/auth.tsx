@@ -330,6 +330,35 @@ export function formatAuthError(message: string): string {
     return 'AgriMark authentication is temporarily unavailable. Please try again.';
   }
   if (
+    normalized.includes('unsupported provider') ||
+    normalized.includes('provider is not enabled') ||
+    normalized.includes('google provider disabled')
+  ) {
+    return 'Google Sign-In is temporarily unavailable. Please try another login method.';
+  }
+  if (
+    normalized.includes('redirect_uri_mismatch') ||
+    normalized.includes('redirect not allowed') ||
+    normalized.includes('invalid redirect')
+  ) {
+    return 'Google Sign-In configuration needs attention. Please try again later.';
+  }
+  if (
+    normalized.includes('access_denied') ||
+    normalized.includes('cancelled') ||
+    normalized.includes('canceled') ||
+    normalized.includes('user_cancelled')
+  ) {
+    return 'Google Sign-In was cancelled.';
+  }
+  if (
+    normalized.includes('code exchange') ||
+    normalized.includes('invalid_grant') ||
+    normalized.includes('pkce')
+  ) {
+    return "We couldn't complete Google Sign-In. Please try again.";
+  }
+  if (
     normalized.includes('rate limit') ||
     normalized.includes('too many') ||
     normalized.includes('over_email_send_rate_limit') ||
@@ -340,13 +369,11 @@ export function formatAuthError(message: string): string {
   if (
     normalized.includes('unsupported phone provider') ||
     normalized.includes('sms provider not configured') ||
-    normalized.includes('phone provider disabled') ||
-    normalized.includes('provider is not enabled')
+    normalized.includes('phone provider disabled')
   ) {
     return 'SMS login is temporarily unavailable. Please try again later or use Google / Email sign-in.';
   }
   if (
-    normalized.includes('provider') ||
     normalized.includes('sms') ||
     normalized.includes('unavailable') ||
     normalized.includes('service_unavailable') ||
@@ -377,7 +404,7 @@ export function formatAuthError(message: string): string {
   if (normalized.includes('phone') && normalized.includes('disabled')) {
     return 'Phone authentication is not enabled yet. Please try another login method.';
   }
-  return message || 'Unable to send or verify the OTP. Please try again.';
+  return message || 'Unable to authenticate. Please try again.';
 }
 
 export const useAuth = () => useContext(AuthContext);

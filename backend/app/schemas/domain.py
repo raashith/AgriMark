@@ -13,6 +13,7 @@ class ProfileCreate(BaseModel):
 
 class ProfileResponse(ProfileCreate):
     id: UUID
+    needs_onboarding: bool = False
 
 
 class FarmCreate(BaseModel):

@@ -57,6 +57,7 @@ export default function OnboardingPage() {
           role,
           location: location.trim(),
           email: email.trim() || user?.email,
+          needs_onboarding: false,
         };
         localStorage.setItem('agrimark_user', JSON.stringify(updatedUser));
       }

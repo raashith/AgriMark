@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { supabase, logSupabaseDiagnostic } from '@/lib/supabase';
+import { formatAuthError } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { UserRole } from '@/types';
 
@@ -13,9 +14,29 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const handleCallback = async () => {
       try {
+        const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+        const errorParam = searchParams.get('error') || searchParams.get('error_code');
+        const errorDescParam = searchParams.get('error_description') || searchParams.get('error_message');
+
+        if (errorParam || errorDescParam) {
+          const rawErr = errorDescParam || errorParam || 'Authentication failed.';
+          logSupabaseDiagnostic('OAuth Callback', window.location.href, 400, rawErr);
+          throw new Error(formatAuthError(rawErr));
+        }
+
+        const code = searchParams.get('code');
+        if (code) {
+          const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeErr) {
+            logSupabaseDiagnostic('exchangeCodeForSession', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/token', 400, exchangeErr.message);
+            throw new Error(formatAuthError(exchangeErr.message));
+          }
+        }
+
         const { data, error: sessionError } = await supabase.auth.getSession();
         if (sessionError || !data.session) {
-          throw new Error(sessionError?.message || 'Authentication session could not be established.');
+          logSupabaseDiagnostic('getSession', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/session', 401, sessionError?.message);
+          throw new Error(formatAuthError(sessionError?.message || 'Authentication session could not be established.'));
         }
 
         const accessToken = data.session.access_token;
@@ -23,11 +44,10 @@ export default function AuthCallbackPage() {
           localStorage.setItem('agrimark_token', accessToken);
         }
 
-        let profile;
+        let profile: any = null;
         try {
           profile = await api.getMe();
         } catch {
-          // Fallback if profile endpoint requires retry or auto-creation
           const user = data.session.user;
           profile = {
             id: user.id,
@@ -35,12 +55,21 @@ export default function AuthCallbackPage() {
             full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'AgriMark User',
             phone: user.phone || null,
             role: 'farmer' as UserRole,
+            needs_onboarding: true,
           };
         }
 
         if (typeof window !== 'undefined') {
           localStorage.setItem('agrimark_user', JSON.stringify(profile));
         }
+
+        if (profile?.needs_onboarding) {
+          router.replace('/auth/onboarding');
+          return;
+        }
+
+        const next = searchParams.get('next');
+        const safeNext = (next && next.startsWith('/') && !next.startsWith('//')) ? next : null;
 
         const role = profile.role || 'farmer';
         const redirectMap: Record<string, string> = {
@@ -51,7 +80,7 @@ export default function AuthCallbackPage() {
           admin: '/admin/dashboard',
         };
 
-        const targetRoute = redirectMap[role] || '/farmer/dashboard';
+        const targetRoute = safeNext || redirectMap[role] || '/farmer/dashboard';
         router.replace(targetRoute);
       } catch (err: any) {
         console.error('Auth callback error:', err);
