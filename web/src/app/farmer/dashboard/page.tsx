@@ -26,10 +26,11 @@ export default function FarmerDashboard() {
       setLoading(false);
       return;
     }
+    const id = profileId;
     async function loadDashboardData() {
       try {
         const [farmList, lotList, priceList] = await Promise.allSettled([
-          api.getFarms(profileId),
+          api.getFarms(id),
           api.getProduceLots(),
           api.getMarketPrices(),
         ]);
@@ -85,7 +86,7 @@ export default function FarmerDashboard() {
           </div>
           <div className="bg-[#121a16] border border-[#1e2d26] p-5 rounded-2xl shadow-md">
             <div className="flex justify-between items-center mb-4"><h2 className="text-lg font-bold text-gray-100 flex items-center gap-2"><PackageCheck className="w-5 h-5 text-amber-400" /> {t('harvest')} & Produce Lots</h2><Link href="/farmer/harvest" className="text-xs font-semibold text-amber-400 hover:underline">+ {t('recordHarvest')}</Link></div>
-            {loading ? <p className="text-sm text-gray-400">{t('loading')}</p> : lots.length === 0 ? <div className="p-4 bg-[#0a0f0d] border border-dashed border-[#1e2d26] rounded-xl text-center text-sm text-gray-400">Record your first harvest to start selling produce lots.</div> : <div className="space-y-3">{lots.map((lot) => <div key={lot.id} className="p-4 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl flex items-center justify-between"><div><h4 className="font-bold text-gray-200">Lot {lot.id.slice(0, 8)}</h4><p className="text-xs text-gray-400">Qty: {lot.quantity_kg} kg • Grade: {lot.quality_grade}</p><span className="text-[10px] text-gray-500 font-mono">Harvest Date: {lot.harvest_date}</span></div>{lot.is_listed ? <span className="text-xs px-2.5 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded-full font-semibold">Listed</span> : <Link href={`/farmer/sell?lot_id=${lot.id}`} className="text-xs px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg transition">{t('sellProduce')}</Link>}</div>)}</div>}
+            {loading ? <p className="text-sm text-gray-400">{t('loading')}</p> : lots.length === 0 ? <div className="p-4 bg-[#0a0f0d] border border-dashed border-[#1e2d26] rounded-xl text-center text-sm text-gray-400">Record your first harvest to start selling produce lots.</div> : <div className="space-y-3">{lots.map((lot) => <div key={lot.id} className="p-4 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl flex items-center justify-between"><div><h4 className="font-bold text-gray-200">Lot {lot.id.slice(0, 8)}</h4><p className="text-xs text-gray-400">Qty: {lot.quantity} {lot.unit}</p><span className="text-[10px] text-gray-500 font-mono">Harvest Date: {lot.harvested_at || 'Not set'}</span></div>{lot.status === 'available' ? <Link href={`/farmer/sell?lot_id=${lot.id}`} className="text-xs px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg transition">{t('sellProduce')}</Link> : <span className="text-xs px-2.5 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded-full font-semibold">{lot.status}</span>}</div>)}</div>}
           </div>
         </div>
         <div className="space-y-6">
