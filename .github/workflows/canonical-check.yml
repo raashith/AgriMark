@@ -23,6 +23,10 @@ jobs:
           if [ -d agents ]; then python -m compileall agents; fi
           if [ -d ml ]; then python -m compileall ml; fi
       - name: Run backend tests when present
+        env:
+          SUPABASE_URL: "https://xrcqzpnstdbbtafhcwbb.supabase.co"
+          DATABASE_URL: "sqlite:///:memory:"
+          SECRET_KEY: "ci-secret-key-testing"
         shell: bash
         run: |
           if [ -d tests ]; then
