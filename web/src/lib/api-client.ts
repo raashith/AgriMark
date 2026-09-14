@@ -3,9 +3,12 @@ export type ApiErrorShape = {
   detail: string;
 };
 
-const API_BASE_URL =
+const rawApiUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   'https://agrimark-api.onrender.com/api/v1';
+const API_BASE_URL = rawApiUrl.includes('supabase.co')
+  ? 'https://agrimark-api.onrender.com/api/v1'
+  : rawApiUrl;
 
 async function parseResponse(response: Response) {
   const text = await response.text();

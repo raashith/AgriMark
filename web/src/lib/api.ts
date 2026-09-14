@@ -1,6 +1,7 @@
 import { UserProfile, Farm, Cultivation, ProduceLot, Listing, MarketplaceOrder, MarketPriceObservation } from '@/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://agrimark-api.onrender.com/api/v1';
+const rawApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://agrimark-api.onrender.com/api/v1';
+const API_BASE_URL = rawApiUrl.includes('supabase.co') ? 'https://agrimark-api.onrender.com/api/v1' : rawApiUrl;
 
 export class ApiError extends Error {
   statusCode: number;
