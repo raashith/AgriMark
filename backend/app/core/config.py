@@ -6,7 +6,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "AgriMark API"
     environment: str = "production"
-    supabase_url: str
+    supabase_url: str = "https://xrcqzpnstdbbtafhcwbb.supabase.co"
+
     supabase_service_role_key: str | None = None
     supabase_publishable_key: str | None = None
     openai_api_key: str | None = None
