@@ -1,0 +1,37 @@
+name: Web Checks
+
+on:
+  pull_request:
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-checks.yml'
+  push:
+    branches:
+      - main
+      - 'feat/**'
+      - 'web-production-*'
+    paths:
+      - 'web/**'
+      - '.github/workflows/web-checks.yml'
+
+jobs:
+  web-checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npx eslint .
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Build
+        run: npm run build

@@ -6,11 +6,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "AgriMark API"
     environment: str = "production"
-    supabase_url: str
+    supabase_url: str = "https://xrcqzpnstdbbtafhcwbb.supabase.co"
     supabase_service_role_key: str | None = None
     supabase_publishable_key: str | None = None
     openai_api_key: str | None = None
-    cors_origins: str = "https://agrimark.onrender.com,http://localhost:5173,http://localhost:3000"
+    cors_origins: str = "https://agrimark.onrender.com,http://localhost:5173,http://localhost:3000,https://agrimark.vercel.app"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

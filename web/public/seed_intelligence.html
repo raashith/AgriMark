@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgriMark - Seed Intelligence & Research Portal</title>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-bg: #1e293b;
+      --accent-green: #10b981;
+      --accent-blue: #3b82f6;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      margin: 0;
+      padding: 20px;
+    }
+    .header {
+      border-bottom: 1px solid #334155;
+      padding-bottom: 15px;
+      margin-bottom: 20px;
+    }
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--card-bg);
+      border-radius: 8px;
+      padding: 20px;
+      border: 1px solid #334155;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      background: var(--accent-green);
+      color: #000;
+    }
+    .badge-sim {
+      background: #f59e0b;
+      color: #000;
+    }
+    button {
+      background: var(--accent-blue);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>AgriMark Bio-Agriculture & Seed Intelligence OS</h1>
+    <p>Governed Decision Support for Seeds, Varieties, Germplasm, GxE Analysis, Bio-Inputs, and Scientific Evidence</p>
+  </div>
+
+  <div class="grid-container">
+    <div class="card">
+      <h3>Variety Explorer & Recommendations</h3>
+      <p>Search suitable varieties tailored for regional soil, climate forecasts, and water availability.</p>
+      <button onclick="fetchVarieties()">Load Varieties</button>
+      <div id="variety-output" style="margin-top: 15px;"></div>
+    </div>
+
+    <div class="card">
+      <h3>Seed Authenticity & QR Scanner</h3>
+      <p>Scan seed batch QR hash to verify producer credentials, quality testing certificates, and detect counterfeit risk flags.</p>
+      <input type="text" id="batch-input" placeholder="e.g. BATCH-PADDY-001" style="padding: 8px; width: 80%; margin-bottom: 10px;">
+      <br>
+      <button onclick="verifyBatch()">Verify Seed Batch</button>
+      <div id="auth-output" style="margin-top: 15px;"></div>
+    </div>
+
+    <div class="card">
+      <h3>Bio-Input Efficacy & Soil Biology</h3>
+      <p>Compare baseline vs treatment yield delta, disease reduction, and soil biological activity scores.</p>
+      <button onclick="loadBioInputs()">Load Bio-Products</button>
+      <div id="bio-output" style="margin-top: 15px;"></div>
+    </div>
+  </div>
+
+  <script src="js/seed_app.js"></script>
+</body>
+</html>

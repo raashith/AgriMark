@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgriMark - National Agricultural Control Tower</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --panel: #131c2e;
+      --accent: #10b981;
+      --accent-blue: #3b82f6;
+      --accent-amber: #f59e0b;
+      --text: #f1f5f9;
+      --muted: #64748b;
+    }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 20px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 15px;
+      margin-bottom: 20px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .stat-number {
+      font-size: 2rem;
+      font-weight: bold;
+      color: var(--accent);
+    }
+    .badge {
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      background: var(--accent-blue);
+      color: white;
+    }
+    .badge-alert {
+      background: #ef4444;
+      color: white;
+    }
+    button {
+      background: var(--accent-blue);
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1 style="margin:0;">AGRIMARK NATIONAL CONTROL TOWER</h1>
+      <p style="margin:5px 0 0 0; color:var(--muted);">National Agricultural OS — Stages 1–30 Convergence Platform</p>
+    </div>
+    <div>
+      <span class="badge">SYSTEM STATUS: ALL OPERATIONAL</span>
+      <span class="badge" style="background:var(--accent);">EVIDENCE TIER: OBSERVED</span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Unified Decision Engine</h3>
+      <p>Multi-dimensional synthesis across market, climate, soil, biology, logistics, and finance.</p>
+      <button onclick="runDecisionEngine()">Synthesize Decision Card</button>
+      <div id="decision-output" style="margin-top:15px;"></div>
+    </div>
+
+    <div class="card">
+      <h3>External Provider Health</h3>
+      <p>Real-time status monitoring for IMD Weather, e-NAM Market, Maps, ISRO Satellite, and LLM Engines.</p>
+      <button onclick="checkProviders()">Check Provider Health</button>
+      <div id="provider-output" style="margin-top:15px;"></div>
+    </div>
+
+    <div class="card">
+      <h3>Global Trade & Logistics</h3>
+      <p>Multimodal route optimization, reefer cold chain telemetry, export corridor landed costs.</p>
+      <div class="stat-number">₹480/MT</div>
+      <p style="color:var(--muted);">UAE Corridor Landed Cost (Competitiveness: 91.5)</p>
+    </div>
+
+    <div class="card">
+      <h3>Climate Risk & Disaster Mode</h3>
+      <p>National Disaster Mode lifecycle (DETECTED -> CONFIRMED -> ALERT -> RESPONSE -> RECOVERY -> CLOSED).</p>
+      <div class="badge badge-alert">STATUS: MONITORING</div>
+      <p style="margin-top:10px; color:var(--muted);">Thanjavur Rainfed District Moisture Deficit Index: 0.35</p>
+    </div>
+  </div>
+
+  <script src="js/control_tower_app.js"></script>
+</body>
+</html>
