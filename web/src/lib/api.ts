@@ -30,9 +30,10 @@ async function parseResponseBody(response: Response): Promise<any> {
   const compact = text.replace(/\s+/g, ' ').trim();
   return {
     detail: compact.startsWith('<!DOCTYPE') || compact.startsWith('<html')
-      ? 'The API endpoint returned an HTML page instead of JSON. Check the API URL and backend deployment.'
+      ? 'AgriMark server is temporarily unavailable. Please try again.'
       : compact.slice(0, 500),
   };
+
 }
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
