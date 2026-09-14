@@ -18,9 +18,7 @@ class FarmRepository {
 
   Future<List<dynamic>> fetchFarms() async {
     final response = await _apiClient.get(ApiEndpoints.farmerFarms);
-    if (response is List) {
-      return response;
-    }
+    if (response is List) return response;
     return [];
   }
 
@@ -49,9 +47,7 @@ class FarmRepository {
 
   Future<List<dynamic>> fetchCrops() async {
     final response = await _apiClient.get(ApiEndpoints.farmerCrops);
-    if (response is List) {
-      return response;
-    }
+    if (response is List) return response;
     return [];
   }
 
@@ -110,5 +106,15 @@ class FarmRepository {
 
     final response = await _apiClient.post(ApiEndpoints.farmerHarvests, body: body);
     return response as Map<String, dynamic>;
+  }
+
+  Future<List<dynamic>> fetchHarvests() async {
+    final response = await _apiClient.get(ApiEndpoints.farmerHarvests);
+    if (response is List) return response;
+    if (response is Map<String, dynamic>) {
+      final items = response['items'] ?? response['harvests'] ?? response['data'];
+      if (items is List) return items;
+    }
+    return [];
   }
 }
