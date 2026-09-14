@@ -335,13 +335,22 @@ export function formatAuthError(message: string): string {
     normalized.includes('over_email_send_rate_limit') ||
     normalized.includes('over_sms_send_rate_limit')
   ) {
-    return 'Too many OTP requests. Please wait a minute and try again.';
+    return 'Too many OTP requests. Please wait before trying again.';
+  }
+  if (
+    normalized.includes('unsupported phone provider') ||
+    normalized.includes('sms provider not configured') ||
+    normalized.includes('phone provider disabled') ||
+    normalized.includes('provider is not enabled')
+  ) {
+    return 'SMS login is temporarily unavailable. Please try again later or use Google / Email sign-in.';
   }
   if (
     normalized.includes('provider') ||
     normalized.includes('sms') ||
     normalized.includes('unavailable') ||
-    normalized.includes('service_unavailable')
+    normalized.includes('service_unavailable') ||
+    normalized.includes('sms_send_failed')
   ) {
     return "We couldn't send the OTP right now. Please try again shortly.";
   }
@@ -360,7 +369,8 @@ export function formatAuthError(message: string): string {
   if (
     normalized.includes('invalid phone') ||
     normalized.includes('phone number') ||
-    normalized.includes('invalid number')
+    normalized.includes('invalid number') ||
+    normalized.includes('e.164')
   ) {
     return 'Enter a valid mobile number.';
   }
