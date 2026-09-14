@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 
 const EXPECTED_SUPABASE_REF = 'xrcqzpnstdbbtafhcwbb';
 const EXPECTED_SUPABASE_HOST = 'xrcqzpnstdbbtafhcwbb.supabase.co';
@@ -59,13 +59,7 @@ function getValidPublishableKey(): string {
 export const SUPABASE_URL = getValidSupabaseUrl();
 export const SUPABASE_PUBLISHABLE_KEY = getValidPublishableKey();
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY || 'unconfigured_key', {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-});
+export const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY || 'unconfigured_key');
 
 export function getSupabaseDiagnostic() {
   let supabaseHost = '';
