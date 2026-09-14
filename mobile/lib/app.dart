@@ -45,7 +45,8 @@ class _AgriMarkAppState extends State<AgriMarkApp> {
     setState(() => _isAuthenticated = true);
   }
 
-  void _onLogout() {
+  Future<void> _onLogout() async {
+    await _authRepo.logout();
     if (!mounted) return;
     setState(() => _isAuthenticated = false);
   }
@@ -56,18 +57,11 @@ class _AgriMarkAppState extends State<AgriMarkApp> {
       title: 'AgriMark',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      localizationsDelegates: const [
-        AppLocalizationsDelegate(),
-      ],
-      supportedLocales: const [
-        Locale('en', ''),
-        Locale('ta', ''),
-      ],
+      localizationsDelegates: const [AppLocalizationsDelegate()],
+      supportedLocales: const [Locale('en', ''), Locale('ta', '')],
       home: _isLoading
           ? const Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(color: Color(0xFF10B981)),
-              ),
+              body: Center(child: CircularProgressIndicator(color: Color(0xFF10B981))),
             )
           : _isAuthenticated
               ? MainNavigationContainer(onLogout: _onLogout)
