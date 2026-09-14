@@ -15,27 +15,18 @@ export class ApiError extends Error {
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('agrimark_token') : null;
-
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
+    Accept: 'application/json',
     ...(options.headers as Record<string, string>),
   };
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const config: RequestInit = {
-    ...options,
-    headers,
-  };
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-
-    let data: any = {};
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
     const text = await response.text();
+    let data: any = {};
     if (text) {
       try {
         data = JSON.parse(text);
@@ -61,26 +52,40 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
 export const api = {
   // Auth
-  login: (data: any) => request<{ access_token: string; token_type: string; user: UserProfile }>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
-  register: (data: any) => request<UserProfile>('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  login: (data: any) => request<{ access_token: string; refresh_token?: string; token_type: string; user: UserProfile }>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+  register: (data: any) => request<{ access_token?: string; refresh_token?: string; user?: UserProfile } | UserProfile>('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   getMe: () => request<UserProfile>('/auth/me'),
   logout: () => request<{ message: string }>('/auth/logout', { method: 'POST' }),
 
-  // Farmer Operations
-  getFarms: () => request<Farm[]>('/farmer/farms'),
-  createFarm: (data: Partial<Farm>) => request<Farm>('/farmer/farms', { method: 'POST', body: JSON.stringify(data) }),
-  getCrops: () => request<Cultivation[]>('/farmer/crops'),
-  createCrop: (data: Partial<Cultivation>) => request<Cultivation>('/farmer/crops', { method: 'POST', body: JSON.stringify(data) }),
-  getProduceLots: () => request<ProduceLot[]>('/farmer/harvests'),
-  createProduceLot: (data: Partial<ProduceLot>) => request<ProduceLot>('/farmer/harvests', { method: 'POST', body: JSON.stringify(data) }),
+  // Core farmer operations
+  listCrops: (search?: string) => request<{ items: any[] }>(`/core/crops${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  getCrops: () => request<{ items: any[] }>('/core/crops'),
+  getFarms: (profileId: string) => request<Farm[]>(`/core/profiles/${profileId}/farms`),
+  createFarm: (profileId: string, data: Partial<Farm>) => request<Farm>(`/core/profiles/${profileId}/farms`, { method: 'POST', body: JSON.stringify(data) }),
+  getCultivations: (params?: { farm_id?: string; crop_id?: string }) => {
+    const query = new URLSearchParams();
+    if (params?.farm_id) query.set('farm_id', params.farm_id);
+    if (params?.crop_id) query.set('crop_id', params.crop_id);
+    return request<Cultivation[]>(`/core/cultivations${query.toString() ? `?${query}` : ''}`);
+  },
+  createCultivation: (data: Partial<Cultivation>) => request<Cultivation>('/core/cultivations', { method: 'POST', body: JSON.stringify(data) }),
+  getProduceLots: () => request<ProduceLot[]>('/core/produce-lots'),
+  createProduceLot: (data: Partial<ProduceLot>) => request<ProduceLot>('/core/produce-lots', { method: 'POST', body: JSON.stringify(data) }),
+  createListing: (data: Partial<Listing>) => request<Listing>('/core/listings', { method: 'POST', body: JSON.stringify(data) }),
 
   // Marketplace
   getListings: (query?: string) => request<Listing[]>(`/marketplace/listings${query ? `?${query}` : ''}`),
-  createListing: (data: Partial<Listing>) => request<Listing>('/marketplace/listings', { method: 'POST', body: JSON.stringify(data) }),
-  placeOrder: (data: { listing_id: string; quantity_kg: number }) => request<MarketplaceOrder>('/marketplace/orders', { method: 'POST', body: JSON.stringify(data) }),
+  placeOrder: (data: { listing_id: string; quantity: number; unit?: string }) => request<MarketplaceOrder>('/marketplace/orders', { method: 'POST', body: JSON.stringify(data) }),
   getOrders: () => request<MarketplaceOrder[]>('/marketplace/orders'),
+  createRFQ: (data: any) => request<any>('/marketplace/rfqs', { method: 'POST', body: JSON.stringify(data) }),
+  getRFQs: () => request<any[]>('/marketplace/rfqs'),
+  createOffer: (data: any) => request<any>('/marketplace/offers', { method: 'POST', body: JSON.stringify(data) }),
+  getOffers: () => request<any[]>('/marketplace/offers'),
+
+  // Tracking
+  getDeliveries: () => request<any[]>('/tracking/deliveries'),
 
   // Intelligence & AI
-  getMarketPrices: () => request<MarketPriceObservation[]>('/market/prices'),
+  getMarketPrices: () => request<MarketPriceObservation[]>('/marketplace/prices'),
   askAgriAI: (prompt: string) => request<{ response: string }>('/ai/chat', { method: 'POST', body: JSON.stringify({ prompt }) }),
 };
