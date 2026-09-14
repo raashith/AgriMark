@@ -78,6 +78,13 @@ class ListingResponse(ListingCreate):
     id: UUID
     seller_id: UUID
     status: str
+    crop_name: str | None = None
+    quality_grade: str | None = None
+    price_per_kg: Decimal | None = None
+    quantity_available_kg: Decimal | None = None
+    seller_name: str | None = None
+    location: str | None = None
+
 
 
 class CropCatalogResponse(BaseModel):

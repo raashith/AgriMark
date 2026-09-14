@@ -124,6 +124,21 @@ def list_cultivations(
     return [CultivationResponse(**{key: value for key, value in row.items() if key != "farms"}) for row in rows]
 
 
+@router.get("/produce-lots", response_model=list[ProduceLotResponse])
+def list_produce_lots(
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> list[ProduceLotResponse]:
+    result = (
+        get_supabase()
+        .table("produce_lots")
+        .select("*")
+        .eq("owner_id", str(user.id))
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return [ProduceLotResponse(**row) for row in (result.data or [])]
+
+
 @router.post("/produce-lots", response_model=ProduceLotResponse, status_code=201)
 def create_produce_lot(
     request: ProduceLotCreate,
@@ -148,18 +163,50 @@ def create_listing(
     request: ListingCreate,
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> ListingResponse:
-    lot = get_supabase().table("produce_lots").select("id").eq("id", str(request.lot_id)).eq("owner_id", str(user.id)).limit(1).execute()
-    _single(lot)
+    lot = get_supabase().table("produce_lots").select("id, status").eq("id", str(request.lot_id)).eq("owner_id", str(user.id)).limit(1).execute()
+    lot_data = _single(lot)
+
+    if lot_data.get("status") == "listed":
+        raise HTTPException(status_code=400, detail="Produce lot is already listed")
+
     payload = request.model_dump(mode="json")
     payload["seller_id"] = str(user.id)
     try:
         result = get_supabase().table("listings").insert(payload).execute()
-        return ListingResponse(**_single(result))
+        created = _single(result)
+        try:
+            get_supabase().table("produce_lots").update({"status": "listed"}).eq("id", str(request.lot_id)).execute()
+        except Exception as lot_exc:
+            get_supabase().table("listings").delete().eq("id", created["id"]).execute()
+            raise lot_exc
+        return ListingResponse(**created)
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=400, detail="Unable to create listing") from exc
+
 
 
 @router.get("/listings", response_model=list[ListingResponse])
 def list_listings(status: str = Query(default="active", max_length=30)) -> list[ListingResponse]:
     result = get_supabase().table("listings").select("*").eq("status", status).order("created_at", desc=True).execute()
-    return [ListingResponse(**row) for row in (result.data or [])]
+    rows = result.data or []
+    items = []
+    for row in rows:
+        item = dict(row)
+        if item.get("lot_id"):
+            try:
+                lot_res = get_supabase().table("produce_lots").select("*, crops(name)").eq("id", item["lot_id"]).limit(1).execute()
+                if lot_res.data:
+                    lot_row = lot_res.data[0]
+                    crop = lot_row.get("crops")
+                    item["crop_name"] = crop.get("name") if isinstance(crop, dict) else item.get("title")
+                    item["quality_grade"] = lot_row.get("quality_grade")
+                    item["quantity_available_kg"] = lot_row.get("available_quantity")
+            except Exception:
+                pass
+        item["price_per_kg"] = item.get("price_per_unit")
+        item["location"] = "Tamil Nadu, India"
+        items.append(ListingResponse(**item))
+    return items
+

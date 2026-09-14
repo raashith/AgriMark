@@ -138,3 +138,10 @@ def list_orders(user: AuthenticatedUser = Depends(get_current_user)):
         .execute()
     )
     return result.data or []
+
+
+@router.get("/listings")
+def list_marketplace_listings(status: str = Query(default="active", max_length=30)):
+    from .core import list_listings
+    return list_listings(status=status)
+
