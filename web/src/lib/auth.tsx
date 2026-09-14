@@ -201,16 +201,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithGoogle = async (): Promise<void> => {
-    const redirectUrl = typeof window !== 'undefined'
-      ? `${window.location.origin}/auth/callback`
-      : 'https://agrimark-six.vercel.app/auth/callback';
+    const redirectUrl = `${window.location.origin}/auth/callback`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: redirectUrl },
+      options: {
+        redirectTo: redirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'select_account',
+        },
+      },
     });
     if (error) {
       logSupabaseDiagnostic('signInWithOAuth', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/authorize', 400, error.message);
-      throw new Error(error.message || 'Unable to initiate Google Sign-In.');
+      throw new Error(formatAuthError(error.message));
     }
   };
 
@@ -322,83 +326,35 @@ export function normalizePhone(phone: string): string {
 
 export function formatAuthError(message: string): string {
   const normalized = (message || '').toLowerCase();
-  if (
-    normalized.includes('invalid api key') ||
-    normalized.includes('api key is invalid') ||
-    normalized.includes('invalid_api_key')
-  ) {
+  if (normalized.includes('invalid api key') || normalized.includes('api key is invalid') || normalized.includes('invalid_api_key')) {
     return 'AgriMark authentication is temporarily unavailable. Please try again.';
   }
-  if (
-    normalized.includes('unsupported provider') ||
-    normalized.includes('provider is not enabled') ||
-    normalized.includes('google provider disabled')
-  ) {
+  if (normalized.includes('unsupported provider') || normalized.includes('provider is not enabled') || normalized.includes('google provider disabled')) {
     return 'Google Sign-In is temporarily unavailable. Please try another login method.';
   }
-  if (
-    normalized.includes('redirect_uri_mismatch') ||
-    normalized.includes('redirect not allowed') ||
-    normalized.includes('invalid redirect')
-  ) {
+  if (normalized.includes('redirect_uri_mismatch') || normalized.includes('redirect not allowed') || normalized.includes('invalid redirect')) {
     return 'Google Sign-In configuration needs attention. Please try again later.';
   }
-  if (
-    normalized.includes('access_denied') ||
-    normalized.includes('cancelled') ||
-    normalized.includes('canceled') ||
-    normalized.includes('user_cancelled')
-  ) {
+  if (normalized.includes('access_denied') || normalized.includes('cancelled') || normalized.includes('canceled') || normalized.includes('user_cancelled')) {
     return 'Google Sign-In was cancelled.';
   }
-  if (
-    normalized.includes('code exchange') ||
-    normalized.includes('invalid_grant') ||
-    normalized.includes('pkce')
-  ) {
+  if (normalized.includes('code exchange') || normalized.includes('invalid_grant') || normalized.includes('pkce')) {
     return "We couldn't complete Google Sign-In. Please try again.";
   }
-  if (
-    normalized.includes('rate limit') ||
-    normalized.includes('too many') ||
-    normalized.includes('over_email_send_rate_limit') ||
-    normalized.includes('over_sms_send_rate_limit')
-  ) {
+  if (normalized.includes('rate limit') || normalized.includes('too many') || normalized.includes('over_email_send_rate_limit') || normalized.includes('over_sms_send_rate_limit')) {
     return 'Too many OTP requests. Please wait before trying again.';
   }
-  if (
-    normalized.includes('unsupported phone provider') ||
-    normalized.includes('sms provider not configured') ||
-    normalized.includes('phone provider disabled')
-  ) {
+  if (normalized.includes('unsupported phone provider') || normalized.includes('sms provider not configured') || normalized.includes('phone provider disabled')) {
     return 'SMS login is temporarily unavailable. Please try again later or use Google / Email sign-in.';
   }
-  if (
-    normalized.includes('sms') ||
-    normalized.includes('unavailable') ||
-    normalized.includes('service_unavailable') ||
-    normalized.includes('sms_send_failed')
-  ) {
+  if (normalized.includes('sms') || normalized.includes('unavailable') || normalized.includes('service_unavailable') || normalized.includes('sms_send_failed')) {
     return "We couldn't send the OTP right now. Please try again shortly.";
   }
-  if (
-    normalized.includes('invalid otp') ||
-    normalized.includes('invalid token') ||
-    normalized.includes('token is invalid') ||
-    normalized.includes('otp_expired') ||
-    normalized.includes('expired')
-  ) {
-    if (normalized.includes('expired')) {
-      return 'This OTP has expired. Request a new OTP.';
-    }
+  if (normalized.includes('invalid otp') || normalized.includes('invalid token') || normalized.includes('token is invalid') || normalized.includes('otp_expired') || normalized.includes('expired')) {
+    if (normalized.includes('expired')) return 'This OTP has expired. Request a new OTP.';
     return 'Incorrect OTP. Please check the 6-digit code and try again.';
   }
-  if (
-    normalized.includes('invalid phone') ||
-    normalized.includes('phone number') ||
-    normalized.includes('invalid number') ||
-    normalized.includes('e.164')
-  ) {
+  if (normalized.includes('invalid phone') || normalized.includes('phone number') || normalized.includes('invalid number') || normalized.includes('e.164')) {
     return 'Enter a valid mobile number.';
   }
   if (normalized.includes('phone') && normalized.includes('disabled')) {
