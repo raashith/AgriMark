@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { SkipForward } from 'lucide-react';
 
 export function AgriMarkIntro() {
   const pathname = usePathname();
@@ -17,11 +16,11 @@ export function AgriMarkIntro() {
     setFading(true);
     setTimeout(() => {
       setVisible(false);
-    }, 700);
+    }, 1000); // 1000ms smooth fade/scale transition
   };
 
   useEffect(() => {
-    // Only show intro on home landing page '/'
+    // Only show intro on root landing entry '/'
     if (pathname !== '/') return;
 
     // Check prefers-reduced-motion
@@ -29,7 +28,7 @@ export function AgriMarkIntro() {
       return;
     }
 
-    // Check sessionStorage to play only once per browser session
+    // Check sessionStorage to prevent repeated intro during internal navigation in same tab session
     try {
       const shown = sessionStorage.getItem('agrimark_intro_shown');
       if (shown) return;
@@ -44,15 +43,15 @@ export function AgriMarkIntro() {
   useEffect(() => {
     if (!visible) return;
 
-    // Safety fallback timer (12 seconds) in case video fails to fire 'onEnded'
+    // Safety fallback timer (10 seconds) in case video playback fails or stalls
     const fallbackTimer = setTimeout(() => {
       handleDismiss();
-    }, 12000);
+    }, 10000);
 
     // Attempt video playback
     if (videoRef.current) {
       videoRef.current.play().catch(() => {
-        // If autoplay fails, gracefully dismiss
+        // If autoplay fails, gracefully transition
         handleDismiss();
       });
     }
@@ -67,8 +66,8 @@ export function AgriMarkIntro() {
   return (
     <div
       aria-label="AgriMark Cinematic Intro"
-      className={`fixed inset-0 z-[9999] bg-black flex items-center justify-center overflow-hidden transition-opacity duration-700 ease-in-out ${
-        fading ? 'opacity-0 pointer-events-none' : 'opacity-100'
+      className={`fixed inset-0 z-[9999] bg-black w-screen h-screen overflow-hidden flex items-center justify-center transition-all duration-1000 ease-in-out select-none ${
+        fading ? 'opacity-0 scale-105 pointer-events-none' : 'opacity-100 scale-100'
       }`}
     >
       <video
@@ -80,18 +79,8 @@ export function AgriMarkIntro() {
         preload="auto"
         onEnded={handleDismiss}
         onError={handleDismiss}
-        className="w-full h-full object-contain max-h-screen max-w-screen select-none"
+        className="w-full h-full object-cover max-w-none max-h-none pointer-events-none"
       />
-
-      <button
-        type="button"
-        onClick={handleDismiss}
-        aria-label="Skip Intro Video"
-        className="absolute bottom-6 right-6 z-[10000] bg-black/70 hover:bg-emerald-950/90 border border-emerald-800/60 hover:border-emerald-500 text-emerald-400 font-bold text-xs px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur-md transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-      >
-        <span>Skip Intro</span>
-        <SkipForward className="w-3.5 h-3.5" />
-      </button>
     </div>
   );
 }

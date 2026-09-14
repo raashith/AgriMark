@@ -23,20 +23,20 @@ export async function GET(request: NextRequest) {
 
   if (error || errorDescription) {
     const loginUrl = new URL('/auth/login', baseUrl);
-    loginUrl.searchParams.set('error', errorDescription || error || 'oauth_error');
+    loginUrl.searchParams.set('error', 'Google Sign-In couldn\'t be completed. Please try again.');
     return NextResponse.redirect(loginUrl);
   }
 
   if (!code) {
     const loginUrl = new URL('/auth/login', baseUrl);
-    loginUrl.searchParams.set('error', 'oauth_callback_failed');
+    loginUrl.searchParams.set('error', 'Google Sign-In couldn\'t be completed. Please try again.');
     return NextResponse.redirect(loginUrl);
   }
 
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseKey) {
     const loginUrl = new URL('/auth/login', baseUrl);
-    loginUrl.searchParams.set('error', 'oauth_configuration_failed');
+    loginUrl.searchParams.set('error', 'Google Sign-In couldn\'t be completed. Please try again.');
     return NextResponse.redirect(loginUrl);
   }
 
@@ -54,15 +54,25 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  const exchangeResult = flowId
-    ? await supabase.auth.exchangeCodeForSession(code, { flowId })
-    : await supabase.auth.exchangeCodeForSession(code);
+  // Guard against duplicate code exchange if session is already established
+  const { data: existingSessionData } = await supabase.auth.getSession();
+  if (!existingSessionData?.session && code) {
+    const exchangeResult = flowId
+      ? await supabase.auth.exchangeCodeForSession(code, { flowId })
+      : await supabase.auth.exchangeCodeForSession(code);
 
-  const { error: exchangeError } = exchangeResult;
-  if (exchangeError) {
-    const loginUrl = new URL('/auth/login', baseUrl);
-    loginUrl.searchParams.set('error', exchangeError.message || 'oauth_code_exchange_failed');
-    return NextResponse.redirect(loginUrl);
+    if (exchangeResult.error) {
+      const { data: recheckData } = await supabase.auth.getSession();
+      if (!recheckData?.session) {
+        const loginUrl = new URL('/auth/login', baseUrl);
+        const errMsg = (exchangeResult.error.message || '').toLowerCase();
+        const userMsg = errMsg.includes('expired') || errMsg.includes('4/0a') || errMsg.includes('already used') || errMsg.includes('invalid_grant')
+          ? 'Your sign-in session expired. Please start Google Sign-In again.'
+          : 'Google Sign-In couldn\'t be completed. Please try again.';
+        loginUrl.searchParams.set('error', userMsg);
+        return NextResponse.redirect(loginUrl);
+      }
+    }
   }
 
   return response;
