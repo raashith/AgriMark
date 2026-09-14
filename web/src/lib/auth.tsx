@@ -36,7 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const profile = await api.getMe();
           setUser(profile);
           localStorage.setItem('agrimark_user', JSON.stringify(profile));
-        } catch (e) {
+        } catch {
           localStorage.removeItem('agrimark_token');
           localStorage.removeItem('agrimark_user');
           setUser(null);
@@ -55,11 +55,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('agrimark_token', res.access_token);
       localStorage.setItem('agrimark_user', JSON.stringify(res.user));
       setUser(res.user);
-      setIsLoading(false);
       return res.user;
-    } catch (e) {
+    } finally {
       setIsLoading(false);
-      throw e;
     }
   };
 
@@ -69,17 +67,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.role === 'admin') {
         throw new Error('Self-registration as admin is prohibited.');
       }
-      const profile = await api.register(data);
-      // Auto login after registration
-      const loginRes = await api.login({ email: data.email, password: data.password });
+      await api.register(data);
+
+      // The backend login endpoint accepts either email or phone as the identifier.
+      // Reuse the exact identifier supplied during registration so phone-only signup works.
+      const identifier = data.email || data.phone;
+      if (!identifier) {
+        throw new Error('Registration requires an email or phone identifier for automatic login.');
+      }
+      const loginRes = await api.login({
+        email: data.email,
+        phone: data.phone,
+        phone_or_email: identifier,
+        password: data.password,
+      });
       localStorage.setItem('agrimark_token', loginRes.access_token);
       localStorage.setItem('agrimark_user', JSON.stringify(loginRes.user));
       setUser(loginRes.user);
-      setIsLoading(false);
       return loginRes.user;
-    } catch (e) {
+    } finally {
       setIsLoading(false);
-      throw e;
     }
   };
 
