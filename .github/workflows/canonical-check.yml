@@ -2,7 +2,7 @@ name: AgriMark canonical checks
 
 on:
   push:
-    branches: [main, integration/agri-canonical, web-production-*]
+    branches: [main, integration/agri-canonical, 'web-production-*']
   pull_request:
     branches: [main]
 
@@ -25,9 +25,6 @@ jobs:
       - name: Run backend tests when present
         env:
           PYTHONPATH: "."
-          SUPABASE_URL: "https://xrcqzpnstdbbtafhcwbb.supabase.co"
-          DATABASE_URL: "sqlite:///:memory:"
-          SECRET_KEY: "ci-secret-key-testing"
         shell: bash
         run: |
           if [ -d tests ]; then
