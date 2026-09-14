@@ -16,6 +16,8 @@ jobs:
           python-version: '3.11'
       - name: Install backend dependencies
         run: pip install -r backend/requirements.txt
+      - name: Install test runner
+        run: pip install pytest
       - name: Compile Python sources
         run: python -m compileall backend agents ml
       - name: Run backend tests when present
