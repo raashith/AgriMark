@@ -36,7 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const profile = await api.getMe();
           setUser(profile);
           localStorage.setItem('agrimark_user', JSON.stringify(profile));
-        } catch (e) {
+        } catch {
           localStorage.removeItem('agrimark_token');
           localStorage.removeItem('agrimark_user');
           setUser(null);
@@ -52,14 +52,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const res = await api.login(credentials);
+      if (!res?.access_token || !res?.user) {
+        throw new Error('Login succeeded but the authentication service returned an incomplete response. Please try again.');
+      }
       localStorage.setItem('agrimark_token', res.access_token);
       localStorage.setItem('agrimark_user', JSON.stringify(res.user));
       setUser(res.user);
-      setIsLoading(false);
       return res.user;
-    } catch (e) {
+    } finally {
       setIsLoading(false);
-      throw e;
     }
   };
 
@@ -69,17 +70,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.role === 'admin') {
         throw new Error('Self-registration as admin is prohibited.');
       }
-      const profile = await api.register(data);
-      // Auto login after registration
-      const loginRes = await api.login({ email: data.email, password: data.password });
+
+      await api.register(data);
+
+      // The backend may accept email or phone as the sign-in identifier.
+      // Prefer the identifier that was actually provided by the user.
+      const identifier = data.email || data.phone || data.phone_number;
+      if (!identifier) {
+        throw new Error('Registration completed, but no sign-in identifier was provided. Please log in manually.');
+      }
+
+      const loginRes = await api.login({
+        ...(data.email ? { email: data.email } : { phone_or_email: identifier }),
+        password: data.password,
+      });
+
+      if (!loginRes?.access_token || !loginRes?.user) {
+        throw new Error('Registration completed, but automatic sign-in failed. Please log in manually.');
+      }
+
       localStorage.setItem('agrimark_token', loginRes.access_token);
       localStorage.setItem('agrimark_user', JSON.stringify(loginRes.user));
       setUser(loginRes.user);
-      setIsLoading(false);
       return loginRes.user;
-    } catch (e) {
+    } finally {
       setIsLoading(false);
-      throw e;
     }
   };
 
