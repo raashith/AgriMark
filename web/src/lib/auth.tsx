@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile, UserRole } from '@/types';
 import { api } from './api';
-import { supabase } from './supabase';
+import { supabase, logSupabaseDiagnostic } from './supabase';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -56,11 +56,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
+        const { data, error: sessionErr } = await supabase.auth.getSession();
+        if (sessionErr) {
+          logSupabaseDiagnostic('getSession', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/session', 401, sessionErr.message);
+          const msg = (sessionErr.message || '').toLowerCase();
+          if (msg.includes('invalid api key') || msg.includes('invalid') || msg.includes('jwt')) {
+            console.warn('Supabase session reset because the stored session was invalid.');
+            await supabase.auth.signOut().catch(() => {});
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('agrimark_token');
+              localStorage.removeItem('agrimark_user');
+            }
+            setUser(null);
+            return;
+          }
+        }
         if (data?.session?.access_token) {
-          await syncProfile(data.session.access_token);
+          const profile = await syncProfile(data.session.access_token);
+          if (!profile) {
+            console.warn('Supabase session reset because the stored session was invalid.');
+            await supabase.auth.signOut().catch(() => {});
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('agrimark_token');
+              localStorage.removeItem('agrimark_user');
+            }
+            setUser(null);
+          }
         }
       } catch {
+        console.warn('Supabase session reset because the stored session was invalid.');
+        await supabase.auth.signOut().catch(() => {});
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('agrimark_token');
+          localStorage.removeItem('agrimark_user');
+        }
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -102,6 +131,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         if (!sbError && sbData?.session?.access_token) {
           sessionToken = sbData.session.access_token;
+        } else if (sbError) {
+          logSupabaseDiagnostic('signInWithPassword', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/token', 400, sbError.message);
         }
       }
 
@@ -126,7 +157,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const sendPhoneOtp = async (phone: string): Promise<void> => {
     const normalized = normalizePhone(phone);
     const { error } = await supabase.auth.signInWithOtp({ phone: normalized });
-    if (error) throw new Error(formatAuthError(error.message));
+    if (error) {
+      logSupabaseDiagnostic('signInWithOtp', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/otp', 400, error.message);
+      throw new Error(formatAuthError(error.message));
+    }
   };
 
   const loginWithPhoneOtp = sendPhoneOtp;
@@ -143,7 +177,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       token: code,
       type: 'sms',
     });
-    if (error) throw new Error(formatAuthError(error.message));
+    if (error) {
+      logSupabaseDiagnostic('verifyOtp', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/verify', 400, error.message);
+      throw new Error(formatAuthError(error.message));
+    }
     if (!data.session?.access_token) {
       throw new Error('Verification succeeded, but no session was returned. Please try again.');
     }
@@ -172,6 +209,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       options: { redirectTo: redirectUrl },
     });
     if (error) {
+      logSupabaseDiagnostic('signInWithOAuth', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/authorize', 400, error.message);
       throw new Error(error.message || 'Unable to initiate Google Sign-In.');
     }
   };
@@ -203,6 +241,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (sbError) {
+        logSupabaseDiagnostic('signUp', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/signup', 400, sbError.message);
         const normalized = sbError.message.toLowerCase();
         if (normalized.includes('already registered') || normalized.includes('user already registered')) {
           throw new Error('An account with this email already exists. Please log in instead.');
@@ -283,19 +322,46 @@ export function normalizePhone(phone: string): string {
 
 export function formatAuthError(message: string): string {
   const normalized = (message || '').toLowerCase();
-  if (normalized.includes('rate limit') || normalized.includes('too many') || normalized.includes('over_email_send_rate_limit') || normalized.includes('over_sms_send_rate_limit')) {
+  if (
+    normalized.includes('invalid api key') ||
+    normalized.includes('api key is invalid') ||
+    normalized.includes('invalid_api_key')
+  ) {
+    return 'AgriMark authentication is temporarily unavailable. Please try again.';
+  }
+  if (
+    normalized.includes('rate limit') ||
+    normalized.includes('too many') ||
+    normalized.includes('over_email_send_rate_limit') ||
+    normalized.includes('over_sms_send_rate_limit')
+  ) {
     return 'Too many OTP requests. Please wait a minute and try again.';
   }
-  if (normalized.includes('provider') || normalized.includes('sms') || normalized.includes('unavailable') || normalized.includes('service_unavailable')) {
+  if (
+    normalized.includes('provider') ||
+    normalized.includes('sms') ||
+    normalized.includes('unavailable') ||
+    normalized.includes('service_unavailable')
+  ) {
     return "We couldn't send the OTP right now. Please try again shortly.";
   }
-  if (normalized.includes('invalid otp') || normalized.includes('invalid token') || normalized.includes('token is invalid') || normalized.includes('otp_expired') || normalized.includes('expired')) {
+  if (
+    normalized.includes('invalid otp') ||
+    normalized.includes('invalid token') ||
+    normalized.includes('token is invalid') ||
+    normalized.includes('otp_expired') ||
+    normalized.includes('expired')
+  ) {
     if (normalized.includes('expired')) {
       return 'This OTP has expired. Request a new OTP.';
     }
     return 'Incorrect OTP. Please check the 6-digit code and try again.';
   }
-  if (normalized.includes('invalid phone') || normalized.includes('phone number') || normalized.includes('invalid number')) {
+  if (
+    normalized.includes('invalid phone') ||
+    normalized.includes('phone number') ||
+    normalized.includes('invalid number')
+  ) {
     return 'Enter a valid mobile number.';
   }
   if (normalized.includes('phone') && normalized.includes('disabled')) {

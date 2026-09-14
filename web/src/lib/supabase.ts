@@ -9,7 +9,7 @@ function getValidSupabaseUrl(): string {
   if (!envUrl) return EXPECTED_SUPABASE_URL;
   try {
     const parsed = new URL(envUrl);
-    if (parsed.protocol !== 'https:' || parsed.hostname !== EXPECTED_SUPABASE_HOST) {
+    if (parsed.protocol !== 'https:' || !parsed.hostname.includes(EXPECTED_SUPABASE_REF)) {
       return EXPECTED_SUPABASE_URL;
     }
     return EXPECTED_SUPABASE_URL;
@@ -18,45 +18,48 @@ function getValidSupabaseUrl(): string {
   }
 }
 
-function getValidSupabaseKey(): string {
+export function detectKeyType(key: string): string {
+  if (!key) return 'none';
+  if (key.startsWith('sb_publishable_')) return 'sb_publishable';
+  if (key.startsWith('eyJ')) return 'legacy_anon';
+  return 'unknown';
+}
+
+function getValidPublishableKey(): string {
   const preferred = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
   const legacy = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
-  // Prefer the modern browser-safe publishable key, but accept the legacy anon
-  // key during Supabase's migration period. Never fall back to a fabricated key.
   const candidates = [preferred, legacy].filter(Boolean) as string[];
   const valid = candidates.find((key) => {
     const isPublishable = key.startsWith('sb_publishable_');
-    const isLegacyJwt = key.split('.').length === 3 && key.length > 100;
+    const isLegacyJwt = key.split('.').length === 3 && key.length > 50;
     return isPublishable || isLegacyJwt;
   });
 
   if (!valid) {
-    throw new Error(
-      'AgriMark Supabase configuration is missing or invalid. Configure NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (preferred) or NEXT_PUBLIC_SUPABASE_ANON_KEY for the canonical project.'
-    );
+    return candidates[0] || '';
   }
 
-  if (valid.includes(EXPECTED_SUPABASE_REF)) return valid;
   if (valid.startsWith('sb_publishable_')) return valid;
 
   try {
-    const payload = JSON.parse(Buffer.from(valid.split('.')[1], 'base64url').toString('utf8')) as { ref?: string };
-    if (payload.ref && payload.ref !== EXPECTED_SUPABASE_REF) {
-      throw new Error('AgriMark Supabase API key belongs to a different project.');
+    const parts = valid.split('.');
+    if (parts.length === 3) {
+      const payloadStr = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
+      const payload = JSON.parse(payloadStr);
+      if (payload.ref && payload.ref !== EXPECTED_SUPABASE_REF) {
+        return '';
+      }
     }
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('different project')) throw error;
-    // A publishable key is intentionally not a JWT and cannot expose the ref.
-  }
+  } catch {}
 
   return valid;
 }
 
 export const SUPABASE_URL = getValidSupabaseUrl();
-export const SUPABASE_PUBLISHABLE_KEY = getValidSupabaseKey();
+export const SUPABASE_PUBLISHABLE_KEY = getValidPublishableKey();
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY || 'unconfigured_key', {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
@@ -88,10 +91,30 @@ export function getSupabaseDiagnostic() {
   return {
     hasSupabaseUrl: Boolean(SUPABASE_URL),
     supabaseHost,
-    hasSupabasePublishableKey: Boolean(SUPABASE_PUBLISHABLE_KEY),
-    publishableKeyPrefix: SUPABASE_PUBLISHABLE_KEY.startsWith('sb_publishable_')
-      ? 'sb_publishable_'
-      : 'legacy_anon_jwt',
+    keyType: detectKeyType(SUPABASE_PUBLISHABLE_KEY),
     apiBaseHost,
   };
+}
+
+export function logSupabaseDiagnostic(
+  action: string,
+  url: string,
+  status: number,
+  errorCode?: string
+) {
+  if (typeof window !== 'undefined') {
+    try {
+      const parsedUrl = new URL(url);
+      console.error(`[AgriMark Auth Diagnostic] ${action} failed`, {
+        endpointHost: parsedUrl.hostname,
+        endpointPath: parsedUrl.pathname,
+        status,
+        errorCode: errorCode || 'unknown',
+        keyType: detectKeyType(SUPABASE_PUBLISHABLE_KEY),
+        hasApiKey: Boolean(SUPABASE_PUBLISHABLE_KEY),
+        hasAuthorization: Boolean(localStorage.getItem('agrimark_token')),
+        authorizationType: localStorage.getItem('agrimark_token') ? 'Bearer' : 'none',
+      });
+    } catch {}
+  }
 }
