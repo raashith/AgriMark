@@ -71,8 +71,6 @@ class _FarmerSellScreenState extends State<FarmerSellScreen> {
     });
 
     try {
-      // The authenticated profile UUID is supplied by the backend session.
-      // This flow expects the UI to resolve it from the user's profile before creating a farm.
       final profile = await _farmRepo.fetchProfile();
       final profileId = profile['id']?.toString();
       if (profileId == null || profileId.isEmpty) {
@@ -152,7 +150,12 @@ class _FarmerSellScreenState extends State<FarmerSellScreen> {
             _field(_village, 'Village'),
             _field(_district, 'District'),
             _field(_state, 'State'),
-            _field(_area, 'Area in acres', keyboard: const TextInputType.numberWithOptions(decimal: true), validator: (v) => _positive(v, 'Area')),
+            _field(
+              _area,
+              'Area in acres',
+              keyboard: const TextInputType.numberWithOptions(decimal: true),
+              validator: (v) => _positive(v, 'Area'),
+            ),
             const SizedBox(height: 24),
             const Text('2. Crop & harvest', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
@@ -173,18 +176,39 @@ class _FarmerSellScreenState extends State<FarmerSellScreen> {
                 onChanged: (value) => setState(() => _cropId = value),
               ),
             const SizedBox(height: 12),
-            _field(_quantity, 'Harvest quantity (kg)', keyboard: const TextInputType.numberWithOptions(decimal: true), validator: (v) => _positive(v, 'Quantity')),
+            _field(
+              _quantity,
+              'Harvest quantity (kg)',
+              keyboard: const TextInputType.numberWithOptions(decimal: true),
+              validator: (v) => _positive(v, 'Quantity'),
+            ),
             _field(_quality, 'Quality grade'),
             const SizedBox(height: 24),
             const Text('3. Sell to buyers', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
             _field(_title, 'Listing title', validator: (v) => _required(v, 'Listing title')),
-            _field(_price, 'Selling price per kg (₹)', keyboard: const TextInputType.numberWithOptions(decimal: true), validator: (v) => _positive(v, 'Price')),
-            _field(_minimum, 'Minimum order (kg)', keyboard: const TextInputType.numberWithOptions(decimal: true), validator: (v) => _positive(v, 'Minimum order')),
+            _field(
+              _price,
+              'Selling price per kg (₹)',
+              keyboard: const TextInputType.numberWithOptions(decimal: true),
+              validator: (v) => _positive(v, 'Price'),
+            ),
+            _field(
+              _minimum,
+              'Minimum order (kg)',
+              keyboard: const TextInputType.numberWithOptions(decimal: true),
+              validator: (v) => _positive(v, 'Minimum order'),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Publishing creates the farm, crop cycle, harvest lot, and listing as separate backend records. If a later step fails, the earlier records may remain and can be reused on retry.',
+            ),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: _submitting ? null : _submit,
-              icon: _submitting ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.sell_outlined),
+              icon: _submitting
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.sell_outlined),
               label: Text(_submitting ? 'Publishing…' : 'Publish produce'),
             ),
             if (_message != null) ...[
@@ -192,7 +216,10 @@ class _FarmerSellScreenState extends State<FarmerSellScreen> {
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(14),
-                  child: Text(_message!, style: TextStyle(color: _success ? null : Theme.of(context).colorScheme.error)),
+                  child: Text(
+                    _message!,
+                    style: TextStyle(color: _success ? null : Theme.of(context).colorScheme.error),
+                  ),
                 ),
               ),
             ],
