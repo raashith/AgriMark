@@ -9,6 +9,7 @@ interface AuthContextType {
   user: UserProfile | null;
   isLoading: boolean;
   login: (credentials: any) => Promise<UserProfile>;
+  sendPhoneOtp: (phone: string) => Promise<void>;
   loginWithPhoneOtp: (phone: string) => Promise<void>;
   verifyPhoneOtp: (phone: string, token: string) => Promise<UserProfile>;
   loginWithGoogle: () => Promise<void>;
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
   login: async () => { throw new Error('Not initialized'); },
+  sendPhoneOtp: async () => { throw new Error('Not initialized'); },
   loginWithPhoneOtp: async () => { throw new Error('Not initialized'); },
   verifyPhoneOtp: async () => { throw new Error('Not initialized'); },
   loginWithGoogle: async () => {},
@@ -67,10 +69,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     void initAuth();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.access_token) {
         await syncProfile(session.access_token);
-      } else if (_event === 'SIGNED_OUT') {
+      } else if (event === 'SIGNED_OUT') {
         setUser(null);
         if (typeof window !== 'undefined') {
           localStorage.removeItem('agrimark_token');
@@ -121,18 +123,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginWithPhoneOtp = async (phone: string): Promise<void> => {
+  const sendPhoneOtp = async (phone: string): Promise<void> => {
     const normalized = normalizePhone(phone);
-    validatePhone(normalized);
     const { error } = await supabase.auth.signInWithOtp({ phone: normalized });
     if (error) throw new Error(formatAuthError(error.message));
   };
 
+  const loginWithPhoneOtp = sendPhoneOtp;
+
   const verifyPhoneOtp = async (phone: string, token: string): Promise<UserProfile> => {
     const normalized = normalizePhone(phone);
-    validatePhone(normalized);
     const code = token.replace(/\D/g, '');
-    if (!/^\d{6}$/.test(code)) throw new Error('Enter the 6-digit verification code.');
+    if (!/^\d{6}$/.test(code)) {
+      throw new Error('Incorrect OTP. Please check the 6-digit code and try again.');
+    }
 
     const { data, error } = await supabase.auth.verifyOtp({
       phone: normalized,
@@ -140,10 +144,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       type: 'sms',
     });
     if (error) throw new Error(formatAuthError(error.message));
-    if (!data.session?.access_token) throw new Error('Verification succeeded but no session was returned. Please try again.');
+    if (!data.session?.access_token) {
+      throw new Error('Verification succeeded, but no session was returned. Please try again.');
+    }
 
     const profile = await syncProfile(data.session.access_token);
-    if (!profile) throw new Error('Phone verified, but profile setup could not be loaded. Please try again.');
+    if (!profile) {
+      const sbUser = data.session.user;
+      return {
+        id: sbUser.id,
+        email: sbUser.email,
+        full_name: sbUser.user_metadata?.full_name || 'AgriMark User',
+        phone: sbUser.phone || normalized,
+        role: 'farmer' as UserRole,
+        needs_onboarding: true,
+      } as UserProfile & { needs_onboarding?: boolean };
+    }
     return profile;
   };
 
@@ -225,6 +241,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user,
       isLoading,
       login,
+      sendPhoneOtp,
       loginWithPhoneOtp,
       verifyPhoneOtp,
       loginWithGoogle,
@@ -238,27 +255,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-function normalizePhone(phone: string): string {
+export function normalizePhone(phone: string): string {
+  if (!phone) throw new Error('Enter a valid mobile number.');
   const raw = phone.trim();
-  const digits = raw.replace(/\D/g, '');
-  if (raw.startsWith('+')) return `+${digits}`;
-  if (digits.length === 10) return `+91${digits}`;
-  return `+${digits}`;
-}
-
-function validatePhone(phone: string): void {
-  if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
-    throw new Error('Enter a valid mobile number with country code, for example +919876543210.');
+  if (raw.startsWith('+')) {
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length < 8 || digits.length > 15) {
+      throw new Error('Enter a valid mobile number.');
+    }
+    return `+${digits}`;
   }
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 10) {
+    return `+91${digits}`;
+  }
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return `+91${digits.slice(1)}`;
+  }
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return `+${digits}`;
+  }
+  if (digits.length >= 8 && digits.length <= 15) {
+    return `+${digits}`;
+  }
+  throw new Error('Enter a valid mobile number.');
 }
 
-function formatAuthError(message: string): string {
-  const normalized = message.toLowerCase();
-  if (normalized.includes('rate limit') || normalized.includes('too many')) {
-    return 'Too many OTP requests. Please wait before requesting another code.';
+export function formatAuthError(message: string): string {
+  const normalized = (message || '').toLowerCase();
+  if (normalized.includes('rate limit') || normalized.includes('too many') || normalized.includes('over_email_send_rate_limit') || normalized.includes('over_sms_send_rate_limit')) {
+    return 'Too many OTP requests. Please wait a minute and try again.';
+  }
+  if (normalized.includes('provider') || normalized.includes('sms') || normalized.includes('unavailable') || normalized.includes('service_unavailable')) {
+    return "We couldn't send the OTP right now. Please try again shortly.";
+  }
+  if (normalized.includes('invalid otp') || normalized.includes('invalid token') || normalized.includes('token is invalid') || normalized.includes('otp_expired') || normalized.includes('expired')) {
+    if (normalized.includes('expired')) {
+      return 'This OTP has expired. Request a new OTP.';
+    }
+    return 'Incorrect OTP. Please check the 6-digit code and try again.';
+  }
+  if (normalized.includes('invalid phone') || normalized.includes('phone number') || normalized.includes('invalid number')) {
+    return 'Enter a valid mobile number.';
   }
   if (normalized.includes('phone') && normalized.includes('disabled')) {
-    return 'Phone login is not enabled yet. Please contact support.';
+    return 'Phone authentication is not enabled yet. Please try another login method.';
   }
   return message || 'Unable to send or verify the OTP. Please try again.';
 }
+
+export const useAuth = () => useContext(AuthContext);
