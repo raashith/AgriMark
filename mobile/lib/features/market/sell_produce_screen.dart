@@ -27,23 +27,27 @@ class _SellProduceScreenState extends State<SellProduceScreen> {
   String? _error;
   String? _aiGuidanceReply;
 
-  List<dynamic> _crops = [];
-  String? _selectedCropId;
+  List<dynamic> _harvests = [];
+  String? _selectedLotId;
 
   @override
   void initState() {
     super.initState();
-    _loadCrops();
+    _loadHarvests();
   }
 
-  Future<void> _loadCrops() async {
+  Future<void> _loadHarvests() async {
     try {
-      final crops = await _farmRepo.fetchCrops();
+      final harvests = await _farmRepo.fetchHarvests();
       setState(() {
-        _crops = crops;
-        if (crops.isNotEmpty) {
-          _selectedCropId = crops.first['id'];
-          _titleController.text = '${crops.first['name']} Lot';
+        _harvests = harvests;
+        if (harvests.isNotEmpty) {
+          final first = harvests.first as Map<String, dynamic>;
+          _selectedLotId = first['id']?.toString();
+          final cropName = first['crop_name'] ?? first['name'] ?? 'Produce';
+          _titleController.text = '$cropName Fresh Harvest';
+          final quantity = first['available_quantity_kg'] ?? first['quantity_kg'];
+          if (quantity != null) _quantityController.text = quantity.toString();
         }
         _isLoadingData = false;
       });
@@ -66,7 +70,7 @@ class _SellProduceScreenState extends State<SellProduceScreen> {
         _aiGuidanceReply = res['reply'] ?? res['recommendation'];
         _isLoadingGuidance = false;
       });
-    } catch (e) {
+    } catch (_) {
       setState(() {
         _aiGuidanceReply = 'Market price guidance unavailable.';
         _isLoadingGuidance = false;
@@ -79,6 +83,11 @@ class _SellProduceScreenState extends State<SellProduceScreen> {
     final priceStr = _priceController.text.trim();
     final qtyStr = _quantityController.text.trim();
     final desc = _descController.text.trim();
+
+    if (_selectedLotId == null) {
+      setState(() => _error = 'No harvested produce lot is available to sell yet. Record a harvest first.');
+      return;
+    }
 
     if (title.isEmpty || priceStr.isEmpty || qtyStr.isEmpty) {
       setState(() => _error = 'Please fill in Title, Price per Kg, and Quantity.');
@@ -99,10 +108,8 @@ class _SellProduceScreenState extends State<SellProduceScreen> {
     });
 
     try {
-      // Use selected crop ID or fallback lot ID
-      final lotId = _selectedCropId ?? 'lot-default-1';
       await _marketRepo.createListing(
-        lotId: lotId,
+        lotId: _selectedLotId!,
         title: title,
         description: desc.isNotEmpty ? desc : null,
         pricePerKg: price,
@@ -115,6 +122,15 @@ class _SellProduceScreenState extends State<SellProduceScreen> {
         _isSubmitting = false;
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _priceController.dispose();
+    _quantityController.dispose();
+    _descController.dispose();
+    super.dispose();
   }
 
   @override
@@ -134,25 +150,45 @@ class _SellProduceScreenState extends State<SellProduceScreen> {
               Text(_error!, style: const TextStyle(color: AppColors.statusError)),
               const SizedBox(height: 12),
             ],
-
-            if (_crops.isNotEmpty) ...[
-              const Text('Select Harvested Crop', style: TextStyle(fontWeight: FontWeight.bold)),
+            if (_harvests.isEmpty) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.statusWarning.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.statusWarning.withOpacity(0.35)),
+                ),
+                child: const Text(
+                  'No harvested lots are available yet. Record a harvest from My Farm before publishing a marketplace listing.',
+                ),
+              ),
+              const SizedBox(height: 16),
+            ] else ...[
+              const Text('Select Harvested Produce', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                value: _selectedCropId,
-                items: _crops.map<DropdownMenuItem<String>>((c) {
+                value: _selectedLotId,
+                items: _harvests.map<DropdownMenuItem<String>>((h) {
+                  final harvest = h as Map<String, dynamic>;
+                  final id = harvest['id']?.toString();
+                  final name = harvest['crop_name'] ?? harvest['name'] ?? 'Harvest lot';
+                  final qty = harvest['available_quantity_kg'] ?? harvest['quantity_kg'] ?? '-';
                   return DropdownMenuItem<String>(
-                    value: c['id'],
-                    child: Text('${c['name']} (${c['variety'] ?? 'Standard'})'),
+                    value: id,
+                    child: Text('$name • $qty kg'),
                   );
                 }).toList(),
                 onChanged: (val) {
+                  final matches = _harvests.whereType<Map<String, dynamic>>().where(
+                    (h) => h['id']?.toString() == val,
+                  );
+                  final selected = matches.isNotEmpty ? matches.first : <String, dynamic>{};
                   setState(() {
-                    _selectedCropId = val;
-                    final selected = _crops.firstWhere((c) => c['id'] == val, orElse: () => null);
-                    if (selected != null) {
-                      _titleController.text = '${selected['name']} Fresh Harvest';
-                    }
+                    _selectedLotId = val;
+                    final cropName = selected['crop_name'] ?? selected['name'] ?? 'Produce';
+                    _titleController.text = '$cropName Fresh Harvest';
+                    final quantity = selected['available_quantity_kg'] ?? selected['quantity_kg'];
+                    if (quantity != null) _quantityController.text = quantity.toString();
                   });
                 },
                 decoration: const InputDecoration(filled: true, fillColor: AppColors.cardBackground),
