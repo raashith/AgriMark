@@ -1,3 +1,4 @@
+// AgriMark Production Web Application - Main Landing Page
 'use client';
 
 import React from 'react';
