@@ -9,6 +9,8 @@ interface AuthContextType {
   user: UserProfile | null;
   isLoading: boolean;
   login: (credentials: any) => Promise<UserProfile>;
+  loginWithPhoneOtp: (phone: string) => Promise<void>;
+  verifyPhoneOtp: (phone: string, token: string) => Promise<UserProfile>;
   loginWithGoogle: () => Promise<void>;
   register: (data: any) => Promise<UserProfile>;
   logout: () => Promise<void>;
@@ -20,6 +22,8 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
   login: async () => { throw new Error('Not initialized'); },
+  loginWithPhoneOtp: async () => { throw new Error('Not initialized'); },
+  verifyPhoneOtp: async () => { throw new Error('Not initialized'); },
   loginWithGoogle: async () => {},
   register: async () => { throw new Error('Not initialized'); },
   logout: async () => {},
@@ -117,6 +121,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithPhoneOtp = async (phone: string): Promise<void> => {
+    const normalized = normalizePhone(phone);
+    validatePhone(normalized);
+    const { error } = await supabase.auth.signInWithOtp({ phone: normalized });
+    if (error) throw new Error(formatAuthError(error.message));
+  };
+
+  const verifyPhoneOtp = async (phone: string, token: string): Promise<UserProfile> => {
+    const normalized = normalizePhone(phone);
+    validatePhone(normalized);
+    const code = token.replace(/\D/g, '');
+    if (!/^\d{6}$/.test(code)) throw new Error('Enter the 6-digit verification code.');
+
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone: normalized,
+      token: code,
+      type: 'sms',
+    });
+    if (error) throw new Error(formatAuthError(error.message));
+    if (!data.session?.access_token) throw new Error('Verification succeeded but no session was returned. Please try again.');
+
+    const profile = await syncProfile(data.session.access_token);
+    if (!profile) throw new Error('Phone verified, but profile setup could not be loaded. Please try again.');
+    return profile;
+  };
+
   const loginWithGoogle = async (): Promise<void> => {
     const redirectUrl = typeof window !== 'undefined'
       ? `${window.location.origin}/auth/callback`
@@ -170,8 +200,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('Your account was created, but profile setup is still completing. Please log in.');
       }
 
-      // Email confirmation is enabled: signup succeeds without a session.
-      // Do not immediately call login, because the account cannot authenticate until confirmed.
       throw new Error('Account created. Please check your email and confirm your address before logging in.');
     } finally {
       setIsLoading(false);
@@ -197,6 +225,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       user,
       isLoading,
       login,
+      loginWithPhoneOtp,
+      verifyPhoneOtp,
       loginWithGoogle,
       register,
       logout,
@@ -208,4 +238,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+function normalizePhone(phone: string): string {
+  const raw = phone.trim();
+  const digits = raw.replace(/\D/g, '');
+  if (raw.startsWith('+')) return `+${digits}`;
+  if (digits.length === 10) return `+91${digits}`;
+  return `+${digits}`;
+}
+
+function validatePhone(phone: string): void {
+  if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
+    throw new Error('Enter a valid mobile number with country code, for example +919876543210.');
+  }
+}
+
+function formatAuthError(message: string): string {
+  const normalized = message.toLowerCase();
+  if (normalized.includes('rate limit') || normalized.includes('too many')) {
+    return 'Too many OTP requests. Please wait before requesting another code.';
+  }
+  if (normalized.includes('phone') && normalized.includes('disabled')) {
+    return 'Phone login is not enabled yet. Please contact support.';
+  }
+  return message || 'Unable to send or verify the OTP. Please try again.';
+}
