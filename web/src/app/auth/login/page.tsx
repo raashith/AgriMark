@@ -43,29 +43,7 @@ export default function LoginPage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!authLoading && user && isAuthenticated) {
-      goToRole(user);
-    }
-  }, [authLoading, user, isAuthenticated]);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (resendTimer > 0) {
-      interval = setInterval(() => {
-        setResendTimer((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [resendTimer]);
-
-  useEffect(() => {
-    if (otpSent && otpInputRefs.current[0]) {
-      otpInputRefs.current[0]?.focus();
-    }
-  }, [otpSent]);
-
-  const goToRole = (userProfile: any) => {
+  const goToRole = React.useCallback((userProfile: any) => {
     if (userProfile?.needs_onboarding) {
       router.push('/auth/onboarding');
       return;
@@ -77,7 +55,13 @@ export default function LoginPage() {
     else if (role === 'logistics') router.push('/logistics/deliveries');
     else if (role === 'admin') router.push('/admin/dashboard');
     else router.push('/farmer/dashboard');
-  };
+  }, [router]);
+
+  useEffect(() => {
+    if (!authLoading && user && isAuthenticated) {
+      goToRole(user);
+    }
+  }, [authLoading, user, isAuthenticated, goToRole]);
 
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
