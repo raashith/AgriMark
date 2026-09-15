@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile, UserRole } from '@/types';
 import { supabase, logSupabaseDiagnostic } from './supabase';
 import { api } from './api';
-import { PRODUCTION_SITE_URL, getAuthCallbackUrl } from './auth-config';
+import { PRODUCTION_SITE_URL, getAuthCallbackUrl, parseOAuthUrl, SUPABASE_GOOGLE_CALLBACK } from './auth-config';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -45,9 +45,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const syncProfile = async (accessToken?: string): Promise<UserProfile | null> => {
-    if (accessToken && typeof window !== 'undefined') {
-      localStorage.setItem('agrimark_token', accessToken);
-    }
+    if (accessToken && typeof window !== 'undefined') localStorage.setItem('agrimark_token', accessToken);
     try {
       const profile = await api.getMe();
       setUser(profile);
@@ -151,17 +149,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         queryParams: { prompt: 'select_account' },
       },
     });
+
     if (error || !data?.url) {
       if (error) logSupabaseDiagnostic('signInWithOAuth', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/authorize', 400, error.message);
       throw new Error(formatAuthError(error?.message || 'Google Sign-In could not start.'));
     }
-    const oauthUrl = new URL(data.url);
-    if (oauthUrl.hostname !== 'accounts.google.com') {
-      throw new Error('Invalid OAuth redirect host returned.');
+
+    const diagnostics = parseOAuthUrl(data.url);
+    if (!diagnostics.isValidGoogleHost || !diagnostics.isCanonicalSupabaseCallback) {
+      console.error('[AgriMark OAuth Diagnostic] Invalid generated Google OAuth request', {
+        ...diagnostics,
+        expectedAppCallback: redirectTo,
+        expectedGoogleCallback: SUPABASE_GOOGLE_CALLBACK,
+      });
+      throw new Error('Google Sign-In configuration needs attention. Please try again.');
     }
-    if (typeof window !== 'undefined') {
-      window.location.assign(data.url);
-    }
+
+    if (typeof window !== 'undefined') window.location.assign(data.url);
   };
 
   const register = async (data: any): Promise<UserProfile> => {
@@ -177,7 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email,
         password,
         options: {
-          emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : PRODUCTION_SITE_URL}/auth/callback`,
+          emailRedirectTo: `${getAuthCallbackUrl()}`,
           data: {
             full_name: data.full_name,
             phone: data.phone || data.phone_number,
