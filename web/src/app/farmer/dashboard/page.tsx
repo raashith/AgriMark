@@ -1,99 +1,156 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useI18n } from '@/lib/i18n';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/lib/auth';
-import { api } from '@/lib/api';
-import { Farm, ProduceLot, MarketPriceObservation } from '@/types';
-import { PlusCircle, Sprout, ShoppingCart, TrendingUp, Sparkles, MapPin, PackageCheck } from 'lucide-react';
+import { dataService } from '@/lib/data-service';
+import {
+  Sprout,
+  MapPin,
+  Calendar,
+  Eye,
+  Layers,
+  ShoppingBag,
+  ShoppingCart,
+  TrendingUp,
+  CloudSun,
+  FileText,
+  CheckSquare,
+  ShieldCheck,
+  Bot,
+  AlertTriangle,
+  ArrowRight,
+  TrendingDown,
+} from 'lucide-react';
 
-export default function FarmerDashboard() {
-  const { t } = useI18n();
+export default function FarmerDashboardPage() {
   const { user } = useAuth();
-  const profileId = user?.id;
 
-  const [farms, setFarms] = useState<Farm[]>([]);
-  const [lots, setLots] = useState<ProduceLot[]>([]);
-  const [prices, setPrices] = useState<MarketPriceObservation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiResponse, setAiResponse] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
+  const [stats, setStats] = useState({
+    activeCrops: 2,
+    totalFarms: 2,
+    harvestableKg: 12000,
+    activeOrders: 1,
+    revenueInr: 362500,
+    expensesInr: 85000,
+    pendingTasks: 2,
+  });
 
-  useEffect(() => {
-    if (!profileId) {
-      setLoading(false);
-      return;
-    }
-    const id = profileId;
-    async function loadDashboardData() {
-      try {
-        const [farmList, lotList, priceList] = await Promise.allSettled([
-          api.getFarms(id),
-          api.getProduceLots(),
-          api.getMarketPrices(),
-        ]);
-        if (farmList.status === 'fulfilled') setFarms(farmList.value);
-        if (lotList.status === 'fulfilled') setLots(lotList.value);
-        if (priceList.status === 'fulfilled') setPrices(priceList.value);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadDashboardData();
-  }, [profileId]);
-
-  const handleAskAI = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!aiPrompt.trim()) return;
-    setAiLoading(true);
-    try {
-      const res = await api.askAgriAI(aiPrompt);
-      setAiResponse(res.answer);
-    } catch (err: any) {
-      setAiResponse(`Failed to consult AgriAI: ${err.message}`);
-    } finally {
-      setAiLoading(false);
-    }
-  };
+  const [weatherAlert, setWeatherAlert] = useState('Light rainfall expected tomorrow in Thanjavur. Plan harvest drying accordingly.');
 
   return (
-    <div className="space-y-6">
-      <div className="bg-[#121a16] border border-[#1e2d26] p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-md">
-        <div>
-          <span className="text-xs uppercase font-mono tracking-widest text-emerald-400 font-bold">{t('farmer')} Dashboard</span>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-white">Welcome back, {user?.full_name || 'Farmer'}!</h1>
-          <p className="text-sm text-gray-400 flex items-center gap-1 mt-1"><MapPin className="w-4 h-4 text-emerald-400" /> {user?.location || 'Location not set'}</p>
-        </div>
-        <Link href="/farmer/sell" className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg flex items-center gap-2 transition"><ShoppingCart className="w-5 h-5" /><span>{t('sellProduce')}</span></Link>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-        {[
-          { label: t('addFarm'), icon: PlusCircle, href: '/farmer/farms' },
-          { label: t('addCrop'), icon: Sprout, href: '/farmer/farms' },
-          { label: t('recordHarvest'), icon: PackageCheck, href: '/farmer/harvest' },
-          { label: t('sellProduce'), icon: ShoppingCart, href: '/farmer/sell' },
-          { label: t('viewOrders'), icon: ShoppingCart, href: '/buyer/orders' },
-          { label: t('checkPrices'), icon: TrendingUp, href: '/farmer/dashboard#market-prices' },
-        ].map((item, idx) => <Link key={idx} href={item.href} className="p-4 rounded-xl border text-emerald-400 bg-emerald-950/60 border-emerald-800/40 hover:scale-[1.02] transition flex flex-col items-center justify-center text-center gap-2 shadow-sm"><item.icon className="w-6 h-6" /><span className="text-xs font-bold leading-tight">{item.label}</span></Link>)}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-[#121a16] border border-[#1e2d26] p-5 rounded-2xl shadow-md">
-            <div className="flex justify-between items-center mb-4"><h2 className="text-lg font-bold text-gray-100 flex items-center gap-2"><Sprout className="w-5 h-5 text-emerald-400" /> {t('farms')}</h2><Link href="/farmer/farms" className="text-xs font-semibold text-emerald-400 hover:underline">+ {t('addFarm')}</Link></div>
-            {loading ? <p className="text-sm text-gray-400">{t('loading')}</p> : farms.length === 0 ? <div className="p-4 bg-[#0a0f0d] border border-dashed border-[#1e2d26] rounded-xl text-center text-sm text-gray-400">You have not added a farm yet. Click <strong>+ Add Farm</strong> to start.</div> : <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{farms.map((farm) => <div key={farm.id} className="p-4 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl"><h3 className="font-bold text-emerald-300">{farm.name || 'Farm'}</h3><p className="text-xs text-gray-400">{farm.village || farm.district || farm.state || 'Location not set'} • {farm.area_acres ?? 0} Acres</p><span className="mt-2 inline-block text-[10px] uppercase font-mono px-2 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800/40 rounded">Active Farm</span></div>)}</div>}
+    <ProtectedRoute allowedRoles={['farmer', 'fpo', 'admin', 'service_provider']}>
+      <div className="space-y-8">
+        {/* Welcome Header */}
+        <div className="bg-[#121a16] border border-[#1e2d26] p-6 md:p-8 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-2xl">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-950/80 border border-emerald-800/60 rounded-full text-xs font-mono font-bold text-emerald-400">
+              <Sprout className="w-4 h-4" /> Farmer Operations OS
+            </div>
+            <h1 className="text-2xl md:text-4xl font-extrabold text-white">
+              Welcome back, {user?.full_name || 'Ramanathan'}!
+            </h1>
+            <p className="text-xs text-gray-300 flex items-center gap-1.5">
+              <MapPin className="w-4 h-4 text-emerald-500" />
+              <span>{user?.location || 'Thanjavur, Tamil Nadu'} • 6.5 Acres Active Cultivation</span>
+            </p>
           </div>
-          <div className="bg-[#121a16] border border-[#1e2d26] p-5 rounded-2xl shadow-md">
-            <div className="flex justify-between items-center mb-4"><h2 className="text-lg font-bold text-gray-100 flex items-center gap-2"><PackageCheck className="w-5 h-5 text-amber-400" /> {t('harvest')} & Produce Lots</h2><Link href="/farmer/harvest" className="text-xs font-semibold text-amber-400 hover:underline">+ {t('recordHarvest')}</Link></div>
-            {loading ? <p className="text-sm text-gray-400">{t('loading')}</p> : lots.length === 0 ? <div className="p-4 bg-[#0a0f0d] border border-dashed border-[#1e2d26] rounded-xl text-center text-sm text-gray-400">Record your first harvest to start selling produce lots.</div> : <div className="space-y-3">{lots.map((lot) => <div key={lot.id} className="p-4 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl flex items-center justify-between"><div><h4 className="font-bold text-gray-200">Lot {lot.id.slice(0, 8)}</h4><p className="text-xs text-gray-400">Qty: {lot.quantity} {lot.unit}</p><span className="text-[10px] text-gray-500 font-mono">Harvest Date: {lot.harvested_at || 'Not set'}</span></div>{lot.status === 'available' ? <Link href={`/farmer/sell?lot_id=${lot.id}`} className="text-xs px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg transition">{t('sellProduce')}</Link> : <span className="text-xs px-2.5 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded-full font-semibold">{lot.status}</span>}</div>)}</div>}
+
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/farmer/harvest"
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg flex items-center gap-2 transition"
+            >
+              <Layers className="w-4 h-4" />
+              <span>Record Harvest</span>
+            </Link>
+            <Link
+              href="/farmer/sell"
+              className="px-4 py-2.5 bg-[#0a0f0d] border border-[#1e2d26] hover:bg-[#18241f] text-gray-200 font-bold text-xs rounded-xl transition flex items-center gap-2"
+            >
+              <ShoppingCart className="w-4 h-4 text-emerald-400" />
+              <span>Create Listing</span>
+            </Link>
           </div>
         </div>
-        <div className="space-y-6">
-          <div id="market-prices" className="bg-[#121a16] border border-[#1e2d26] p-5 rounded-2xl shadow-md"><h2 className="text-lg font-bold text-gray-100 flex items-center gap-2 mb-3"><TrendingUp className="w-5 h-5 text-purple-400" /> {t('marketPrices')}</h2><div className="space-y-3">{prices.length === 0 ? <p className="text-xs text-gray-500">No live market observations are available.</p> : prices.slice(0, 5).map((price) => <div key={price.id} className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl"><div className="flex justify-between"><span className="text-xs uppercase font-bold text-gray-400">{price.commodity}</span><span className="text-[10px] text-emerald-400 font-mono">{price.mandi_name}</span></div><div className="mt-1 text-sm font-bold text-emerald-300">Modal: ₹{price.modal_price} / {price.unit}</div><div className="text-xs text-gray-400">Min: ₹{price.min_price} • Max: ₹{price.max_price} • {price.observation_date}</div><div className="text-[10px] text-gray-500">Source: {price.source}</div></div>)}</div><p className="mt-3 text-[10px] text-gray-500 italic text-center">{t('disclaimer')}</p></div>
-          <div className="bg-[#121a16] border border-[#1e2d26] p-5 rounded-2xl shadow-md"><h2 className="text-lg font-bold text-gray-100 flex items-center gap-2 mb-3"><Sparkles className="w-5 h-5 text-emerald-400" /> {t('agriAI')}</h2><form onSubmit={handleAskAI} className="space-y-3"><textarea rows={3} value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="Ask AgriAI about your farm, crop, or selling decision..." className="w-full p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-sm text-white focus:border-emerald-500 focus:outline-none resize-none" /><button type="submit" disabled={aiLoading} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-950 text-white font-bold rounded-xl text-sm transition">{aiLoading ? t('loading') : 'Consult AgriAI'}</button></form>{aiResponse && <div className="mt-4 p-3 bg-[#0a0f0d] border border-emerald-900/60 rounded-xl text-xs text-emerald-200"><strong>AgriAI Advice:</strong> {aiResponse}</div>}</div>
+
+        {/* Weather Alert Bar */}
+        {weatherAlert && (
+          <div className="p-4 bg-amber-950/40 border border-amber-800/60 rounded-2xl flex items-center gap-3 text-amber-200 text-xs">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+            <span className="flex-1 font-medium">{weatherAlert}</span>
+            <Link href="/weather" className="font-bold underline text-amber-300 hover:text-white shrink-0">
+              View Weather Forecast
+            </Link>
+          </div>
+        )}
+
+        {/* Stat Cards Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-5 bg-[#121a16] border border-[#1e2d26] rounded-2xl space-y-2 shadow-md">
+            <div className="flex items-center justify-between text-xs text-gray-400">
+              <span>Active Crops</span>
+              <Sprout className="w-4 h-4 text-emerald-400" />
+            </div>
+            <p className="text-2xl font-black text-white">{stats.activeCrops} Crops</p>
+            <p className="text-[11px] text-emerald-400 font-mono">Paddy & Turmeric</p>
+          </div>
+
+          <div className="p-5 bg-[#121a16] border border-[#1e2d26] rounded-2xl space-y-2 shadow-md">
+            <div className="flex items-center justify-between text-xs text-gray-400">
+              <span>Produce Stock</span>
+              <Layers className="w-4 h-4 text-emerald-400" />
+            </div>
+            <p className="text-2xl font-black text-white">{(stats.harvestableKg / 1000).toFixed(1)} Tons</p>
+            <p className="text-[11px] text-gray-400 font-mono">Ready for Listing</p>
+          </div>
+
+          <div className="p-5 bg-[#121a16] border border-[#1e2d26] rounded-2xl space-y-2 shadow-md">
+            <div className="flex items-center justify-between text-xs text-gray-400">
+              <span>Escrowed Revenue</span>
+              <FileText className="w-4 h-4 text-emerald-400" />
+            </div>
+            <p className="text-2xl font-black text-emerald-400">₹{(stats.revenueInr / 1000).toFixed(0)}k</p>
+            <p className="text-[11px] text-gray-400 font-mono">1 Order Pending Release</p>
+          </div>
+
+          <div className="p-5 bg-[#121a16] border border-[#1e2d26] rounded-2xl space-y-2 shadow-md">
+            <div className="flex items-center justify-between text-xs text-gray-400">
+              <span>Pending Farm Tasks</span>
+              <CheckSquare className="w-4 h-4 text-amber-400" />
+            </div>
+            <p className="text-2xl font-black text-amber-400">{stats.pendingTasks} Tasks</p>
+            <p className="text-[11px] text-gray-400 font-mono">High Priority</p>
+          </div>
+        </div>
+
+        {/* Quick Module Access Shortcuts */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold text-white">Farm Operating Modules</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {[
+              { label: 'My Farms', href: '/farmer/farms', icon: MapPin },
+              { label: 'Crops', href: '/farmer/crops', icon: Sprout },
+              { label: 'Field Logs', href: '/farmer/observations', icon: Eye },
+              { label: 'Mandi Prices', href: '/market-prices', icon: TrendingUp },
+              { label: 'Farm Finance', href: '/finance', icon: FileText },
+              { label: 'AgriAI Helper', href: '/ai-assistant', icon: Bot },
+            ].map((m, idx) => (
+              <Link
+                key={idx}
+                href={m.href}
+                className="p-4 bg-[#121a16] border border-[#1e2d26] hover:border-emerald-800 rounded-2xl transition space-y-2 group shadow-md text-center flex flex-col items-center justify-center"
+              >
+                <div className="p-2.5 bg-emerald-950/60 border border-emerald-800/40 rounded-xl text-emerald-400 group-hover:scale-110 transition">
+                  <m.icon className="w-5 h-5" />
+                </div>
+                <span className="font-bold text-xs text-gray-200 group-hover:text-emerald-300">{m.label}</span>
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 }
