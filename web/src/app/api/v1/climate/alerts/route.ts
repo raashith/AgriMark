@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClimateAlert, ClimateAlert } from '@/lib/climate-response-workflows';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const region = searchParams.get('region') || 'Salem';

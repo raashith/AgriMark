@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { matchCircularDemand, computeCircularValue } from '@/lib/circular-agriculture-marketplace';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const wasteId = searchParams.get('waste_id') || 'WASTE_DEMO_1';
