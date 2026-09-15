@@ -29,13 +29,20 @@ export default function RegisterPage() {
     if (loading) return;
     setError('');
 
-    if (role === 'admin') {
-      setError('Self-registration as admin is prohibited.');
+    if (!fullName.trim()) {
+      setError('Enter your full name.');
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setError('Enter a valid email address.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must contain at least 6 characters.');
       return;
     }
 
     setLoading(true);
-
     try {
       const user = await register({
         email,
@@ -46,20 +53,18 @@ export default function RegisterPage() {
         phone_number: phoneNumber,
       });
 
-      if (user.role === 'farmer') {
-        router.push('/farmer/dashboard');
-      } else if (user.role === 'buyer') {
-        router.push('/buyer/marketplace');
-      } else {
-        router.push('/');
+      if (user.needs_onboarding) {
+        router.push('/auth/onboarding');
+        return;
       }
+      if (user.role === 'farmer') router.push('/farmer/dashboard');
+      else if (user.role === 'buyer') router.push('/buyer/marketplace');
+      else if (user.role === 'fpo') router.push('/fpo/dashboard');
+      else if (user.role === 'logistics') router.push('/logistics/deliveries');
+      else router.push('/');
     } catch (err: any) {
       const raw = String(err?.message || 'Registration failed. Please try again.').trim();
-      if (/rate limit|too many requests|email.*limit/i.test(raw)) {
-        setError('Email signup is temporarily rate-limited by Supabase. Please wait before trying again, or continue with Google Sign-In from the login page.');
-      } else {
-        setError(raw);
-      }
+      setError(raw);
     } finally {
       setLoading(false);
     }
@@ -85,21 +90,11 @@ export default function RegisterPage() {
           </div>
           {isRateLimited && (
             <div className="flex flex-col sm:flex-row gap-2">
-              <button
-                type="button"
-                onClick={goToLogin}
-                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-semibold"
-              >
-                <Mail className="w-4 h-4" />
-                Continue to Login
+              <button type="button" onClick={goToLogin} className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-semibold">
+                <Mail className="w-4 h-4" /> Continue to Login
               </button>
-              <button
-                type="button"
-                onClick={() => setError('')}
-                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-[#2a3a31] text-gray-300 hover:bg-[#172019]"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Try Later
+              <button type="button" onClick={() => setError('')} className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-[#2a3a31] text-gray-300 hover:bg-[#172019]">
+                <RefreshCw className="w-4 h-4" /> Try Later
               </button>
             </div>
           )}
@@ -110,22 +105,8 @@ export default function RegisterPage() {
         <div>
           <label className="block text-xs font-semibold uppercase text-gray-400 mb-2">{t('selectRole')}</label>
           <div className="grid grid-cols-2 gap-2">
-            {[
-              { id: 'farmer', label: t('farmer') },
-              { id: 'buyer', label: t('buyer') },
-              { id: 'fpo', label: t('fpo') },
-              { id: 'logistics', label: t('logistics') },
-            ].map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setRole(item.id as UserRole)}
-                className={`p-3 rounded-xl border text-sm font-semibold flex items-center justify-between transition ${
-                  role === item.id
-                    ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300'
-                    : 'bg-[#0a0f0d] border-[#1e2d26] text-gray-400 hover:border-gray-700'
-                }`}
-              >
+            {[{ id: 'farmer', label: t('farmer') }, { id: 'buyer', label: t('buyer') }, { id: 'fpo', label: t('fpo') }, { id: 'logistics', label: t('logistics') }].map((item) => (
+              <button key={item.id} type="button" onClick={() => setRole(item.id as UserRole)} className={`p-3 rounded-xl border text-sm font-semibold flex items-center justify-between transition ${role === item.id ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300' : 'bg-[#0a0f0d] border-[#1e2d26] text-gray-400 hover:border-gray-700'}`}>
                 <span>{item.label}</span>
                 {role === item.id && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
               </button>
@@ -136,28 +117,28 @@ export default function RegisterPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">{t('fullName')}</label>
-            <input type="text" required value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" placeholder="Ramachandran" />
+            <input type="text" required autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" placeholder="Your full name" />
           </div>
           <div>
             <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">{t('email')}</label>
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" placeholder="farmer@agrimark.org" />
+            <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" placeholder="farmer@example.com" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">{t('location')}</label>
-            <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" placeholder="Dindigul, Tamil Nadu" />
+            <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" placeholder="Village, district, state" />
           </div>
           <div>
             <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">{t('phoneNumber')}</label>
-            <input type="text" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" placeholder="+91 9876543210" />
+            <input type="tel" autoComplete="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" placeholder="+91 9876543210" />
           </div>
         </div>
 
         <div>
           <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">{t('password')}</label>
-          <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" placeholder="••••••••" />
+          <input type="password" required minLength={6} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" placeholder="At least 6 characters" />
         </div>
 
         <button type="submit" disabled={loading} className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2">
