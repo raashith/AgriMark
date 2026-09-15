@@ -1,4 +1,4 @@
-import { supabaseAdmin } from './supabase';
+import { supabase as supabaseAdmin } from './supabase';
 
 export type ContributionType = 'OBSERVED' | 'CORRELATED' | 'ESTIMATED_CONTRIBUTION';
 

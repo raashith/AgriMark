@@ -1,4 +1,4 @@
-import { supabaseAdmin } from './supabase';
+import { supabase as supabaseAdmin } from './supabase';
 
 export type RiskSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type RiskType = 'SUPPLY_SHOCK' | 'DEMAND_SHOCK' | 'MARKET_CONCENTRATION' | 'SINGLE_BUYER_DEPENDENCY' | 'LOGISTICS_BOTTLENECK' | 'PRICE_ANOMALY';

@@ -1,4 +1,4 @@
-import { supabaseAdmin } from './supabase';
+import { supabase as supabaseAdmin } from './supabase';
 
 export interface ModelRecord {
   id: string;
