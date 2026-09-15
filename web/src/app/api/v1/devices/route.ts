@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { registerDevice, verifyDeviceAuthentication } from '@/lib/device-registry-engine';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const deviceId = searchParams.get('device_id') || 'dev_soil_salem_01';

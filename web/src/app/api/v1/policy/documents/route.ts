@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { evaluateDocumentReadiness } from '@/lib/document-readiness-engine';
 
@@ -16,3 +17,4 @@ export async function GET(request: Request) {
     }
   });
 }
+

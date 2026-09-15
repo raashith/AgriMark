@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { generateEarlyWarningAlert } from '@/lib/early-warning-system';
 import { computeFoodSecurityIndicators } from '@/lib/food-security-indicators';
@@ -17,3 +18,4 @@ export async function GET(request: Request) {
     }
   });
 }
+

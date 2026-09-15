@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { ProcurementCommerceEngine } from '@/lib/procurement-commerce-engine';
 
@@ -55,3 +56,4 @@ export async function GET(request: Request) {
     headers: { 'X-Request-ID': requestId }
   });
 }
+

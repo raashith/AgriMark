@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { InterventionCounterfactualEngine } from '@/lib/intervention-counterfactual-engine';
 
@@ -17,3 +18,4 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ success: true, counterfactual });
 }
+

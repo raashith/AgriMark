@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { ReconciliationEngine } from '@/lib/reconciliation-engine';
 
@@ -28,3 +29,4 @@ export async function GET(request: Request) {
     headers: { 'X-Request-ID': requestId }
   });
 }
+

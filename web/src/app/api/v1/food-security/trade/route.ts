@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { evaluateImportDependency, evaluateExportPressure } from '@/lib/trade-intelligence-engine';
 
@@ -19,3 +20,4 @@ export async function GET(request: Request) {
     }
   });
 }
+

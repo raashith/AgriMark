@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { Request } from 'next/dist/compiled/@edge-runtime/primitives';
 import { parsePaginationParams, createInteroperabilityResponse } from '@/lib/interoperability-api-helpers';
 import { InteroperabilityContractEngine } from '@/lib/interoperability-contracts';
@@ -29,3 +30,4 @@ export async function GET(request: Request) {
 
   return createInteroperabilityResponse([contract], pagination, requestId);
 }
+

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getActiveSchemes } from '@/lib/scheme-intelligence-engine';
 import { compareGovernmentSchemes } from '@/lib/policy-search-comparison';
@@ -16,3 +17,4 @@ export async function GET(request: Request) {
   const schemes = await getActiveSchemes();
   return NextResponse.json({ success: true, data: schemes });
 }
+

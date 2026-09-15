@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { computeWaterIntelligence, generateIrrigationRecommendation } from '@/lib/water-intelligence-engine';
 
@@ -18,3 +19,4 @@ export async function GET(request: Request) {
     }
   });
 }
+

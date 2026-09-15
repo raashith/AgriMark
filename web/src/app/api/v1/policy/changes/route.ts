@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { detectPolicyChanges } from '@/lib/policy-change-detection';
 
@@ -8,3 +9,4 @@ export async function GET(request: Request) {
   const changes = await detectPolicyChanges(policyId);
   return NextResponse.json({ success: true, data: changes });
 }
+

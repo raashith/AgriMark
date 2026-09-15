@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getProcessingAnalytics } from '@/lib/storage-processing-intelligence';
 
@@ -8,3 +9,4 @@ export async function GET(request: Request) {
   const processing = await getProcessingAnalytics(commodity);
   return NextResponse.json({ success: true, data: processing });
 }
+

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { NationalSupplyDemandEngine } from '@/lib/national-supply-demand';
 
@@ -26,3 +27,4 @@ export async function GET(request: Request) {
     headers: { 'X-Request-ID': requestId }
   });
 }
+

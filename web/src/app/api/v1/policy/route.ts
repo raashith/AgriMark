@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { fetchPolicyDocument } from '@/lib/policy-document-system';
 
@@ -14,3 +15,4 @@ export async function GET(request: Request) {
     }
   });
 }
+

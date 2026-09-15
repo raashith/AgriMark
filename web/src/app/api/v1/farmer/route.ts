@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
@@ -22,3 +23,4 @@ export async function GET(req: Request) {
     ai_recommendation: 'Apply pulse drip irrigation during morning hours. 12% yield improvement projected.'
   });
 }
+

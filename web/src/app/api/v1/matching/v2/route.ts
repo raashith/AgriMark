@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { computeMatchingV2, getMatchesForFarmer } from '@/lib/matching-v2-engine';
 
@@ -26,3 +27,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 400 });
   }
 }
+

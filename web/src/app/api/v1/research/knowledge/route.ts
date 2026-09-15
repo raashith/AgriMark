@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { queryKnowledgeGraph } from '@/lib/knowledge-graph-engine';
 import {
@@ -26,3 +27,4 @@ export async function GET(request: Request) {
     }
   });
 }
+

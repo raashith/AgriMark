@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { searchResearchPapers } from '@/lib/research-repository-engine';
 
@@ -10,3 +11,4 @@ export async function GET(request: Request) {
   const results = await searchResearchPapers(crop, page, limit);
   return NextResponse.json({ success: true, ...results });
 }
+

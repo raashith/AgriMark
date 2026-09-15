@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { queryAgriResearchAssistant } from '@/lib/agri-research-assistant';
 
@@ -15,3 +16,4 @@ export async function GET(request: Request) {
     }
   });
 }
+

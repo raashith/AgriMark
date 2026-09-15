@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { createKnowledgeClaim, translateResearchForFarmer } from '@/lib/evidence-engine';
 
@@ -19,3 +20,4 @@ export async function GET(request: Request) {
     }
   });
 }
+

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { CommodityBalanceEngine } from '@/lib/commodity-balance-engine';
 
@@ -47,3 +48,4 @@ export async function GET(request: Request) {
     }
   });
 }
+

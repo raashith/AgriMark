@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { ScenarioSimulationEngine } from '@/lib/scenario-simulation-engine';
 
@@ -16,3 +17,4 @@ export async function GET(req: Request) {
 
   return NextResponse.json(mcResults);
 }
+

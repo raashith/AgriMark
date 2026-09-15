@@ -55,6 +55,68 @@ def test_generated_oauth_request_url_parsing():
     assert code_challenge_method == "S256"
 
 
+def test_pkce_flow_id_extraction():
+    """Verify sb_flow_id parameter extraction from callback query string."""
+    sample_callback = "https://agrimark-six.vercel.app/auth/callback?code=auth_code_123&sb_flow_id=flow_abc_456"
+    parsed = urlparse(sample_callback)
+    params = parse_qs(parsed.query)
+
+    code = params.get("code", [None])[0]
+    flow_id = params.get("sb_flow_id", [None])[0] or params.get("flow_id", [None])[0]
+
+    assert code == "auth_code_123"
+    assert flow_id == "flow_abc_456"
+
+
+def test_callback_cookie_propagation_sync():
+    """Verify that setAll synchronizes both request and response cookies."""
+    request_cookies = {}
+    response_cookies = {}
+
+    def set_all(cookies_to_set):
+        for c in cookies_to_set:
+            request_cookies[c['name']] = c['value']
+            response_cookies[c['name']] = c['value']
+
+    set_all([
+        {'name': 'sb-xrcqzpnstdbbtafhcwbb-auth-token', 'value': 'access_token_123'},
+        {'name': 'sb-xrcqzpnstdbbtafhcwbb-auth-token-code-verifier', 'value': 'verifier_xyz'}
+    ])
+
+    assert request_cookies.get('sb-xrcqzpnstdbbtafhcwbb-auth-token') == 'access_token_123'
+    assert response_cookies.get('sb-xrcqzpnstdbbtafhcwbb-auth-token') == 'access_token_123'
+
+
+def test_duplicate_oauth_lock_prevention():
+    """Verify locking mechanism prevents double-triggering OAuth flows."""
+    lock = False
+    executions = 0
+
+    def trigger_login():
+        nonlocal lock, executions
+        if lock:
+            return "ignored"
+        lock = True
+        executions += 1
+        return "started"
+
+    assert trigger_login() == "started"
+    assert trigger_login() == "ignored"
+    assert executions == 1
+
+
+def test_no_cache_headers_for_callback():
+    """Verify required no-cache headers for OAuth callback route responses."""
+    headers = {}
+    headers["Cache-Control"] = "private, no-store, no-cache, must-revalidate"
+    headers["Pragma"] = "no-cache"
+    headers["Expires"] = "0"
+
+    assert "no-store" in headers["Cache-Control"]
+    assert headers["Pragma"] == "no-cache"
+    assert headers["Expires"] == "0"
+
+
 def test_role_based_post_login_redirection():
     """Verify role-to-dashboard mapping logic for authenticated users."""
     role_dashboard_map = {

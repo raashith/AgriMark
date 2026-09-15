@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { detectMarketOpportunities } from '@/lib/market-opportunity-engine';
 
@@ -9,3 +10,4 @@ export async function GET(request: Request) {
   const opportunities = await detectMarketOpportunities(entityId, entityType);
   return NextResponse.json({ success: true, data: opportunities });
 }
+

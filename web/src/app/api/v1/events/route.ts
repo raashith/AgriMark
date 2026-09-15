@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { DomainEventBus } from '@/lib/domain-event-bus';
 
@@ -21,3 +22,4 @@ export async function GET() {
     headers: { 'X-Request-ID': requestId }
   });
 }
+

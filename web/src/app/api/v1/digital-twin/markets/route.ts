@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { InfrastructureMarketSupplyTwinEngine } from '@/lib/infrastructure-market-supply-twin';
 
@@ -10,3 +11,4 @@ export async function GET(req: Request) {
   const marketSim = InfrastructureMarketSupplyTwinEngine.simulateMarketPrice(commodity, supply, demand);
   return NextResponse.json(marketSim);
 }
+

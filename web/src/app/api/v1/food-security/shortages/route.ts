@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { evaluateShortageRisk } from '@/lib/shortage-detection-engine';
 import { computeRegionalRedistribution } from '@/lib/regional-redistribution-engine';
@@ -22,3 +23,4 @@ export async function GET(request: Request) {
     }
   });
 }
+

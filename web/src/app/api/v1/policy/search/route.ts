@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { searchGovernmentSchemes, SchemeSearchFilters } from '@/lib/policy-search-comparison';
 
@@ -14,3 +15,4 @@ export async function GET(request: Request) {
   const results = await searchGovernmentSchemes(filters);
   return NextResponse.json({ success: true, ...results });
 }
+

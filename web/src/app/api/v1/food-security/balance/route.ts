@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { computeSupplyBalance } from '@/lib/national-supply-balance';
 
@@ -19,3 +20,4 @@ export async function GET(request: Request) {
     }
   });
 }
+

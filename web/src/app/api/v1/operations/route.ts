@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { ObservabilityEngine } from '@/lib/observability-engine';
 
@@ -9,3 +10,4 @@ export async function GET() {
     report,
   });
 }
+

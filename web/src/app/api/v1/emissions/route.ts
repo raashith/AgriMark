@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { calculateFarmEmissions } from '@/lib/emissions-foundation-engine';
 
@@ -15,3 +16,4 @@ export async function GET(request: Request) {
     }
   });
 }
+

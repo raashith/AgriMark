@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { PolicySchemeEngine } from '@/lib/policy-scheme-engine';
 import { GovernmentScheme } from '@/lib/national-data-model';
@@ -59,3 +60,4 @@ export async function GET(request: Request) {
     headers: { 'X-Request-ID': requestId }
   });
 }
+

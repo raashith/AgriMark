@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { DataQualityProvenanceEngine } from '@/lib/data-quality-provenance';
 
@@ -37,3 +38,4 @@ export async function GET() {
     headers: { 'X-Request-ID': requestId }
   });
 }
+

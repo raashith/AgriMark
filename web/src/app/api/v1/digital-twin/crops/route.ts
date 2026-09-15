@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { FarmCropSoilWaterTwinEngine, CropStage } from '@/lib/farm-crop-soil-water-twin';
 
@@ -21,3 +22,4 @@ export async function GET(req: Request) {
     ]
   });
 }
+

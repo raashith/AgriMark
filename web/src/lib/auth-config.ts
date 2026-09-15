@@ -4,6 +4,22 @@ export const PRODUCTION_AUTH_CALLBACK = `${PRODUCTION_SITE_URL}/auth/callback`;
 export const SUPABASE_EXPECTED_HOST = 'xrcqzpnstdbbtafhcwbb.supabase.co';
 export const SUPABASE_GOOGLE_CALLBACK = `https://${SUPABASE_EXPECTED_HOST}/auth/v1/callback`;
 
+export function getRoleDashboard(role?: string | null): string {
+  switch (role) {
+    case 'buyer':
+      return '/buyer/marketplace';
+    case 'admin':
+      return '/admin/dashboard';
+    case 'fpo':
+      return '/fpo/dashboard';
+    case 'logistics':
+      return '/logistics/deliveries';
+    case 'farmer':
+    default:
+      return '/farmer/dashboard';
+  }
+}
+
 export function getAuthCallbackUrl(): string {
   if (typeof window !== 'undefined') {
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';

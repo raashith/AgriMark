@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { evaluateEligibility } from '@/lib/eligibility-engine';
 
@@ -27,3 +28,4 @@ export async function GET(request: Request) {
   const result = await evaluateEligibility(sampleProfile);
   return NextResponse.json({ success: true, data: result });
 }
+

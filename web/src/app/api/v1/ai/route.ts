@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { AISupervisorEngine } from '@/lib/ai-supervisor';
 
@@ -21,3 +22,4 @@ export async function POST(req: Request) {
       : 'ACTION APPROVED: Safe to proceed.',
   });
 }
+

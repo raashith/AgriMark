@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { runScenarioSimulation, SimulationScenarioType } from '@/lib/scenario-simulation-engine';
 
@@ -17,3 +18,4 @@ export async function GET(request: Request) {
     }
   });
 }
+

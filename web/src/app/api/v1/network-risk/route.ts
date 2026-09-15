@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { detectNetworkRisks } from '@/lib/network-risk-engine';
 
@@ -8,3 +9,4 @@ export async function GET(request: Request) {
   const risks = await detectNetworkRisks(region);
   return NextResponse.json({ success: true, data: risks });
 }
+

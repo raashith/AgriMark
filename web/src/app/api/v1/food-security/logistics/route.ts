@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { detectLogisticsBottlenecks } from '@/lib/logistics-bottleneck-engine';
 
@@ -9,3 +10,4 @@ export async function GET(request: Request) {
   const bottlenecks = await detectLogisticsBottlenecks(origin, destination);
   return NextResponse.json({ success: true, data: bottlenecks });
 }
+

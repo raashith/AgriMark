@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile, UserRole } from '@/types';
 import { supabase, logSupabaseDiagnostic } from './supabase';
 import { api } from './api';
-import { PRODUCTION_SITE_URL, PRODUCTION_AUTH_CALLBACK, SUPABASE_GOOGLE_CALLBACK } from './auth-config';
+import { PRODUCTION_AUTH_CALLBACK, getAuthCallbackUrl } from './auth-config';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -33,6 +33,8 @@ const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   role: null,
 });
+
+let isOAuthInProgress = false;
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -140,38 +142,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithPhoneOtp = sendPhoneOtp;
 
   const loginWithGoogle = async () => {
-    const redirectTo = PRODUCTION_AUTH_CALLBACK;
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo,
-        scopes: 'openid email profile',
-        queryParams: { prompt: 'select_account' },
-      },
-    });
-
-    if (error || !data?.url) {
-      if (error) logSupabaseDiagnostic('signInWithOAuth', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/authorize', 400, error.message);
-      throw new Error(formatAuthError(error?.message || 'Google Sign-In could not start.'));
+    if (isOAuthInProgress) {
+      console.warn('[AgriMark Auth] OAuth sign-in attempt ignored: sign-in already in progress.');
+      return;
     }
-
+    isOAuthInProgress = true;
     try {
-      const oauthUrl = new URL(data.url);
-      const actualRedirectUri = oauthUrl.searchParams.get('redirect_uri');
-      if (oauthUrl.hostname !== 'accounts.google.com' || actualRedirectUri !== SUPABASE_GOOGLE_CALLBACK) {
-        console.error('[AgriMark OAuth Diagnostic] Invalid generated Google OAuth request', {
-          host: oauthUrl.hostname,
-          redirectUri: actualRedirectUri,
-          expectedRedirectUri: SUPABASE_GOOGLE_CALLBACK,
-        });
-        throw new Error('Google Sign-In configuration needs attention. Please try again.');
+      const redirectTo = getAuthCallbackUrl();
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          scopes: 'openid email profile',
+          queryParams: { prompt: 'select_account' },
+        },
+      });
+      if (error || !data?.url) {
+        if (error) logSupabaseDiagnostic('signInWithOAuth', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/authorize', 400, error.message);
+        throw new Error(formatAuthError(error?.message || 'Google Sign-In could not start.'));
       }
-    } catch (diagnosticError) {
-      if (diagnosticError instanceof Error) throw diagnosticError;
-      throw new Error('Google Sign-In configuration needs attention. Please try again.');
+      const oauthUrl = new URL(data.url);
+      if (oauthUrl.hostname !== 'accounts.google.com') {
+        throw new Error('Invalid OAuth redirect host returned.');
+      }
+      if (typeof window !== 'undefined') {
+        window.location.assign(data.url);
+      }
+    } catch (err) {
+      isOAuthInProgress = false;
+      throw err;
     }
-
-    if (typeof window !== 'undefined') window.location.assign(data.url);
   };
 
   const register = async (data: any): Promise<UserProfile> => {

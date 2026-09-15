@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { createFieldTrial, getPracticeLibrary } from '@/lib/practice-trial-engine';
 
@@ -32,3 +33,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: err.message }, { status: 400 });
   }
 }
+

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getStorageAnalytics, evaluatePostHarvestLoss } from '@/lib/storage-processing-intelligence';
 
@@ -17,3 +18,4 @@ export async function GET(request: Request) {
     }
   });
 }
+

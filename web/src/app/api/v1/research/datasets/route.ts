@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getResearchDatasets } from '@/lib/dataset-catalog-quality';
 
@@ -8,3 +9,4 @@ export async function GET(request: Request) {
   const datasets = await getResearchDatasets(crop);
   return NextResponse.json({ success: true, data: datasets });
 }
+
