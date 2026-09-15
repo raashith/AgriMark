@@ -197,9 +197,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithGoogle = async (): Promise<void> => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1');
-    const redirectUrl = isLocal ? `${origin}/auth/callback` : PRODUCTION_AUTH_CALLBACK;
+    const origin = typeof window !== 'undefined' ? window.location.origin : PRODUCTION_SITE_URL;
+    const redirectUrl = `${origin}/auth/callback`;
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
