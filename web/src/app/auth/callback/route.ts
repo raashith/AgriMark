@@ -4,9 +4,20 @@ import { createServerClient } from '@supabase/ssr';
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://agrimark-six.vercel.app';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xrcqzpnstdbbtafhcwbb.supabase.co';
 
-function getSafeNext(value: string | null): string {
-  if (value && value.startsWith('/') && !value.startsWith('//')) return value;
-  return '/auth/login';
+function getRoleDashboard(role?: string | null): string {
+  switch (role) {
+    case 'buyer':
+      return '/buyer/marketplace';
+    case 'admin':
+      return '/admin/dashboard';
+    case 'fpo':
+      return '/fpo/dashboard';
+    case 'logistics':
+      return '/logistics/deliveries';
+    case 'farmer':
+    default:
+      return '/farmer/dashboard';
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -16,7 +27,6 @@ export async function GET(request: NextRequest) {
   const error = requestUrl.searchParams.get('error');
   const errorDescription = requestUrl.searchParams.get('error_description');
   const rawNext = requestUrl.searchParams.get('next');
-  const nextRoute = getSafeNext(rawNext);
 
   const isLocalhost = requestUrl.origin.includes('localhost') || requestUrl.origin.includes('127.0.0.1');
   const baseUrl = isLocalhost ? requestUrl.origin : SITE_URL;
@@ -40,7 +50,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const response = NextResponse.redirect(new URL(nextRoute, baseUrl));
+  // Create response placeholder for cookie setting
+  let targetPath = '/farmer/dashboard';
+  const response = NextResponse.redirect(new URL(targetPath, baseUrl));
+
   const supabase = createServerClient(SUPABASE_URL, supabaseKey, {
     cookies: {
       getAll() {
@@ -54,26 +67,40 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  // Guard against duplicate code exchange if session is already established
-  const { data: existingSessionData } = await supabase.auth.getSession();
-  if (!existingSessionData?.session && code) {
-    const exchangeResult = flowId
-      ? await supabase.auth.exchangeCodeForSession(code, { flowId })
-      : await supabase.auth.exchangeCodeForSession(code);
+  // Perform PKCE code exchange
+  const exchangeResult = flowId
+    ? await supabase.auth.exchangeCodeForSession(code, { flowId })
+    : await supabase.auth.exchangeCodeForSession(code);
 
-    if (exchangeResult.error) {
-      const { data: recheckData } = await supabase.auth.getSession();
-      if (!recheckData?.session) {
-        const loginUrl = new URL('/auth/login', baseUrl);
-        const errMsg = (exchangeResult.error.message || '').toLowerCase();
-        const userMsg = errMsg.includes('expired') || errMsg.includes('4/0a') || errMsg.includes('already used') || errMsg.includes('invalid_grant')
-          ? 'Your sign-in session expired. Please start Google Sign-In again.'
-          : 'Google Sign-In couldn\'t be completed. Please try again.';
-        loginUrl.searchParams.set('error', userMsg);
-        return NextResponse.redirect(loginUrl);
+  if (exchangeResult.error) {
+    const { data: recheckData } = await supabase.auth.getSession();
+    if (!recheckData?.session) {
+      const loginUrl = new URL('/auth/login', baseUrl);
+      const errMsg = (exchangeResult.error.message || '').toLowerCase();
+      const userMsg = errMsg.includes('expired') || errMsg.includes('4/0a') || errMsg.includes('already used') || errMsg.includes('invalid_grant')
+        ? 'Your sign-in session expired. Please start Google Sign-In again.'
+        : 'Google Sign-In couldn\'t be completed. Please try again.';
+      loginUrl.searchParams.set('error', userMsg);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
+  // Session is established. Determine user role and target redirect path.
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    if (rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') && rawNext !== '/auth/login') {
+      targetPath = rawNext;
+    } else {
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+      if (profile?.role) {
+        targetPath = getRoleDashboard(profile.role);
+      } else {
+        targetPath = '/auth/onboarding';
       }
     }
   }
 
+  // Update redirect location to the resolved target path
+  response.headers.set('Location', new URL(targetPath, baseUrl).toString());
   return response;
 }
