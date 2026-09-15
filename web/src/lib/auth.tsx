@@ -36,6 +36,8 @@ const AuthContext = createContext<AuthContextType>({
 
 let isOAuthInProgress = false;
 
+const GOOGLE_OAUTH_SCOPES = 'openid email profile https://www.googleapis.com/auth/userinfo.email';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -153,7 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         provider: 'google',
         options: {
           redirectTo,
-          scopes: 'openid email profile',
+          scopes: GOOGLE_OAUTH_SCOPES,
           queryParams: { prompt: 'select_account' },
         },
       });
@@ -164,6 +166,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const oauthUrl = new URL(data.url);
       if (oauthUrl.hostname !== 'accounts.google.com') {
         throw new Error('Invalid OAuth redirect host returned.');
+      }
+      if (oauthUrl.searchParams.get('redirect_uri') !== 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/callback') {
+        throw new Error('Google OAuth is misconfigured: the provider callback URL is not the AgriMark Supabase callback.');
       }
       if (typeof window !== 'undefined') {
         window.location.assign(data.url);
