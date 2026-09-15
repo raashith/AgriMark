@@ -1,73 +1,75 @@
-/**
- * AgriMark Phase 13 - National Alert System Engine
- * Dispatches targeted multi-category agricultural alerts (WEATHER, CROP_RISK, DISEASE, PRICE_MOVEMENT, DEMAND,
- * ORDERS, SHIPMENTS, FPO, FINANCIAL, POLICY, DATA_QUALITY) with priority levels and recommended actions.
- */
+import { supabase as supabaseAdmin } from './supabase';
 
-export type AlertCategory = 
-  | 'WEATHER'
-  | 'CROP_RISK'
-  | 'DISEASE'
-  | 'PRICE_MOVEMENT'
-  | 'DEMAND'
-  | 'ORDER'
-  | 'SHIPMENT'
-  | 'FPO'
-  | 'FINANCIAL'
-  | 'POLICY'
-  | 'DATA_QUALITY';
+export type AlertLifecycleStatus = 'CREATED' | 'ACKNOWLEDGED' | 'IN_PROGRESS' | 'RESOLVED' | 'EXPIRED';
+export type NationalAlertType =
+  | 'weather' | 'climate' | 'crop_disease' | 'market' | 'food_security'
+  | 'water' | 'logistics' | 'scheme_deadline' | 'device_failure' | 'ai_incident';
 
-export type AlertPriority = 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-
-export interface NationalAlert {
-  alert_id: string;
-  category: AlertCategory;
-  priority: AlertPriority;
+export interface NationalAlertRecord {
+  id: string;
+  alert_type: NationalAlertType;
   title: string;
-  reason: string;
-  source: string;
-  confidence: number;
-  recommended_action: string;
-  recipient_id: string;
-  is_read: boolean;
+  description: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  status: AlertLifecycleStatus;
+  acknowledged_by?: string;
+  resolved_at?: string;
   created_at: string;
 }
 
 export class NationalAlertSystem {
-  private static alerts: Map<string, NationalAlert> = new Map();
-
-  public static dispatchAlert(
+  static dispatchAlert(
     recipientId: string,
-    category: AlertCategory,
-    priority: AlertPriority,
+    alertType: string,
+    severity: string,
     title: string,
-    reason: string,
-    source: string,
-    recommendedAction: string,
-    confidence: number = 0.90
-  ): NationalAlert {
-    const alertId = `alt_${Date.now()}`;
-    const now = new Date().toISOString();
-
-    const alert: NationalAlert = {
-      alert_id: alertId,
-      category,
-      priority,
-      title,
-      reason,
-      source,
-      confidence,
-      recommended_action: recommendedAction,
+    description: string,
+    source?: string,
+    actionItem?: string,
+    confidence?: number
+  ) {
+    return {
+      id: `ALT-DISP-${Date.now()}`,
       recipient_id: recipientId,
-      is_read: false,
-      created_at: now
+      alert_type: alertType.toLowerCase() as NationalAlertType,
+      severity: severity as any,
+      title,
+      description,
+      source: source || 'SYSTEM',
+      action_item: actionItem,
+      confidence: confidence || 1.0,
+      status: 'CREATED' as AlertLifecycleStatus,
+      created_at: new Date().toISOString()
     };
-
-    this.alerts.set(alertId, alert);
-    return alert;
   }
 
-  public static getAlertsForUser(recipientId: string): NationalAlert[] {
-    return Array.from(this.alerts.values()).filter(a => a.recipient_id === recipientId);
+  static async createAlert(alert: Omit<NationalAlertRecord, 'id' | 'status' | 'created_at'>): Promise<NationalAlertRecord> {
+    const record: NationalAlertRecord = {
+      ...alert,
+      id: `ALT-NAT-${Date.now()}`,
+      status: 'CREATED',
+      created_at: new Date().toISOString(),
+    };
+
+    if (process.env.NODE_ENV !== 'test' && supabaseAdmin) {
+      await supabaseAdmin.from('national_alerts').insert([record]);
+    }
+
+    return record;
+  }
+
+  static transitionAlertStatus(currentStatus: AlertLifecycleStatus, newStatus: AlertLifecycleStatus): AlertLifecycleStatus {
+    const allowedTransitions: Record<AlertLifecycleStatus, AlertLifecycleStatus[]> = {
+      'CREATED': ['ACKNOWLEDGED', 'EXPIRED'],
+      'ACKNOWLEDGED': ['IN_PROGRESS', 'RESOLVED', 'EXPIRED'],
+      'IN_PROGRESS': ['RESOLVED', 'EXPIRED'],
+      'RESOLVED': [],
+      'EXPIRED': []
+    };
+
+    if (allowedTransitions[currentStatus]?.includes(newStatus)) {
+      return newStatus;
+    }
+    return currentStatus;
   }
 }

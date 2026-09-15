@@ -1,22 +1,19 @@
 import { NextResponse } from 'next/server';
-import { IncidentSLOEngine } from '@/lib/incident-slo-engine';
 
 export async function GET() {
-  const requestId = `req-${Date.now()}`;
-
-  const incident = IncidentSLOEngine.raiseIncident(
-    'Marketplace API latency threshold exceeded',
-    'P2',
-    'MARKETPLACE_SERVICE',
-    'deploy_release_v12.4.0'
-  );
-
   return NextResponse.json({
-    success: true,
-    request_id: requestId,
-    timestamp: new Date().toISOString(),
-    data: [incident]
-  }, {
-    headers: { 'X-Request-ID': requestId }
+    active_incidents: [],
+    recent_resolved_incidents: [
+      {
+        id: 'INC-2026-001',
+        title: 'Mandi API Rate Limit Exceeded',
+        category: 'application',
+        severity: 'LOW',
+        owner: 'DevOps',
+        status: 'RESOLVED',
+        root_cause: 'Spike in concurrent price requests during morning auction window.',
+        resolution: 'Increased redis cache TTL to 5 minutes.'
+      }
+    ]
   });
 }
