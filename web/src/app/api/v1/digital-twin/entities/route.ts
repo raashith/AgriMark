@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { DigitalTwinEntityGraph } from '@/lib/digital-twin-entity-graph';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const startId = searchParams.get('start_entity_id') || 'DIST-TN-SLM';

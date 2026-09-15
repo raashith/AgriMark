@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { DigitalTwinStateModel } from '@/lib/digital-twin-state-model';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const district = searchParams.get('district') || 'Salem';
