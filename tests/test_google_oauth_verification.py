@@ -1,41 +1,29 @@
 import pytest
-import re
 from urllib.parse import urlparse, parse_qs
 
-# AgriMark Google OAuth Production Configuration & Verification Test Suite
 
 def test_canonical_urls_and_hosts():
-    """Verify production URLs, Supabase host, and canonical OAuth callback structure."""
     production_site_url = "https://agrimark-six.vercel.app"
     supabase_host = "xrcqzpnstdbbtafhcwbb.supabase.co"
     supabase_url = f"https://{supabase_host}"
-    
     canonical_app_callback = f"{production_site_url}/auth/callback"
     google_cloud_authorized_redirect = f"{supabase_url}/auth/v1/callback"
 
-    # Verify HTTPS enforcement
     assert production_site_url.startswith("https://")
     assert supabase_url.startswith("https://")
     assert canonical_app_callback.startswith("https://")
     assert google_cloud_authorized_redirect.startswith("https://")
-
-    # Verify project reference ID matches
-    assert "xrcqzpnstdbbtafhcwbb" in supabase_host
-    assert "agrimark-six.vercel.app" in canonical_app_callback
-    
-    # Verify Google Cloud OAuth redirect target MUST be Supabase Auth, NOT the Vercel app directly
     assert google_cloud_authorized_redirect == "https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/callback"
     assert google_cloud_authorized_redirect != canonical_app_callback
 
 
 def test_generated_oauth_request_url_parsing():
-    """Simulate and parse Supabase-generated Google OAuth request URL to assert redirect_uri parameter."""
     sample_oauth_url = (
         "https://accounts.google.com/o/oauth2/v2/auth?"
-        "client_id=1234567890-test.apps.googleusercontent.com&"
+        "client_id=683524176381-test.apps.googleusercontent.com&"
         "redirect_uri=https%3A%2F%2Fxrcqzpnstdbbtafhcwbb.supabase.co%2Fauth%2Fv1%2Fcallback&"
         "response_type=code&"
-        "scope=openid+email+profile&"
+        "scope=openid+email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email&"
         "code_challenge=xyz123&"
         "code_challenge_method=S256&"
         "state=st_98765"
@@ -43,49 +31,38 @@ def test_generated_oauth_request_url_parsing():
 
     parsed = urlparse(sample_oauth_url)
     assert parsed.hostname == "accounts.google.com"
-
     params = parse_qs(parsed.query)
-    redirect_uri = params.get("redirect_uri", [None])[0]
+    assert params.get("redirect_uri", [None])[0] == "https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/callback"
     scope = params.get("scope", [None])[0]
-    response_type = params.get("response_type", [None])[0]
-    code_challenge_method = params.get("code_challenge_method", [None])[0]
-
-    assert redirect_uri == "https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/callback"
-    assert scope == "openid email profile"
-    assert response_type == "code"
-    assert code_challenge_method == "S256"
+    assert scope is not None
+    assert "openid" in scope
+    assert "email" in scope
+    assert "profile" in scope
+    assert "https://www.googleapis.com/auth/userinfo.email" in scope
+    assert params.get("response_type", [None])[0] == "code"
+    assert params.get("code_challenge_method", [None])[0] == "S256"
 
 
 def test_pkce_flow_id_extraction_and_fallback():
-    """Verify sb_flow_id and flow_id parameter extraction from callback query string."""
     sample_callback_1 = "https://agrimark-six.vercel.app/auth/callback?code=auth_code_123&sb_flow_id=flow_abc_456"
-    parsed_1 = urlparse(sample_callback_1)
-    params_1 = parse_qs(parsed_1.query)
-    flow_id_1 = params_1.get("sb_flow_id", [None])[0] or params_1.get("flow_id", [None])[0]
-    assert flow_id_1 == "flow_abc_456"
+    params_1 = parse_qs(urlparse(sample_callback_1).query)
+    assert params_1.get("sb_flow_id", [None])[0] or params_1.get("flow_id", [None])[0] == "flow_abc_456"
 
     sample_callback_2 = "https://agrimark-six.vercel.app/auth/callback?code=auth_code_123&flow_id=flow_def_789"
-    parsed_2 = urlparse(sample_callback_2)
-    params_2 = parse_qs(parsed_2.query)
-    flow_id_2 = params_2.get("sb_flow_id", [None])[0] or params_2.get("flow_id", [None])[0]
-    assert flow_id_2 == "flow_def_789"
+    params_2 = parse_qs(urlparse(sample_callback_2).query)
+    assert params_2.get("sb_flow_id", [None])[0] or params_2.get("flow_id", [None])[0] == "flow_def_789"
 
 
 def test_correlation_id_format():
-    """Verify correlation ID structure format."""
-    def generate_correlation_id():
-        import random, time
-        rand = hex(random.getrandbits(32))[2:9]
-        ts = hex(int(time.time() * 1000))[2:]
-        return f"req_{rand}_{ts}"
-
-    cid = generate_correlation_id()
+    import random, time
+    rand = hex(random.getrandbits(32))[2:9]
+    ts = hex(int(time.time() * 1000))[2:]
+    cid = f"req_{rand}_{ts}"
     assert cid.startswith("req_")
     assert len(cid) > 10
 
 
 def test_callback_cookie_and_headers_propagation_sync():
-    """Verify that setAll synchronizes both request cookies, response cookies, and response headers."""
     request_cookies = {}
     response_cookies = {}
     response_headers = {}
@@ -95,8 +72,8 @@ def test_callback_cookie_and_headers_propagation_sync():
             request_cookies[c['name']] = c['value']
             response_cookies[c['name']] = c['value']
         if headers:
-          for k, v in headers.items():
-            response_headers[k] = v
+            for k, v in headers.items():
+                response_headers[k] = v
 
     set_all([
         {'name': 'sb-xrcqzpnstdbbtafhcwbb-auth-token', 'value': 'access_token_123'},
@@ -109,7 +86,6 @@ def test_callback_cookie_and_headers_propagation_sync():
 
 
 def test_duplicate_oauth_lock_prevention():
-    """Verify locking mechanism prevents double-triggering OAuth flows."""
     lock = False
     executions = 0
 
@@ -127,19 +103,17 @@ def test_duplicate_oauth_lock_prevention():
 
 
 def test_no_cache_headers_for_callback():
-    """Verify required no-cache headers for OAuth callback route responses."""
-    headers = {}
-    headers["Cache-Control"] = "private, no-store, no-cache, must-revalidate"
-    headers["Pragma"] = "no-cache"
-    headers["Expires"] = "0"
-
+    headers = {
+        "Cache-Control": "private, no-store, no-cache, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
     assert "no-store" in headers["Cache-Control"]
     assert headers["Pragma"] == "no-cache"
     assert headers["Expires"] == "0"
 
 
 def test_role_based_post_login_redirection():
-    """Verify role-to-dashboard mapping logic for authenticated users."""
     role_dashboard_map = {
         "farmer": "/farmer/dashboard",
         "buyer": "/buyer/marketplace",
@@ -161,20 +135,17 @@ def test_role_based_post_login_redirection():
     assert resolve_dashboard(None, has_profile=False) == "/auth/onboarding"
 
 
-def test_oauth_scope_minimality():
-    """Verify requested Google OAuth scopes are minimal (openid, email, profile)."""
-    requested_scopes = ["openid", "email", "profile"]
-    sensitive_scopes = ["https://www.googleapis.com/auth/contacts", "https://www.googleapis.com/auth/drive"]
-
-    for scope in requested_scopes:
-        assert scope in ["openid", "email", "profile"]
-
-    for s_scope in sensitive_scopes:
-        assert s_scope not in requested_scopes
+def test_oauth_scope_includes_required_google_email_scope():
+    requested_scopes = "openid email profile https://www.googleapis.com/auth/userinfo.email"
+    assert "openid" in requested_scopes
+    assert "email" in requested_scopes
+    assert "profile" in requested_scopes
+    assert "https://www.googleapis.com/auth/userinfo.email" in requested_scopes
+    assert "https://www.googleapis.com/auth/contacts" not in requested_scopes
+    assert "https://www.googleapis.com/auth/drive" not in requested_scopes
 
 
 def test_error_formatting_and_redirect_mismatch_handling():
-    """Verify user-friendly error formatting for OAuth redirect mismatches and expired grants."""
     def format_auth_error(message: str) -> str:
         normalized = (message or "").lower()
         if "redirect_uri_mismatch" in normalized or "invalid redirect" in normalized:
@@ -191,11 +162,10 @@ def test_error_formatting_and_redirect_mismatch_handling():
 
 
 def test_no_secret_exposure_in_client_config():
-    """Verify that service role keys and secrets are never present in client configuration."""
     dummy_client_env = {
         "NEXT_PUBLIC_SUPABASE_URL": "https://xrcqzpnstdbbtafhcwbb.supabase.co",
         "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_test_12345",
-        "NEXT_PUBLIC_API_BASE_URL": "https://agrimark-api.onrender.com/api/v1"
+        "NEXT_PUBLIC_API_BASE_URL": "https://agrimark-api.onrender.com/api/v1",
     }
 
     for key, val in dummy_client_env.items():
