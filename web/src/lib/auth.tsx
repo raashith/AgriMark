@@ -2,8 +2,9 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile, UserRole } from '@/types';
-import { api } from './api';
 import { supabase, logSupabaseDiagnostic } from './supabase';
+import { api } from './api';
+import { PRODUCTION_SITE_URL } from './auth-config';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -33,12 +34,15 @@ const AuthContext = createContext<AuthContextType>({
   role: null,
 });
 
-const PRODUCTION_SITE_URL = 'https://agrimark-six.vercel.app';
-const PRODUCTION_AUTH_CALLBACK = `${PRODUCTION_SITE_URL}/auth/callback`;
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const clearLocalAuth = () => {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem('agrimark_token');
+    localStorage.removeItem('agrimark_user');
+  };
 
   const syncProfile = async (accessToken?: string): Promise<UserProfile | null> => {
     if (accessToken && typeof window !== 'undefined') {
@@ -47,9 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const profile = await api.getMe();
       setUser(profile);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('agrimark_user', JSON.stringify(profile));
-      }
+      if (typeof window !== 'undefined') localStorage.setItem('agrimark_user', JSON.stringify(profile));
       return profile;
     } catch {
       return null;
@@ -57,104 +59,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    const initAuth = async () => {
+    const init = async () => {
       try {
-        const { data, error: sessionErr } = await supabase.auth.getSession();
-        if (sessionErr) {
-          logSupabaseDiagnostic('getSession', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/session', 401, sessionErr.message);
-          const msg = (sessionErr.message || '').toLowerCase();
-          if (msg.includes('invalid api key') || msg.includes('invalid') || msg.includes('jwt')) {
-            await supabase.auth.signOut().catch(() => {});
-            if (typeof window !== 'undefined') {
-              localStorage.removeItem('agrimark_token');
-              localStorage.removeItem('agrimark_user');
-            }
-            setUser(null);
-            return;
-          }
-        }
-        if (data?.session?.access_token) {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          clearLocalAuth();
+          await supabase.auth.signOut().catch(() => {});
+        } else if (data.session?.access_token) {
           const profile = await syncProfile(data.session.access_token);
           if (!profile) {
+            clearLocalAuth();
             await supabase.auth.signOut().catch(() => {});
-            if (typeof window !== 'undefined') {
-              localStorage.removeItem('agrimark_token');
-              localStorage.removeItem('agrimark_user');
-            }
             setUser(null);
           }
         }
       } catch {
-        await supabase.auth.signOut().catch(() => {});
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('agrimark_token');
-          localStorage.removeItem('agrimark_user');
-        }
+        clearLocalAuth();
         setUser(null);
       } finally {
         setIsLoading(false);
       }
     };
 
-    void initAuth();
-
+    void init();
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.access_token) {
         await syncProfile(session.access_token);
       } else if (event === 'SIGNED_OUT') {
+        clearLocalAuth();
         setUser(null);
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('agrimark_token');
-          localStorage.removeItem('agrimark_user');
-        }
       }
     });
 
-    return () => {
-      authListener?.subscription?.unsubscribe();
-    };
+    return () => authListener.subscription.unsubscribe();
   }, []);
 
   const login = async (credentials: any): Promise<UserProfile> => {
     setIsLoading(true);
     try {
-      const emailOrPhone = credentials.email || credentials.phone_or_email || credentials.phone;
-      if (!emailOrPhone || !credentials.password) {
-        throw new Error('Please enter a valid email or phone number and password.');
+      const identifier = String(credentials.email || credentials.phone_or_email || credentials.phone || '').trim();
+      const password = String(credentials.password || '');
+      if (!identifier || !password) throw new Error('Enter your email and password.');
+      if (!identifier.includes('@')) throw new Error('Password login uses email address. Use Mobile OTP for phone login.');
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email: identifier.toLowerCase(), password });
+      if (error || !data.session?.access_token) {
+        if (error) logSupabaseDiagnostic('signInWithPassword', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/token', 400, error.message);
+        throw new Error(formatAuthError(error?.message || 'Invalid email or password.'));
       }
 
-      let sessionToken: string | null = null;
-      if (emailOrPhone.includes('@')) {
-        const { data: sbData, error: sbError } = await supabase.auth.signInWithPassword({
-          email: emailOrPhone,
-          password: credentials.password,
-        });
-        if (!sbError && sbData?.session?.access_token) {
-          sessionToken = sbData.session.access_token;
-        } else if (sbError) {
-          logSupabaseDiagnostic('signInWithPassword', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/token', 400, sbError.message);
-        }
-      }
-
-      if (!sessionToken) {
-        const res = await api.login(credentials);
-        if (!res?.access_token) {
-          throw new Error('Invalid email/phone or password. Please try again.');
-        }
-        sessionToken = res.access_token;
-      }
-
-      const profile = await syncProfile(sessionToken);
-      if (!profile) {
-        throw new Error('Sign-in succeeded, but profile verification failed. Please try again.');
-      }
+      const profile = await syncProfile(data.session.access_token);
+      if (!profile) throw new Error('Login succeeded, but your AgriMark profile could not be loaded.');
       return profile;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const sendPhoneOtp = async (phone: string): Promise<void> => {
+  const sendPhoneOtp = async (phone: string) => {
     const normalized = normalizePhone(phone);
     const { error } = await supabase.auth.signInWithOtp({ phone: normalized });
     if (error) {
@@ -163,114 +125,85 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginWithPhoneOtp = sendPhoneOtp;
-
   const verifyPhoneOtp = async (phone: string, token: string): Promise<UserProfile> => {
     const normalized = normalizePhone(phone);
     const code = token.replace(/\D/g, '');
-    if (!/^\d{6}$/.test(code)) {
-      throw new Error('Incorrect OTP. Please check the 6-digit code and try again.');
-    }
-
+    if (!/^\d{6}$/.test(code)) throw new Error('Enter the 6-digit OTP.');
     const { data, error } = await supabase.auth.verifyOtp({ phone: normalized, token: code, type: 'sms' });
-    if (error) {
-      logSupabaseDiagnostic('verifyOtp', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/verify', 400, error.message);
-      throw new Error(formatAuthError(error.message));
+    if (error || !data.session?.access_token) {
+      if (error) logSupabaseDiagnostic('verifyOtp', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/verify', 400, error.message);
+      throw new Error(formatAuthError(error?.message || 'OTP verification failed.'));
     }
-    if (!data.session?.access_token) {
-      throw new Error('Verification succeeded, but no session was returned. Please try again.');
-    }
-
     const profile = await syncProfile(data.session.access_token);
-    if (!profile) {
-      const sbUser = data.session.user;
-      return {
-        id: sbUser.id,
-        email: sbUser.email,
-        full_name: sbUser.user_metadata?.full_name || 'AgriMark User',
-        phone: sbUser.phone || normalized,
-        role: 'farmer' as UserRole,
-        needs_onboarding: true,
-      } as UserProfile & { needs_onboarding?: boolean };
-    }
+    if (!profile) throw new Error('Phone verification succeeded, but your AgriMark profile could not be loaded.');
     return profile;
   };
 
-  const loginWithGoogle = async (): Promise<void> => {
-    const origin = typeof window !== 'undefined' ? window.location.origin : PRODUCTION_SITE_URL;
-    const redirectUrl = `${origin}/auth/callback`;
+  const loginWithPhoneOtp = sendPhoneOtp;
 
+  const loginWithGoogle = async () => {
+    const redirectTo = `${typeof window !== 'undefined' ? window.location.origin : PRODUCTION_SITE_URL}/auth/callback`;
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: {
-        redirectTo: redirectUrl,
-        queryParams: { prompt: 'select_account' },
-      },
+      options: { redirectTo, queryParams: { prompt: 'select_account' } },
     });
-
-    if (error) {
-      logSupabaseDiagnostic('signInWithOAuth', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/authorize', 400, error.message);
-      throw new Error(formatAuthError(error.message));
+    if (error || !data?.url) {
+      if (error) logSupabaseDiagnostic('signInWithOAuth', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/authorize', 400, error.message);
+      throw new Error(formatAuthError(error?.message || 'Google Sign-In could not start.'));
     }
-
-    if (!data?.url) {
-      throw new Error('Google Sign-In could not start. Please try again.');
-    }
-
-    if (typeof window !== 'undefined') {
-      window.location.assign(data.url);
-    }
+    window.location.assign(data.url);
   };
 
   const register = async (data: any): Promise<UserProfile> => {
     setIsLoading(true);
     try {
       if (data.role === 'admin') throw new Error('Self-registration as admin is prohibited.');
-      const email = data.email?.trim();
-      const password = data.password;
-      if (!email || !password) throw new Error('Email and password are required to create an account.');
+      const email = String(data.email || '').trim().toLowerCase();
+      const password = String(data.password || '');
+      if (!email || !email.includes('@')) throw new Error('Enter a valid email address.');
+      if (password.length < 6) throw new Error('Password must contain at least 6 characters.');
 
-      const { data: sbData, error: sbError } = await supabase.auth.signUp({
+      const { data: signup, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { full_name: data.full_name, phone: data.phone || data.phone_number, location: data.location, requested_role: data.role } },
+        options: {
+          emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : PRODUCTION_SITE_URL}/auth/callback`,
+          data: {
+            full_name: data.full_name,
+            phone: data.phone || data.phone_number,
+            location: data.location,
+            requested_role: data.role || 'farmer',
+          },
+        },
       });
 
-      if (sbError) {
-        logSupabaseDiagnostic('signUp', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/signup', 400, sbError.message);
-        const normalized = sbError.message.toLowerCase();
-        if (normalized.includes('already registered') || normalized.includes('user already registered')) {
-          throw new Error('An account with this email already exists. Please log in instead.');
-        }
-        throw new Error(sbError.message || 'Unable to create your account.');
+      if (error) {
+        logSupabaseDiagnostic('signUp', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/signup', 400, error.message);
+        const normalized = error.message.toLowerCase();
+        if (normalized.includes('already registered')) throw new Error('An account with this email already exists. Please log in instead.');
+        throw new Error(formatAuthError(error.message));
       }
 
-      if (sbData.session?.access_token) {
-        const profile = await syncProfile(sbData.session.access_token);
-        if (profile) return profile;
-        throw new Error('Your account was created, but profile setup is still completing. Please log in.');
+      if (signup.session?.access_token) {
+        const profile = await syncProfile(signup.session.access_token);
+        if (!profile) throw new Error('Account created, but your AgriMark profile is still being prepared. Please log in.');
+        return profile;
       }
-      throw new Error('Account created. Please check your email and confirm your address before logging in.');
+
+      throw new Error('Account created. Check your email and confirm your address before logging in.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = async (): Promise<void> => {
-    try { await supabase.auth.signOut(); } catch {}
-    try { await api.logout(); } catch {}
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('agrimark_token');
-      localStorage.removeItem('agrimark_user');
-    }
+  const logout = async () => {
+    await supabase.auth.signOut().catch(() => {});
+    await api.logout().catch(() => {});
+    clearLocalAuth();
     setUser(null);
   };
 
-  return (
-    <AuthContext.Provider value={{ user, isLoading, login, sendPhoneOtp, loginWithPhoneOtp, verifyPhoneOtp, loginWithGoogle, register, logout, isAuthenticated: !!user, role: user?.role || null }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ user, isLoading, login, sendPhoneOtp, loginWithPhoneOtp, verifyPhoneOtp, loginWithGoogle, register, logout, isAuthenticated: !!user, role: user?.role || null }}>{children}</AuthContext.Provider>;
 };
 
 export function normalizePhone(phone: string): string {
@@ -285,23 +218,19 @@ export function normalizePhone(phone: string): string {
   if (digits.length === 10) return `+91${digits}`;
   if (digits.length === 11 && digits.startsWith('0')) return `+91${digits.slice(1)}`;
   if (digits.length === 12 && digits.startsWith('91')) return `+${digits}`;
-  if (digits.length >= 8 && digits.length <= 15) return `+${digits}`;
   throw new Error('Enter a valid mobile number.');
 }
 
 export function formatAuthError(message: string): string {
   const normalized = (message || '').toLowerCase();
-  if (normalized.includes('invalid api key') || normalized.includes('api key is invalid') || normalized.includes('invalid_api_key')) return 'AgriMark authentication is temporarily unavailable. Please try again.';
-  if (normalized.includes('unsupported provider') || normalized.includes('provider is not enabled') || normalized.includes('google provider disabled')) return 'Google Sign-In is temporarily unavailable. Please try another login method.';
-  if (normalized.includes('redirect_uri_mismatch') || normalized.includes('redirect not allowed') || normalized.includes('invalid redirect')) return 'Google Sign-In configuration needs attention. Please try again later.';
-  if (normalized.includes('access_denied') || normalized.includes('cancelled') || normalized.includes('canceled') || normalized.includes('user_cancelled')) return 'Google Sign-In was cancelled.';
-  if (normalized.includes('code exchange') || normalized.includes('invalid_grant') || normalized.includes('pkce')) return "We couldn't complete Google Sign-In. Please try again.";
-  if (normalized.includes('rate limit') || normalized.includes('too many') || normalized.includes('over_email_send_rate_limit') || normalized.includes('over_sms_send_rate_limit')) return 'Too many OTP requests. Please wait before trying again.';
-  if (normalized.includes('unsupported phone provider') || normalized.includes('sms provider not configured') || normalized.includes('phone provider disabled')) return 'SMS login is temporarily unavailable. Please try again later or use Google / Email sign-in.';
-  if (normalized.includes('sms') || normalized.includes('unavailable') || normalized.includes('service_unavailable') || normalized.includes('sms_send_failed')) return "We couldn't send the OTP right now. Please try again shortly.";
-  if (normalized.includes('invalid otp') || normalized.includes('invalid token') || normalized.includes('token is invalid') || normalized.includes('otp_expired') || normalized.includes('expired')) return normalized.includes('expired') ? 'This OTP has expired. Request a new OTP.' : 'Incorrect OTP. Please check the 6-digit code and try again.';
-  if (normalized.includes('invalid phone') || normalized.includes('phone number') || normalized.includes('invalid number') || normalized.includes('e.164')) return 'Enter a valid mobile number.';
-  if (normalized.includes('phone') && normalized.includes('disabled')) return 'Phone authentication is not enabled yet. Please try another login method.';
+  if (normalized.includes('invalid api key') || normalized.includes('api key')) return 'AgriMark authentication is temporarily unavailable. Please try again.';
+  if (normalized.includes('email not confirmed')) return 'Please confirm your email address before logging in.';
+  if (normalized.includes('invalid login credentials')) return 'Incorrect email or password.';
+  if (normalized.includes('already registered')) return 'An account with this email already exists. Please log in instead.';
+  if (normalized.includes('redirect') || normalized.includes('pkce') || normalized.includes('invalid_grant')) return 'Authentication configuration needs attention. Please try again.';
+  if (normalized.includes('provider is not enabled') || normalized.includes('unsupported provider')) return 'This sign-in method is not enabled yet.';
+  if (normalized.includes('rate limit') || normalized.includes('too many')) return 'Too many authentication attempts. Please wait and try again.';
+  if (normalized.includes('sms') || normalized.includes('phone')) return 'Mobile authentication is temporarily unavailable. Please use Email & Password or Google.';
   return message || 'Unable to authenticate. Please try again.';
 }
 
