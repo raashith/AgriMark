@@ -9,7 +9,7 @@ function getValidSupabaseUrl(): string {
   if (!envUrl) return EXPECTED_SUPABASE_URL;
   try {
     const parsed = new URL(envUrl);
-    if (parsed.protocol !== 'https:' || !parsed.hostname.includes(EXPECTED_SUPABASE_REF)) {
+    if (parsed.protocol !== 'https:' || parsed.hostname !== EXPECTED_SUPABASE_HOST) {
       return EXPECTED_SUPABASE_URL;
     }
     return EXPECTED_SUPABASE_URL;
@@ -28,34 +28,38 @@ export function detectKeyType(key: string): string {
 function getValidPublishableKey(): string {
   const preferred = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
   const legacy = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
-
   const candidates = [preferred, legacy].filter(Boolean) as string[];
-  const valid = candidates.find((key) => {
-    const isPublishable = key.startsWith('sb_publishable_');
-    const isLegacyJwt = key.split('.').length === 3 && key.length > 50;
-    return isPublishable || isLegacyJwt;
-  });
 
-  if (!valid) return candidates[0] || '';
-  if (valid.startsWith('sb_publishable_')) return valid;
+  // Prefer the modern publishable key. Both this key and the legacy anon key are
+  // safe to expose in a browser when backed by proper RLS policies.
+  const publishable = candidates.find((key) => key.startsWith('sb_publishable_'));
+  if (publishable) return publishable;
 
-  try {
-    const parts = valid.split('.');
-    if (parts.length === 3) {
-      const payloadStr = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
-      const payload = JSON.parse(payloadStr);
+  const legacyJwt = candidates.find((key) => key.split('.').length === 3 && key.length > 50);
+  if (legacyJwt) {
+    try {
+      const parts = legacyJwt.split('.');
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
       if (payload.ref && payload.ref !== EXPECTED_SUPABASE_REF) return '';
+      if (payload.iss && payload.iss !== 'supabase') return '';
+    } catch {
+      return '';
     }
-  } catch {}
+    return legacyJwt;
+  }
 
-  return valid;
+  return '';
 }
 
 export const SUPABASE_URL = getValidSupabaseUrl();
 export const SUPABASE_PUBLISHABLE_KEY = getValidPublishableKey();
+export const SUPABASE_AUTH_CONFIGURED = Boolean(SUPABASE_PUBLISHABLE_KEY);
 
 export const supabase = createBrowserClient(
   SUPABASE_URL,
+  // Keep the client constructible for SSR/build environments; auth operations
+  // are guarded by SUPABASE_AUTH_CONFIGURED and fail with a clear message when
+  // deployment variables have not been supplied.
   SUPABASE_PUBLISHABLE_KEY || 'unconfigured_key',
   {
     auth: {
@@ -93,6 +97,7 @@ export function getSupabaseDiagnostic() {
     hasSupabaseUrl: Boolean(SUPABASE_URL),
     supabaseHost,
     keyType: detectKeyType(SUPABASE_PUBLISHABLE_KEY),
+    hasAuthConfig: SUPABASE_AUTH_CONFIGURED,
     apiBaseHost,
   };
 }
@@ -101,7 +106,7 @@ export function logSupabaseDiagnostic(
   action: string,
   url: string,
   status: number,
-  errorCode?: string
+  errorCode?: string,
 ) {
   if (typeof window !== 'undefined') {
     try {
