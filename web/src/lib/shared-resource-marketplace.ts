@@ -77,7 +77,7 @@ export async function matchResourcesForFarmer(
       .limit(10);
 
     if (data && data.length > 0) {
-      return data.map(r => ({ resource: r as SharedResource, match_score: 92 }));
+      return data.map((r: any) => ({ resource: r as SharedResource, match_score: 92 }));
     }
   }
 

@@ -42,16 +42,16 @@ export async function evaluateAttributionMetrics(userId?: string): Promise<{
       .eq('user_id', userId);
 
     if (data && data.length > 0) {
-      const accepted = data.filter(d => d.accepted_at).length;
+      const accepted = data.filter((d: any) => d.accepted_at).length;
       return {
         total_recommendations: data.length,
         acceptance_rate_pct: Number(((accepted / data.length) * 100).toFixed(1)),
         avg_income_uplift_pct: 11.4,
         total_value_added_inr: 45200,
         attribution_breakdown: {
-          OBSERVED: data.filter(d => d.contribution_type === 'OBSERVED').length,
-          CORRELATED: data.filter(d => d.contribution_type === 'CORRELATED').length,
-          ESTIMATED_CONTRIBUTION: data.filter(d => d.contribution_type === 'ESTIMATED_CONTRIBUTION').length
+          OBSERVED: data.filter((d: any) => d.contribution_type === 'OBSERVED').length,
+          CORRELATED: data.filter((d: any) => d.contribution_type === 'CORRELATED').length,
+          ESTIMATED_CONTRIBUTION: data.filter((d: any) => d.contribution_type === 'ESTIMATED_CONTRIBUTION').length
         }
       };
     }

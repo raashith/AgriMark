@@ -26,7 +26,8 @@ export function getAuthCallbackUrl(): string {
     if (isLocalhost) {
       return `${window.location.origin}/auth/callback`;
     }
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+    const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    const siteUrl = (rawSiteUrl && typeof rawSiteUrl === 'string') ? rawSiteUrl.trim() : '';
     if (siteUrl && !siteUrl.includes('localhost')) {
       const cleanSiteUrl = siteUrl.replace(/\/$/, '');
       return `${cleanSiteUrl}/auth/callback`;

@@ -203,3 +203,59 @@ def test_no_secret_exposure_in_client_config():
         assert not key.startswith("SECRET")
         assert "sb_secret_" not in val
         assert "service_role" not in val
+
+
+def test_google_email_scope_preservation():
+    """Verify requested Google OAuth scopes contain openid, email, profile, and explicit googleapis userinfo.email in web/src/lib/auth.tsx."""
+    with open('web/src/lib/auth.tsx', 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    assert "scopes: 'openid email profile https://www.googleapis.com/auth/userinfo.email'" in content or \
+           'scopes: "openid email profile https://www.googleapis.com/auth/userinfo.email"' in content, \
+           "Google email scope https://www.googleapis.com/auth/userinfo.email must be preserved in loginWithGoogle"
+
+
+def test_deleted_client_error_formatting():
+    """Verify web/src/lib/auth.tsx contains deleted_client error handling."""
+    with open('web/src/lib/auth.tsx', 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    assert "deleted_client" in content
+    assert "Google OAuth Client has been deleted or invalidated" in content
+    assert "Google Cloud Console" in content
+    assert "Supabase Dashboard" in content
+
+
+def test_no_hardcoded_google_client_id_in_source():
+    """Verify source code does not hardcode any obsolete Google OAuth client IDs."""
+    import os, re
+    pattern = re.compile(r'\b[0-9]{10,}-[a-zA-Z0-9_-]{20,}\.apps\.googleusercontent\.com\b')
+    matched_files = []
+
+    for root, dirs, files in os.walk('web/src'):
+        for f in files:
+            filepath = os.path.join(root, f)
+            with open(filepath, 'r', encoding='utf-8', errors='ignore') as f_obj:
+                for line_idx, line in enumerate(f_obj, 1):
+                    if pattern.search(line):
+                        matched_files.append((filepath, line_idx))
+
+    assert len(matched_files) == 0, f"Found hardcoded Google client ID in source files: {matched_files}"
+
+
+def test_no_accounts_google_hostname_restriction_in_auth_tsx():
+    """Verify web/src/lib/auth.tsx does NOT restrict returned OAuth URL hostname to accounts.google.com."""
+    with open('web/src/lib/auth.tsx', 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    assert "oauthUrl.hostname !== 'accounts.google.com'" not in content, \
+        "Fragile hostname check accounts.google.com must be removed because Supabase returns its own authorization URL first."
+    assert "Invalid OAuth redirect host returned." not in content
+    assert "['https:', 'http:'].includes(oauthUrl.protocol)" in content or \
+           '["https:", "http:"].includes(oauthUrl.protocol)' in content
+    assert "window.location.assign(oauthUrl.toString())" in content or \
+           "window.location.assign(data.url)" in content or \
+           "window.location.assign" in content
+
+
+
