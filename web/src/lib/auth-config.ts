@@ -10,12 +10,7 @@ export function getAuthCallbackUrl(): string {
     if (isLocalhost) {
       return `${window.location.origin}/auth/callback`;
     }
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-    if (siteUrl && !siteUrl.includes('localhost')) {
-      const cleanSiteUrl = siteUrl.replace(/\/$/, '');
-      return `${cleanSiteUrl}/auth/callback`;
-    }
-    return `${window.location.origin}/auth/callback`;
+    return PRODUCTION_AUTH_CALLBACK;
   }
   return PRODUCTION_AUTH_CALLBACK;
 }
