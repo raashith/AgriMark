@@ -6,6 +6,7 @@ build/
 *.log
 *.tsbuildinfo
 stitch_export/
+stitch_downloads/
 backend/venv/
 backend/.env
 __pycache__/
