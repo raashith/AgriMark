@@ -7,12 +7,15 @@ import { dataService } from '@/lib/data-service';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/components/ui/Toast';
 import { Modal } from '@/components/ui/Modal';
-import { FileText, Plus, MapPin, Calendar, Tag, ArrowRight } from 'lucide-react';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { FileText, Plus, MapPin, Calendar } from 'lucide-react';
 
 export default function BuyerRFQsPage() {
   const { user } = useAuth();
   const { showSuccess, showError } = useToast();
   const [rfqs, setRfqs] = useState<RFQ[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Form state
@@ -24,26 +27,43 @@ export default function BuyerRFQsPage() {
   const [neededBy, setNeededBy] = useState('');
 
   useEffect(() => {
-    dataService.getRFQs().then(setRfqs);
-  }, []);
+    async function loadData() {
+      try {
+        const list = await dataService.getRFQs(user?.id);
+        setRfqs(list);
+      } catch {
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [user]);
 
   const handleCreateRFQ = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user?.id) {
+      showError('Authentication Required', 'Please sign in to post an RFQ demand.');
+      return;
+    }
     try {
       const created = await dataService.createRFQ({
-        buyer_id: user?.id || 'user-buyer-01',
-        buyer_name: user?.full_name || 'Procurement Buyer',
+        buyer_id: user.id,
+        buyer_name: user.full_name || 'Procurement Buyer',
         crop_name: cropName,
         required_quantity_kg: Number(qtyKg),
         target_price_per_kg: Number(targetPrice),
         quality_grade: grade,
-        location: location || 'Regional Warehouse',
+        location: location || user.location || 'Regional Warehouse',
         needed_by_date: neededBy || new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
       });
-      setRfqs((prev) => [created, ...prev]);
-      showSuccess('RFQ Posted Successfully!', 'Farmers and FPOs can now view and submit competitive pricing offers.');
-      setIsModalOpen(false);
-      setCropName('');
+      if (created) {
+        setRfqs((prev) => [created, ...prev]);
+        showSuccess('RFQ Posted Successfully!', 'Farmers and FPOs can now view and submit competitive pricing offers.');
+        setIsModalOpen(false);
+        setCropName('');
+      } else {
+        showError('Failed to post RFQ', 'Database submission failed.');
+      }
     } catch (err: any) {
       showError('Failed to post RFQ', err.message);
     }
@@ -75,41 +95,54 @@ export default function BuyerRFQsPage() {
         </div>
 
         {/* RFQ List */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {rfqs.map((rfq) => (
-            <div key={rfq.id} className="bg-[#121a16] border border-[#1e2d26] rounded-3xl p-6 space-y-4 shadow-lg">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-extrabold text-lg text-white">{rfq.crop_name}</h3>
-                  <p className="text-xs text-emerald-400 font-medium">{rfq.buyer_name}</p>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-44 rounded-3xl" />
+            ))}
+          </div>
+        ) : rfqs.length === 0 ? (
+          <EmptyState
+            title="No Active RFQs Found"
+            description="You have not published any crop procurement demands yet. Click 'Create New RFQ' to publish your requirements."
+          />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {rfqs.map((rfq) => (
+              <div key={rfq.id} className="bg-[#121a16] border border-[#1e2d26] rounded-3xl p-6 space-y-4 shadow-lg">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-extrabold text-lg text-white">{rfq.crop_name}</h3>
+                    <p className="text-xs text-emerald-400 font-medium">{rfq.buyer_name}</p>
+                  </div>
+                  <span className="px-2.5 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] font-mono font-bold uppercase rounded-full">
+                    {rfq.status}
+                  </span>
                 </div>
-                <span className="px-2.5 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] font-mono font-bold uppercase rounded-full">
-                  {rfq.status}
-                </span>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl">
-                  <span className="text-gray-400 uppercase font-mono text-[10px]">Required Vol</span>
-                  <p className="font-bold text-white text-sm mt-0.5">{rfq.required_quantity_kg.toLocaleString('en-IN')} kg</p>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl">
+                    <span className="text-gray-400 uppercase font-mono text-[10px]">Required Vol</span>
+                    <p className="font-bold text-white text-sm mt-0.5">{rfq.required_quantity_kg.toLocaleString('en-IN')} kg</p>
+                  </div>
+                  <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl">
+                    <span className="text-gray-400 uppercase font-mono text-[10px]">Target Price</span>
+                    <p className="font-bold text-emerald-400 text-sm mt-0.5">₹{rfq.target_price_per_kg}/kg</p>
+                  </div>
                 </div>
-                <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl">
-                  <span className="text-gray-400 uppercase font-mono text-[10px]">Target Price</span>
-                  <p className="font-bold text-emerald-400 text-sm mt-0.5">₹{rfq.target_price_per_kg}/kg</p>
-                </div>
-              </div>
 
-              <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-[#1e2d26]">
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-3.5 h-3.5 text-emerald-500" /> {rfq.location}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-emerald-500" /> Needed by: {rfq.needed_by_date}
-                </span>
+                <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-[#1e2d26]">
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-500" /> {rfq.location}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-500" /> Needed by: {rfq.needed_by_date}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Modal */}
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create New RFQ" subtitle="Post bulk demand for farmers">

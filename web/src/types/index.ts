@@ -51,6 +51,7 @@ export interface CropCatalogItem {
 export interface Cultivation {
   id: string;
   farm_id: string;
+  farmer_id?: string;
   crop_id: string;
   crop_name?: string;
   variety?: string;

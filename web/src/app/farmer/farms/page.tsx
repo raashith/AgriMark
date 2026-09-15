@@ -7,12 +7,15 @@ import { dataService } from '@/lib/data-service';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/components/ui/Toast';
 import { Modal } from '@/components/ui/Modal';
-import { MapPin, Plus, Droplets, Zap, ShieldCheck, Layers } from 'lucide-react';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { MapPin, Plus } from 'lucide-react';
 
 export default function FarmerFarmsPage() {
   const { user } = useAuth();
   const { showSuccess, showError } = useToast();
   const [farms, setFarms] = useState<Farm[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Form state
@@ -25,14 +28,31 @@ export default function FarmerFarmsPage() {
   const [irrigation, setIrrigation] = useState('Canal & Borewell');
 
   useEffect(() => {
-    dataService.getFarms(user?.id).then(setFarms);
+    async function loadData() {
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const list = await dataService.getFarms(user.id);
+        setFarms(list);
+      } catch {
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
   }, [user]);
 
   const handleAddFarm = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user?.id) {
+      showError('Authentication Required', 'Please sign in to register a farm.');
+      return;
+    }
     try {
       const created = await dataService.createFarm({
-        owner_id: user?.id || 'user-farmer-01',
+        owner_id: user.id,
         name,
         village,
         district,
@@ -41,10 +61,14 @@ export default function FarmerFarmsPage() {
         soil_type: soilType,
         irrigation_source: irrigation,
       });
-      setFarms((prev) => [created, ...prev]);
-      showSuccess('Farm Created Successfully!', `${name} added to your AgriMark profile.`);
-      setIsModalOpen(false);
-      setName('');
+      if (created) {
+        setFarms((prev) => [created, ...prev]);
+        showSuccess('Farm Created Successfully!', `${name} added to your AgriMark profile.`);
+        setIsModalOpen(false);
+        setName('');
+      } else {
+        showError('Registration Failed', 'Database submission failed.');
+      }
     } catch (err: any) {
       showError('Failed to create farm', err.message);
     }
@@ -76,45 +100,60 @@ export default function FarmerFarmsPage() {
         </div>
 
         {/* Farms Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {farms.map((farm) => (
-            <div key={farm.id} className="bg-[#121a16] border border-[#1e2d26] rounded-3xl p-6 space-y-4 shadow-lg">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-extrabold text-lg text-white">{farm.name}</h3>
-                  <p className="text-xs text-emerald-400 flex items-center gap-1 mt-0.5">
-                    <MapPin className="w-3.5 h-3.5" /> {farm.village}, {farm.district}, {farm.state}
-                  </p>
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-44 rounded-3xl" />
+            ))}
+          </div>
+        ) : farms.length === 0 ? (
+          <EmptyState
+            title="No Registered Farms Found"
+            description="You have not registered any farm acreage yet. Click 'Add New Farm' to add your field details."
+          />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {farms.map((farm) => (
+              <div key={farm.id} className="bg-[#121a16] border border-[#1e2d26] rounded-3xl p-6 space-y-4 shadow-lg">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-extrabold text-lg text-white">{farm.name}</h3>
+                    <p className="text-xs text-emerald-400 flex items-center gap-1 mt-0.5">
+                      <MapPin className="w-3.5 h-3.5" /> {farm.village}, {farm.district}, {farm.state}
+                    </p>
+                  </div>
+                  <span className="px-3 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 text-xs font-mono font-bold rounded-full">
+                    {farm.area_acres} Acres
+                  </span>
                 </div>
-                <span className="px-3 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 text-xs font-mono font-bold rounded-full">
-                  {farm.area_acres} Acres
-                </span>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl">
-                  <span className="text-gray-400 uppercase font-mono text-[10px]">Soil Type</span>
-                  <p className="font-bold text-white text-xs mt-0.5">{farm.soil_type}</p>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl">
+                    <span className="text-gray-400 uppercase font-mono text-[10px]">Soil Type</span>
+                    <p className="font-bold text-white text-xs mt-0.5">{farm.soil_type}</p>
+                  </div>
+                  <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl">
+                    <span className="text-gray-400 uppercase font-mono text-[10px]">Irrigation Source</span>
+                    <p className="font-bold text-white text-xs mt-0.5">{farm.irrigation_source}</p>
+                  </div>
                 </div>
-                <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl">
-                  <span className="text-gray-400 uppercase font-mono text-[10px]">Irrigation Source</span>
-                  <p className="font-bold text-white text-xs mt-0.5">{farm.irrigation_source}</p>
-                </div>
-              </div>
 
-              <div className="space-y-1.5 pt-2 border-t border-[#1e2d26]">
-                <span className="text-[10px] font-mono uppercase text-gray-400">Registered Infrastructure</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {(farm.infrastructure || ['Borewell Pump', 'Drip Lines']).map((infra, idx) => (
-                    <span key={idx} className="px-2.5 py-0.5 bg-[#0a0f0d] border border-[#1e2d26] text-gray-300 text-[10px] rounded-lg">
-                      {infra}
-                    </span>
-                  ))}
-                </div>
+                {farm.infrastructure && farm.infrastructure.length > 0 && (
+                  <div className="space-y-1.5 pt-2 border-t border-[#1e2d26]">
+                    <span className="text-[10px] font-mono uppercase text-gray-400">Registered Infrastructure</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {farm.infrastructure.map((infra, idx) => (
+                        <span key={idx} className="px-2.5 py-0.5 bg-[#0a0f0d] border border-[#1e2d26] text-gray-300 text-[10px] rounded-lg">
+                          {infra}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Modal */}
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Register New Farm" subtitle="Enter your field location & acreage">

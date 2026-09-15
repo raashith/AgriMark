@@ -7,12 +7,15 @@ import { dataService } from '@/lib/data-service';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/components/ui/Toast';
 import { Modal } from '@/components/ui/Modal';
-import { FileText, Plus, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { FileText, Plus, TrendingUp, TrendingDown } from 'lucide-react';
 
 export default function FinancePage() {
   const { user } = useAuth();
   const { showSuccess, showError } = useToast();
   const [records, setRecords] = useState<FinanceRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Form
@@ -22,7 +25,20 @@ export default function FinancePage() {
   const [description, setDescription] = useState('');
 
   useEffect(() => {
-    dataService.getFinance(user?.id).then(setRecords);
+    async function loadData() {
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const list = await dataService.getFinance(user.id);
+        setRecords(list);
+      } catch {
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
   }, [user]);
 
   const totalIncome = records.filter((r) => r.type === 'income').reduce((sum, r) => sum + r.amount, 0);
@@ -31,18 +47,26 @@ export default function FinancePage() {
 
   const handleAddRecord = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user?.id) {
+      showError('Authentication Required', 'Please sign in to record financial transactions.');
+      return;
+    }
     try {
       const created = await dataService.createFinanceRecord({
-        user_id: user?.id || 'user-farmer-01',
+        user_id: user.id,
         type,
         category,
         amount: Number(amount),
         description,
       });
-      setRecords((prev) => [created, ...prev]);
-      showSuccess('Transaction Saved!', `${type.toUpperCase()} of ₹${amount} recorded.`);
-      setIsModalOpen(false);
-      setDescription('');
+      if (created) {
+        setRecords((prev) => [created, ...prev]);
+        showSuccess('Transaction Saved!', `${type.toUpperCase()} of ₹${amount} recorded.`);
+        setIsModalOpen(false);
+        setDescription('');
+      } else {
+        showError('Save Failed', 'Database submission failed.');
+      }
     } catch (err: any) {
       showError('Failed to record transaction', err.message);
     }
@@ -100,19 +124,28 @@ export default function FinancePage() {
         {/* Transaction History */}
         <div className="bg-[#121a16] border border-[#1e2d26] rounded-3xl p-6 space-y-4 shadow-lg">
           <h3 className="font-bold text-base text-white">Recent Transactions</h3>
-          <div className="space-y-2">
-            {records.map((r) => (
-              <div key={r.id} className="p-4 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl flex items-center justify-between">
-                <div>
-                  <h4 className="font-bold text-sm text-white">{r.description || r.category}</h4>
-                  <p className="text-xs text-gray-400">{r.transaction_date} • {r.category}</p>
+          {loading ? (
+            <Skeleton className="h-36 rounded-2xl" />
+          ) : records.length === 0 ? (
+            <EmptyState
+              title="No Recorded Financial Transactions"
+              description="No transaction entries found. Click 'Record Transaction' to record income or expenses."
+            />
+          ) : (
+            <div className="space-y-2">
+              {records.map((r) => (
+                <div key={r.id} className="p-4 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-sm text-white">{r.description || r.category}</h4>
+                    <p className="text-xs text-gray-400">{r.transaction_date} • {r.category}</p>
+                  </div>
+                  <span className={`font-black text-base ${r.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {r.type === 'income' ? '+' : '-'}₹{r.amount.toLocaleString('en-IN')}
+                  </span>
                 </div>
-                <span className={`font-black text-base ${r.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {r.type === 'income' ? '+' : '-'}₹{r.amount.toLocaleString('en-IN')}
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Modal */}

@@ -9,18 +9,13 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/components/ui/Toast';
 import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import {
   ShoppingCart,
   MapPin,
   ShieldCheck,
   Award,
-  Calendar,
-  Layers,
   ArrowLeft,
-  CheckCircle2,
-  TrendingUp,
-  Building2,
-  Phone,
   MessageSquare,
 } from 'lucide-react';
 
@@ -58,7 +53,7 @@ export default function ProductDetailPage() {
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!listing) return;
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user?.id) {
       router.push(`/auth/login?redirect=/product/${listing.id}`);
       return;
     }
@@ -69,11 +64,11 @@ export default function ProductDetailPage() {
 
     setIsSubmitting(true);
     try {
-      await dataService.createOrder({
+      const created = await dataService.createOrder({
         listing_id: listing.id,
         listing_title: listing.title,
-        buyer_id: user?.id || 'user-buyer-01',
-        buyer_name: user?.full_name || 'Buyer',
+        buyer_id: user.id,
+        buyer_name: user.full_name || 'Buyer',
         seller_id: listing.seller_id,
         seller_name: listing.seller_name || 'Farmer',
         quantity_kg: Number(orderQty),
@@ -81,9 +76,13 @@ export default function ProductDetailPage() {
         delivery_address: deliveryAddress,
       });
 
-      showSuccess('Order Placed Successfully!', `Order for ${orderQty} kg of ${listing.crop_name} sent to farmer for fulfillment.`);
-      setIsOrderOpen(false);
-      router.push('/buyer/orders');
+      if (created) {
+        showSuccess('Order Placed Successfully!', `Order for ${orderQty} kg of ${listing.crop_name} sent to seller.`);
+        setIsOrderOpen(false);
+        router.push('/buyer/orders');
+      } else {
+        showError('Order Submission Failed', 'Database reservation failed.');
+      }
     } catch (err: any) {
       showError('Failed to place order', err.message);
     } finally {
@@ -109,9 +108,11 @@ export default function ProductDetailPage() {
 
   if (!listing) {
     return (
-      <div className="max-w-2xl mx-auto my-12 p-8 text-center bg-[#121a16] border border-[#1e2d26] rounded-3xl space-y-4">
-        <h2 className="text-xl font-bold text-white">Listing Not Found</h2>
-        <p className="text-xs text-gray-400">The requested produce lot listing may have been sold or removed.</p>
+      <div className="max-w-2xl mx-auto my-12 py-8 text-center space-y-4">
+        <EmptyState
+          title="Listing Not Found"
+          description="The requested produce lot listing does not exist or may have been removed."
+        />
         <Link href="/marketplace" className="inline-block px-4 py-2 bg-emerald-600 text-white font-bold text-xs rounded-xl">
           Back to Marketplace
         </Link>
@@ -149,10 +150,10 @@ export default function ProductDetailPage() {
             </div>
           </div>
 
-          {/* Quality Assaying & Harvest Traceability */}
+          {/* Quality Assaying & Details */}
           <div className="bg-[#121a16] border border-[#1e2d26] p-6 rounded-3xl space-y-4 shadow-md">
             <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-              <Award className="w-5 h-5 text-emerald-400" /> Assayed Quality & Harvest Provenance
+              <Award className="w-5 h-5 text-emerald-400" /> Produce Specification & Details
             </h3>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -162,24 +163,21 @@ export default function ProductDetailPage() {
               </div>
 
               <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl">
-                <span className="text-[10px] text-gray-400 uppercase font-mono">Moisture Content</span>
-                <p className="font-bold text-sm text-white">11.2% (Standard)</p>
+                <span className="text-[10px] text-gray-400 uppercase font-mono">Available Vol</span>
+                <p className="font-bold text-sm text-white">{listing.quantity_available_kg} kg</p>
               </div>
 
               <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl">
-                <span className="text-[10px] text-gray-400 uppercase font-mono">Storage Type</span>
-                <p className="font-bold text-sm text-white">Ventilated Granary</p>
+                <span className="text-[10px] text-gray-400 uppercase font-mono">Min Order</span>
+                <p className="font-bold text-sm text-white">{listing.min_order_quantity_kg || 100} kg</p>
               </div>
             </div>
 
-            <div className="pt-2">
-              <Link
-                href="/passport/LOT-2026-PADDY-001"
-                className="inline-flex items-center gap-2 text-xs font-bold text-emerald-400 hover:underline"
-              >
-                <ShieldCheck className="w-4 h-4" /> View AgriMark Digital Produce Passport
-              </Link>
-            </div>
+            {listing.description && (
+              <p className="text-xs text-gray-300 bg-[#0a0f0d] p-3.5 rounded-2xl border border-[#1e2d26]">
+                {listing.description}
+              </p>
+            )}
           </div>
         </div>
 
@@ -193,20 +191,17 @@ export default function ProductDetailPage() {
               <h1 className="text-2xl font-extrabold text-white leading-tight">{listing.title}</h1>
               <div className="flex items-center gap-2 text-xs text-gray-400">
                 <MapPin className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>{listing.location || 'Thanjavur, Tamil Nadu'}</span>
+                <span>{listing.location || 'Location Not Specified'}</span>
               </div>
             </div>
 
             {/* Price Box */}
             <div className="p-4 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl space-y-1">
-              <span className="text-xs font-mono uppercase text-gray-400">Direct Farmer Price</span>
+              <span className="text-xs font-mono uppercase text-gray-400">Direct Producer Price</span>
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-black text-emerald-400">₹{pricePerKg}</span>
                 <span className="text-sm text-gray-400 font-mono">per kg</span>
               </div>
-              <p className="text-[11px] text-emerald-400/80 font-mono flex items-center gap-1">
-                <TrendingUp className="w-3.5 h-3.5" /> Mandi Reference Price: ₹{Math.round(pricePerKg * 1.05)}/kg
-              </p>
             </div>
 
             {/* Seller Info */}
@@ -215,9 +210,8 @@ export default function ProductDetailPage() {
                 {listing.seller_name ? listing.seller_name[0] : 'F'}
               </div>
               <div className="flex-1">
-                <h4 className="font-bold text-sm text-white">{listing.seller_name || 'Ramanathan K.'}</h4>
-                <p className="text-xs text-emerald-400 font-medium">Verified Progressive Farmer</p>
-                <p className="text-[10px] text-gray-400">6.5 Acres Paddy & Turmeric Farm</p>
+                <h4 className="font-bold text-sm text-white">{listing.seller_name || 'AgriMark Producer'}</h4>
+                <p className="text-xs text-emerald-400 font-medium">Verified Producer</p>
               </div>
             </div>
 
@@ -248,7 +242,7 @@ export default function ProductDetailPage() {
         isOpen={isOrderOpen}
         onClose={() => setIsOrderOpen(false)}
         title="Procure Produce Lot"
-        subtitle={`Order direct from ${listing.seller_name || 'Farmer'}`}
+        subtitle={`Order direct from ${listing.seller_name || 'Producer'}`}
       >
         <form onSubmit={handlePlaceOrder} className="space-y-4">
           <div>
@@ -297,7 +291,7 @@ export default function ProductDetailPage() {
             disabled={isSubmitting}
             className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition"
           >
-            {isSubmitting ? 'Confirming Order...' : 'Confirm Order & Escrow Payment'}
+            {isSubmitting ? 'Confirming Order...' : 'Confirm Order & Reservation'}
           </button>
         </form>
       </Modal>
