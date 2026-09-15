@@ -21,14 +21,17 @@ AgriMark is a unified, farmer-first, national-scale agricultural operating syste
 ## Canonical Technology Stack
 
 - **Frontend Application**: Next.js 14 App Router, TypeScript, Vanilla CSS + AgriMark Stitch Design System (`#1B4D3E`, `#3E7B54`, `#E5A93C`, `#F7F5EE`, `#19201D`).
+- **Offline Sync & Low Bandwidth**: Client-side action queue (`OfflineSyncEngine`) in `web/src/lib/offline-sync.ts` supporting queued offline actions, low-bandwidth mode auto-detection, and background auto-sync.
 - **Canonical Database**: Supabase PostgreSQL featuring 15 domain migrations with Row-Level Security (RLS) on 100% of private tables.
-- **Test Suite**: Pytest python test suite covering end-to-end workflows and scenario simulations.
+- **Test Suite**: Pytest test suite covering end-to-end workflows and scenario simulations (178 passing tests).
 - **Deployment Host**: Vercel Production (`https://agrimark-six.vercel.app/`).
 
 ---
 
 ## Verification & Quality Assurance
 
-- **End-to-End Tests**: `pytest tests/test_accelerated_part3_national_os.py`
-- **Synthetic Staging**: `python scripts/simulate_accelerated_part3_national_os.py` (100,000 synthetic records with `data_origin = 'SYNTHETIC'`)
-- **Production Build**: `npm run build`
+- **End-to-End Tests**: `pytest` (178 passing unit & integration tests)
+- **Integration & Stabilization**: `pytest tests/test_accelerated_integration_stabilization.py`
+- **Synthetic Staging Simulation**: `python scripts/simulate_accelerated_integration_stabilization.py` (100,000 synthetic records with `data_origin = 'SYNTHETIC'`)
+- **Production Build**: `npm --prefix web run build` (Exit code 0, 0 build errors)
+
