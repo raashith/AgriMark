@@ -1,0 +1,11 @@
+node_modules/
+.next/
+out/
+build/
+.env*.local
+*.log
+*.tsbuildinfo
+stitch_export/
+backend/venv/
+backend/.env
+__pycache__/
