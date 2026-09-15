@@ -2,13 +2,16 @@
 
 import React, { useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { ShieldCheck, CheckCircle2, AlertTriangle, ExternalLink, RefreshCw, Key, Globe, Lock } from 'lucide-react';
-import { detectKeyType } from '@/lib/supabase';
+import { ShieldCheck, CheckCircle2, AlertTriangle, ExternalLink, RefreshCw, Key, Globe, Lock, Play } from 'lucide-react';
+import { detectKeyType, supabase } from '@/lib/supabase';
+import { getAuthCallbackUrl, parseOAuthUrl, OAuthUrlDiagnostics, SUPABASE_GOOGLE_CALLBACK } from '@/lib/auth-config';
 import Link from 'next/link';
 
 export default function AuthVerificationPage() {
   const [testing, setTesting] = useState(false);
+  const [generatingOAuth, setGeneratingOAuth] = useState(false);
   const [testResult, setTestResult] = useState<{ status: 'idle' | 'success' | 'warning'; message: string } | null>(null);
+  const [oauthDiagnostics, setOauthDiagnostics] = useState<OAuthUrlDiagnostics | null>(null);
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xrcqzpnstdbbtafhcwbb.supabase.co';
   let supabaseHost = 'xrcqzpnstdbbtafhcwbb.supabase.co';
@@ -19,8 +22,7 @@ export default function AuthVerificationPage() {
   const activeKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
   const keyType = detectKeyType(activeKey);
 
-  const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://agrimark-six.vercel.app';
-  const callbackUrl = `${currentOrigin}/auth/callback`;
+  const canonicalCallbackUrl = getAuthCallbackUrl();
 
   const runDiagnosticCheck = async () => {
     setTesting(true);
@@ -45,10 +47,45 @@ export default function AuthVerificationPage() {
     } else {
       setTestResult({
         status: 'success',
-        message: 'All client-side configuration parameters are valid. Follow the Google Cloud & Supabase checklist below to ensure zero redirect_uri_mismatch errors.',
+        message: 'Client environment parameters are configured. Use "Generate OAuth Request" below to inspect the live redirect_uri parameters sent to Google.',
       });
     }
     setTesting(false);
+  };
+
+  const handleGenerateOAuthRequest = async () => {
+    setGeneratingOAuth(true);
+    setOauthDiagnostics(null);
+
+    try {
+      const redirectTo = getAuthCallbackUrl();
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          scopes: 'openid email profile',
+          queryParams: { prompt: 'select_account' },
+        },
+      });
+
+      if (error || !data?.url) {
+        setTestResult({
+          status: 'warning',
+          message: `OAuth URL generation failed: ${error?.message || 'No URL returned from Supabase Auth.'}`,
+        });
+      } else {
+        // Intercept and parse without navigating automatically
+        const diagnostics = parseOAuthUrl(data.url);
+        setOauthDiagnostics(diagnostics);
+      }
+    } catch (err: any) {
+      setTestResult({
+        status: 'warning',
+        message: `OAuth request generation error: ${err?.message || 'Unexpected failure'}`,
+      });
+    } finally {
+      setGeneratingOAuth(false);
+    }
   };
 
   return (
@@ -64,18 +101,29 @@ export default function AuthVerificationPage() {
               Google OAuth & Supabase Verification
             </h1>
             <p className="text-xs text-gray-300 max-w-2xl">
-              Non-sensitive diagnostic overview for Google OAuth verification, PKCE flow integrity, and redirect URI configuration.
+              Non-sensitive diagnostic overview for Google OAuth verification, PKCE flow integrity, and live redirect_uri parameter inspection.
             </p>
           </div>
 
-          <button
-            onClick={runDiagnosticCheck}
-            disabled={testing}
-            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition flex items-center gap-2 shadow"
-          >
-            <RefreshCw className={`w-4 h-4 ${testing ? 'animate-spin' : ''}`} />
-            <span>{testing ? 'Verifying...' : 'Run Auth Diagnostic'}</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={runDiagnosticCheck}
+              disabled={testing || generatingOAuth}
+              className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition flex items-center gap-2 shadow"
+            >
+              <RefreshCw className={`w-4 h-4 ${testing ? 'animate-spin' : ''}`} />
+              <span>{testing ? 'Verifying...' : 'Check Config'}</span>
+            </button>
+
+            <button
+              onClick={handleGenerateOAuthRequest}
+              disabled={testing || generatingOAuth}
+              className="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition flex items-center gap-2 shadow"
+            >
+              <Play className={`w-4 h-4 ${generatingOAuth ? 'animate-spin' : ''}`} />
+              <span>{generatingOAuth ? 'Generating...' : 'Generate OAuth Request'}</span>
+            </button>
+          </div>
         </div>
 
         {testResult && (
@@ -94,6 +142,57 @@ export default function AuthVerificationPage() {
             <div className="space-y-1">
               <span className="font-bold">Diagnostic Status</span>
               <p className="leading-relaxed">{testResult.message}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Live Intercepted OAuth Diagnostics Card */}
+        {oauthDiagnostics && (
+          <div className="bg-[#121a16] border border-purple-900/60 p-6 rounded-3xl space-y-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-base text-white flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-purple-400" /> Live Intercepted Google OAuth Request Parameters
+              </h3>
+              <span className={`px-3 py-1 text-xs font-mono font-bold rounded-full border ${
+                oauthDiagnostics.isCanonicalSupabaseCallback
+                  ? 'bg-emerald-950 border-emerald-800 text-emerald-300'
+                  : 'bg-red-950 border-red-800 text-red-300'
+              }`}>
+                {oauthDiagnostics.isCanonicalSupabaseCallback ? '✓ CANONICAL SUPABASE REDIRECT MATCH' : '⚠️ MISMATCH DETECTED'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
+              <div className="p-3.5 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl space-y-1">
+                <span className="text-gray-400 text-[10px] block">GOOGLE OAUTH HOST</span>
+                <span className="text-white font-bold">{oauthDiagnostics.host}</span>
+              </div>
+
+              <div className="p-3.5 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl space-y-1">
+                <span className="text-gray-400 text-[10px] block">RESPONSE TYPE</span>
+                <span className="text-emerald-400 font-bold">{oauthDiagnostics.responseType || 'code'}</span>
+              </div>
+
+              <div className="p-3.5 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl space-y-1">
+                <span className="text-gray-400 text-[10px] block">PKCE METHOD</span>
+                <span className="text-emerald-400 font-bold">{oauthDiagnostics.codeChallengeMethod || 'S256'}</span>
+              </div>
+
+              <div className="p-3.5 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl space-y-1">
+                <span className="text-gray-400 text-[10px] block">STATE PRESENT</span>
+                <span className="text-emerald-400 font-bold">{oauthDiagnostics.hasState ? 'YES' : 'NO'}</span>
+              </div>
+            </div>
+
+            <div className="p-4 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl space-y-2 text-xs font-mono">
+              <div>
+                <span className="text-gray-400 text-[10px] block uppercase">Evaluated `redirect_uri` Parameter</span>
+                <span className="text-emerald-300 font-bold break-all">{oauthDiagnostics.redirectUri}</span>
+              </div>
+              <div className="pt-2 border-t border-[#1e2d26]">
+                <span className="text-gray-400 text-[10px] block uppercase">Expected Google Cloud Authorized Redirect URI</span>
+                <span className="text-purple-300 font-bold break-all">{SUPABASE_GOOGLE_CALLBACK}</span>
+              </div>
             </div>
           </div>
         )}
@@ -122,7 +221,7 @@ export default function AuthVerificationPage() {
             <span className="text-xs font-mono uppercase text-gray-400 flex items-center gap-1.5">
               <Lock className="w-3.5 h-3.5 text-emerald-400" /> Production Callback URL
             </span>
-            <p className="text-xs font-mono font-bold text-emerald-400 break-all">{callbackUrl}</p>
+            <p className="text-xs font-mono font-bold text-emerald-400 break-all">{canonicalCallbackUrl}</p>
             <span className="text-[11px] text-gray-400 block">PKCE Callback Handler</span>
           </div>
         </div>

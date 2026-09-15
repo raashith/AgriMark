@@ -1,5 +1,5 @@
 import pytest
-import re
+from urllib.parse import urlparse, parse_qs
 
 # AgriMark Google OAuth Production Configuration & Verification Test Suite
 
@@ -25,6 +25,34 @@ def test_canonical_urls_and_hosts():
     # Verify Google Cloud OAuth redirect target MUST be Supabase Auth, NOT the Vercel app directly
     assert google_cloud_authorized_redirect == "https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/callback"
     assert google_cloud_authorized_redirect != canonical_app_callback
+
+
+def test_generated_oauth_request_url_parsing():
+    """Simulate and parse Supabase-generated Google OAuth request URL to assert redirect_uri parameter."""
+    sample_oauth_url = (
+        "https://accounts.google.com/o/oauth2/v2/auth?"
+        "client_id=1234567890-test.apps.googleusercontent.com&"
+        "redirect_uri=https%3A%2F%2Fxrcqzpnstdbbtafhcwbb.supabase.co%2Fauth%2Fv1%2Fcallback&"
+        "response_type=code&"
+        "scope=openid+email+profile&"
+        "code_challenge=xyz123&"
+        "code_challenge_method=S256&"
+        "state=st_98765"
+    )
+
+    parsed = urlparse(sample_oauth_url)
+    assert parsed.hostname == "accounts.google.com"
+
+    params = parse_qs(parsed.query)
+    redirect_uri = params.get("redirect_uri", [None])[0]
+    scope = params.get("scope", [None])[0]
+    response_type = params.get("response_type", [None])[0]
+    code_challenge_method = params.get("code_challenge_method", [None])[0]
+
+    assert redirect_uri == "https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/callback"
+    assert scope == "openid email profile"
+    assert response_type == "code"
+    assert code_challenge_method == "S256"
 
 
 def test_role_based_post_login_redirection():

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { PRODUCTION_SITE_URL, SUPABASE_EXPECTED_HOST } from '@/lib/auth-config';
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://agrimark-six.vercel.app';
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xrcqzpnstdbbtafhcwbb.supabase.co';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || PRODUCTION_SITE_URL;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || `https://${SUPABASE_EXPECTED_HOST}`;
 
 function getRoleDashboard(role?: string | null): string {
   switch (role) {
@@ -26,7 +27,11 @@ export async function GET(request: NextRequest) {
   const flowId = requestUrl.searchParams.get('sb_flow_id');
   const error = requestUrl.searchParams.get('error');
   const errorDescription = requestUrl.searchParams.get('error_description');
+
   const rawNext = requestUrl.searchParams.get('next');
+  const sanitizedNext = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') && rawNext !== '/auth/login'
+    ? rawNext
+    : null;
 
   const isLocalhost = requestUrl.origin.includes('localhost') || requestUrl.origin.includes('127.0.0.1');
   const baseUrl = isLocalhost ? requestUrl.origin : SITE_URL;
@@ -88,8 +93,8 @@ export async function GET(request: NextRequest) {
   // Session is established. Determine user role and target redirect path.
   const { data: { user } } = await supabase.auth.getUser();
   if (user) {
-    if (rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') && rawNext !== '/auth/login') {
-      targetPath = rawNext;
+    if (sanitizedNext) {
+      targetPath = sanitizedNext;
     } else {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
       if (profile?.role) {

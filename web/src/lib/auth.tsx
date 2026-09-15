@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile, UserRole } from '@/types';
 import { supabase, logSupabaseDiagnostic } from './supabase';
 import { api } from './api';
-import { PRODUCTION_SITE_URL } from './auth-config';
+import { PRODUCTION_SITE_URL, getAuthCallbackUrl } from './auth-config';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -142,16 +142,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithPhoneOtp = sendPhoneOtp;
 
   const loginWithGoogle = async () => {
-    const redirectTo = `${typeof window !== 'undefined' ? window.location.origin : PRODUCTION_SITE_URL}/auth/callback`;
+    const redirectTo = getAuthCallbackUrl();
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo, queryParams: { prompt: 'select_account' } },
+      options: {
+        redirectTo,
+        scopes: 'openid email profile',
+        queryParams: { prompt: 'select_account' },
+      },
     });
     if (error || !data?.url) {
       if (error) logSupabaseDiagnostic('signInWithOAuth', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/authorize', 400, error.message);
       throw new Error(formatAuthError(error?.message || 'Google Sign-In could not start.'));
     }
-    window.location.assign(data.url);
+    const oauthUrl = new URL(data.url);
+    if (oauthUrl.hostname !== 'accounts.google.com') {
+      throw new Error('Invalid OAuth redirect host returned.');
+    }
+    if (typeof window !== 'undefined') {
+      window.location.assign(data.url);
+    }
   };
 
   const register = async (data: any): Promise<UserProfile> => {
