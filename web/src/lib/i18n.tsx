@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-export type Language = 'en' | 'ta';
+export type Language = 'en' | 'ta' | 'hi' | 'te' | 'kn' | 'ml' | 'mr' | 'bn' | 'gu' | 'pa';
 
 const translations: Record<Language, Record<string, string>> = {
   en: {
@@ -109,6 +109,19 @@ const translations: Record<Language, Record<string, string>> = {
     confidence: 'நம்பகத்தன்மை அளவு',
     disclaimer: 'AI கணிப்புகள் முடிவு எடுப்பதற்கான மதிப்பீடுகள் மட்டுமே.',
   },
+  hi: {
+    appName: 'एग्रीमार्क (AgriMark)',
+    tagline: 'किसान-प्रथम कृषि बाजार और बुद्धिमत्ता प्रणाली',
+    login: 'लॉग इन करें',
+    register: 'खाता बनाएं',
+    logout: 'लॉग आउट',
+    farmer: 'किसान',
+    buyer: 'खरीदार',
+    fpo: 'एफपीओ / सहकारी',
+    logistics: 'लॉजिस्टिक्स पार्टनर',
+    service_provider: 'सेवा प्रदाता',
+  },
+  te: {}, kn: {}, ml: {}, mr: {}, bn: {}, gu: {}, pa: {}
 };
 
 interface I18nContextType {
@@ -128,7 +141,7 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const saved = localStorage.getItem('agrimark_lang') as Language;
-    if (saved && (saved === 'en' || saved === 'ta')) {
+    if (saved) {
       setLanguageState(saved);
     }
   }, []);
@@ -139,7 +152,7 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const t = (key: string): string => {
-    return translations[language][key] || translations['en'][key] || key;
+    return translations[language]?.[key] || translations['en']?.[key] || key;
   };
 
   return (
