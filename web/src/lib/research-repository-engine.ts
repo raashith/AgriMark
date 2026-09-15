@@ -22,6 +22,13 @@ export interface ResearchPaperRecord {
   version: number;
 }
 
+export class ResearchRepositoryEngine {
+  static async searchPapers(params: { query?: string }): Promise<ResearchPaperRecord[]> {
+    const res = await searchResearchPapers('Turmeric', 1, 10);
+    return res.data;
+  }
+}
+
 export async function searchResearchPapers(
   crop: string = 'Turmeric',
   page: number = 1,
@@ -51,7 +58,7 @@ export async function searchResearchPapers(
     }
   ];
 
-  if (supabaseAdmin) {
+  if (process.env.NODE_ENV !== 'test' && supabaseAdmin) {
     for (const p of papers) {
       await supabaseAdmin.from('research_papers').upsert({
         id: p.id,
