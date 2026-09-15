@@ -142,10 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithPhoneOtp = sendPhoneOtp;
 
   const loginWithGoogle = async () => {
-    if (isOAuthInProgress) {
-      console.warn('[AgriMark Auth] OAuth sign-in attempt ignored: sign-in already in progress.');
-      return;
-    }
+    if (isOAuthInProgress) return;
     isOAuthInProgress = true;
     try {
       const redirectTo = getAuthCallbackUrl();
@@ -153,21 +150,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         provider: 'google',
         options: {
           redirectTo,
-          scopes: 'openid email profile',
+          // Supabase's Google integration requires the email/profile identity scopes.
+          // Use the explicit email scope to avoid provider-side email lookup failures.
+          scopes: 'openid email profile https://www.googleapis.com/auth/userinfo.email',
           queryParams: { prompt: 'select_account' },
         },
       });
+
       if (error || !data?.url) {
-        if (error) logSupabaseDiagnostic('signInWithOAuth', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/authorize', 400, error.message);
+        if (error) logSupabaseDiagnostic('signInWithOAuth', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/authorize', error.status || 400, error.code || error.message);
         throw new Error(formatAuthError(error?.message || 'Google Sign-In could not start.'));
       }
+
       const oauthUrl = new URL(data.url);
       if (oauthUrl.hostname !== 'accounts.google.com') {
-        throw new Error('Invalid OAuth redirect host returned.');
+        throw new Error('Google Sign-In returned an invalid provider URL.');
       }
-      if (typeof window !== 'undefined') {
-        window.location.assign(data.url);
+
+      const redirectUri = oauthUrl.searchParams.get('redirect_uri');
+      if (redirectUri !== 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/callback') {
+        console.error('[AgriMark Auth] Unexpected Google redirect URI', { redirectUri });
+        throw new Error('Google Sign-In configuration needs attention.');
       }
+
+      // The browser must own the OAuth navigation and preserve the PKCE verifier.
+      window.location.assign(data.url);
     } catch (err) {
       isOAuthInProgress = false;
       throw err;
@@ -198,7 +205,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
-        logSupabaseDiagnostic('signUp', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/signup', 400, error.message);
+        logSupabaseDiagnostic('signUp', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/signup', error.status || 400, error.code || error.message);
         const normalized = error.message.toLowerCase();
         if (normalized.includes('already registered')) throw new Error('An account with this email already exists. Please log in instead.');
         throw new Error(formatAuthError(error.message));
