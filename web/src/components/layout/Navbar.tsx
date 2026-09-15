@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { useI18n } from '@/lib/i18n';
+import { useI18n, SUPPORTED_LANGUAGES } from '@/lib/i18n';
 import { CommandPalette } from './CommandPalette';
 import {
   Sprout,
@@ -13,11 +13,8 @@ import {
   Globe,
   User,
   LogOut,
-  ShieldCheck,
   Building2,
   ChevronDown,
-  CheckCircle2,
-  AlertTriangle,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -28,6 +25,7 @@ export const Navbar: React.FC = () => {
   const [isCmdOpen, setIsCmdOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isLangOpen, setIsLangOpen] = useState(false);
 
   const notifications = [
     { id: 1, title: 'Market Price Alert', desc: 'Turmeric modal price rose +₹400/quintal in Erode Mandi.', time: '10m ago', type: 'price' },
@@ -72,15 +70,47 @@ export const Navbar: React.FC = () => {
               <Search className="w-5 h-5" />
             </button>
 
-            {/* Language Toggle */}
-            <button
-              onClick={() => setLanguage(language === 'en' ? 'ta' : 'en')}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0a0f0d] border border-[#1e2d26] hover:border-emerald-800 rounded-xl text-xs font-mono font-bold text-emerald-300 transition"
-              title="Switch Language"
-            >
-              <Globe className="w-3.5 h-3.5" />
-              <span>{language === 'en' ? 'தமிழ்' : 'English'}</span>
-            </button>
+            {/* Language Selector Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setIsLangOpen(!isLangOpen);
+                  setIsNotifOpen(false);
+                  setIsProfileOpen(false);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0a0f0d] border border-[#1e2d26] hover:border-emerald-800 rounded-xl text-xs font-mono font-bold text-emerald-300 transition"
+                title="Select Platform Language"
+              >
+                <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{SUPPORTED_LANGUAGES.find((l) => l.code === language)?.nativeName || 'English'}</span>
+                <ChevronDown className="w-3 h-3 text-emerald-400" />
+              </button>
+
+              {isLangOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-[#121a16] border border-[#1e2d26] rounded-2xl shadow-2xl p-1.5 z-50 max-h-64 overflow-y-auto animate-fade-in">
+                  <div className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase text-gray-400 border-b border-[#1e2d26] mb-1">
+                    Select Language
+                  </div>
+                  {SUPPORTED_LANGUAGES.map((langItem) => (
+                    <button
+                      key={langItem.code}
+                      onClick={() => {
+                        setLanguage(langItem.code);
+                        setIsLangOpen(false);
+                      }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-medium transition flex items-center justify-between ${
+                        language === langItem.code
+                          ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/40 font-bold'
+                          : 'text-gray-300 hover:text-white hover:bg-[#18241f]'
+                      }`}
+                    >
+                      <span>{langItem.label}</span>
+                      <span className="font-mono text-emerald-300 text-[11px]">{langItem.nativeName}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {isAuthenticated ? (
               <>
@@ -90,6 +120,7 @@ export const Navbar: React.FC = () => {
                     onClick={() => {
                       setIsNotifOpen(!isNotifOpen);
                       setIsProfileOpen(false);
+                      setIsLangOpen(false);
                     }}
                     className="relative p-2 text-gray-300 hover:text-white hover:bg-[#18241f] rounded-xl transition"
                     aria-label="Notifications"
@@ -131,6 +162,7 @@ export const Navbar: React.FC = () => {
                     onClick={() => {
                       setIsProfileOpen(!isProfileOpen);
                       setIsNotifOpen(false);
+                      setIsLangOpen(false);
                     }}
                     className="flex items-center gap-2 p-1.5 bg-[#0a0f0d] border border-[#1e2d26] hover:border-emerald-800 rounded-xl text-gray-200 transition"
                   >
