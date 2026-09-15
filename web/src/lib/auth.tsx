@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile, UserRole } from '@/types';
 import { supabase, logSupabaseDiagnostic } from './supabase';
 import { api } from './api';
-import { PRODUCTION_SITE_URL, getAuthCallbackUrl, parseOAuthUrl, SUPABASE_GOOGLE_CALLBACK } from './auth-config';
+import { PRODUCTION_SITE_URL, PRODUCTION_AUTH_CALLBACK, SUPABASE_GOOGLE_CALLBACK } from './auth-config';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -140,7 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithPhoneOtp = sendPhoneOtp;
 
   const loginWithGoogle = async () => {
-    const redirectTo = getAuthCallbackUrl();
+    const redirectTo = PRODUCTION_AUTH_CALLBACK;
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -155,13 +155,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error(formatAuthError(error?.message || 'Google Sign-In could not start.'));
     }
 
-    const diagnostics = parseOAuthUrl(data.url);
-    if (!diagnostics.isValidGoogleHost || !diagnostics.isCanonicalSupabaseCallback) {
-      console.error('[AgriMark OAuth Diagnostic] Invalid generated Google OAuth request', {
-        ...diagnostics,
-        expectedAppCallback: redirectTo,
-        expectedGoogleCallback: SUPABASE_GOOGLE_CALLBACK,
-      });
+    try {
+      const oauthUrl = new URL(data.url);
+      const actualRedirectUri = oauthUrl.searchParams.get('redirect_uri');
+      if (oauthUrl.hostname !== 'accounts.google.com' || actualRedirectUri !== SUPABASE_GOOGLE_CALLBACK) {
+        console.error('[AgriMark OAuth Diagnostic] Invalid generated Google OAuth request', {
+          host: oauthUrl.hostname,
+          redirectUri: actualRedirectUri,
+          expectedRedirectUri: SUPABASE_GOOGLE_CALLBACK,
+        });
+        throw new Error('Google Sign-In configuration needs attention. Please try again.');
+      }
+    } catch (diagnosticError) {
+      if (diagnosticError instanceof Error) throw diagnosticError;
       throw new Error('Google Sign-In configuration needs attention. Please try again.');
     }
 
@@ -181,7 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email,
         password,
         options: {
-          emailRedirectTo: `${getAuthCallbackUrl()}`,
+          emailRedirectTo: PRODUCTION_AUTH_CALLBACK,
           data: {
             full_name: data.full_name,
             phone: data.phone || data.phone_number,
