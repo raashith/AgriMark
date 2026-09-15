@@ -26,7 +26,12 @@ export function getAuthCallbackUrl(): string {
     if (isLocalhost) {
       return `${window.location.origin}/auth/callback`;
     }
-    return PRODUCTION_AUTH_CALLBACK;
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+    if (siteUrl && !siteUrl.includes('localhost')) {
+      const cleanSiteUrl = siteUrl.replace(/\/$/, '');
+      return `${cleanSiteUrl}/auth/callback`;
+    }
+    return `${window.location.origin}/auth/callback`;
   }
   return PRODUCTION_AUTH_CALLBACK;
 }
@@ -35,6 +40,7 @@ export interface OAuthUrlDiagnostics {
   rawUrl: string;
   host: string;
   redirectUri: string | null;
+  clientId: string | null;
   clientIdSuffix: string | null;
   scope: string | null;
   responseType: string | null;
@@ -63,6 +69,7 @@ export function parseOAuthUrl(urlStr: string): OAuthUrlDiagnostics {
       rawUrl: urlStr,
       host: parsed.hostname,
       redirectUri,
+      clientId,
       clientIdSuffix,
       scope,
       responseType,
@@ -76,6 +83,7 @@ export function parseOAuthUrl(urlStr: string): OAuthUrlDiagnostics {
       rawUrl: urlStr,
       host: 'invalid',
       redirectUri: null,
+      clientId: null,
       clientIdSuffix: null,
       scope: null,
       responseType: null,

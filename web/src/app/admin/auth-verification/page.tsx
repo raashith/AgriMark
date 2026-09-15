@@ -184,13 +184,22 @@ export default function AuthVerificationPage() {
               </div>
             </div>
 
-            <div className="p-4 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl space-y-2 text-xs font-mono">
+            <div className="p-4 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl space-y-3 text-xs font-mono">
               <div>
-                <span className="text-gray-400 text-[10px] block uppercase">Evaluated `redirect_uri` Parameter</span>
+                <span className="text-gray-400 text-[10px] block uppercase font-bold text-amber-400">Extracted Google Client ID (`client_id`)</span>
+                <span className="text-amber-300 font-bold break-all">{oauthDiagnostics.clientId || 'Not found'}</span>
+                <p className="text-[11px] text-gray-400 font-sans mt-1">
+                  ⚠️ Compare this exact Client ID against the <strong>agrimark</strong> Web OAuth client in Google Cloud Console. They MUST be identical.
+                </p>
+              </div>
+
+              <div className="pt-2 border-t border-[#1e2d26]">
+                <span className="text-gray-400 text-[10px] block uppercase font-bold">Evaluated `redirect_uri` Parameter</span>
                 <span className="text-emerald-300 font-bold break-all">{oauthDiagnostics.redirectUri}</span>
               </div>
+
               <div className="pt-2 border-t border-[#1e2d26]">
-                <span className="text-gray-400 text-[10px] block uppercase">Expected Google Cloud Authorized Redirect URI</span>
+                <span className="text-gray-400 text-[10px] block uppercase font-bold">Expected Google Cloud Authorized Redirect URI</span>
                 <span className="text-purple-300 font-bold break-all">{SUPABASE_GOOGLE_CALLBACK}</span>
               </div>
             </div>
