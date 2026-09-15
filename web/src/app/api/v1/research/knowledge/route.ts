@@ -1,4 +1,3 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { queryKnowledgeGraph } from '@/lib/knowledge-graph-engine';
 import {
@@ -6,6 +5,7 @@ import {
   getDiseaseKnowledgeProfile,
   getSoilKnowledgeProfile
 } from '@/lib/crop-disease-soil-knowledge';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -27,4 +27,6 @@ export async function GET(request: Request) {
     }
   });
 }
+
+
 

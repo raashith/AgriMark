@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { FarmCropSoilWaterTwinEngine, CropStage } from '@/lib/farm-crop-soil-water-twin';
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -22,4 +22,6 @@ export async function GET(req: Request) {
     ]
   });
 }
+
+
 

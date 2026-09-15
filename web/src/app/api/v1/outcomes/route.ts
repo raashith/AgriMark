@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { OutcomeEconomicsEngine } from '@/lib/outcome-economics-engine';
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -9,4 +9,6 @@ export async function GET(req: Request) {
   const outcome = OutcomeEconomicsEngine.calculateFarmerOutcome(farmerId);
   return NextResponse.json(outcome);
 }
+
+
 

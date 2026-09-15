@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { ObservabilityEngine } from '@/lib/observability-engine';
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const report = await ObservabilityEngine.generateHealthReport();
@@ -10,4 +10,6 @@ export async function GET() {
     report,
   });
 }
+
+
 

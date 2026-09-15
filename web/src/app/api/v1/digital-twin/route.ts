@@ -1,5 +1,5 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   return NextResponse.json({
@@ -34,4 +34,6 @@ export async function POST(req: Request) {
     }
   });
 }
+
+
 

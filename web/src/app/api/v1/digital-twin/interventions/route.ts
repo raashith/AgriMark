@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { InterventionCounterfactualEngine, InterventionType } from '@/lib/intervention-counterfactual-engine';
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -16,4 +16,6 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ success: true, comparison });
 }
+
+
 

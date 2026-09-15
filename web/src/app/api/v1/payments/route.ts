@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { PaymentProviderEngine } from '@/lib/payment-provider-engine';
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   const requestId = `req-${Date.now()}`;
@@ -31,4 +31,6 @@ export async function POST(request: Request) {
     headers: { 'X-Request-ID': requestId }
   });
 }
+
+
 

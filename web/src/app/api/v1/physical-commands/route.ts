@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { createSignedPhysicalCommand, verifyCommandExecution } from '@/lib/command-gateway-engine';
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
@@ -24,4 +24,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 400 });
   }
 }
+
+
 

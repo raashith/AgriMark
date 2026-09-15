@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { ScenarioSimulationEngine } from '@/lib/scenario-simulation-engine';
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   return NextResponse.json({
@@ -17,4 +17,6 @@ export async function POST(req: Request) {
   const scenario = await ScenarioSimulationEngine.createScenario(body);
   return NextResponse.json({ success: true, scenario });
 }
+
+
 

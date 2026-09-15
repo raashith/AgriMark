@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClimateAlert, ClimateAlert } from '@/lib/climate-response-workflows';
-
 export const dynamic = 'force-dynamic';
+
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -33,3 +33,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: err.message }, { status: 400 });
   }
 }
+

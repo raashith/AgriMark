@@ -37,8 +37,21 @@ export default function LoginPage() {
     if (typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search);
       const urlError = searchParams.get('error') || searchParams.get('error_description');
+      const providerError = searchParams.get('provider_error');
+      const errorCode = searchParams.get('error_code');
+      const correlationId = searchParams.get('correlation_id');
+
       if (urlError) {
-        setError(formatAuthError(urlError));
+        let msg = formatAuthError(urlError);
+        const details: string[] = [];
+        if (providerError && providerError !== 'none') details.push(`Provider: ${providerError}`);
+        if (errorCode && errorCode !== 'unknown') details.push(`Code: ${errorCode}`);
+        if (correlationId) details.push(`Ref: ${correlationId}`);
+
+        if (details.length > 0) {
+          msg += ` (${details.join(' | ')})`;
+        }
+        setError(msg);
       }
     }
   }, []);

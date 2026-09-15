@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { SimulationGovernanceAsync } from '@/lib/simulation-governance-async';
-
 export const dynamic = 'force-dynamic';
+
 
 export async function GET(req: Request) {
   return NextResponse.json({
@@ -17,3 +17,4 @@ export async function POST(req: Request) {
   const run = await SimulationGovernanceAsync.submitAsyncSimulationJob(body);
   return NextResponse.json({ success: true, run });
 }
+

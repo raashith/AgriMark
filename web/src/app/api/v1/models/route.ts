@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { registerModelVersion, rollbackModelVersion } from '@/lib/model-registry-governance';
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
@@ -18,4 +18,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 400 });
   }
 }
+
+
 

@@ -1,10 +1,10 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import {
   getComplianceRequirements,
   getFarmerComplianceChecklist,
   getFPOGovernanceRecord
 } from '@/lib/compliance-intelligence-engine';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -27,4 +27,6 @@ export async function GET(request: Request) {
     }
   });
 }
+
+
 

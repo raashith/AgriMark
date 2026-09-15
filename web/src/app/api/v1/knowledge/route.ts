@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { KnowledgeGraphEngine } from '@/lib/knowledge-graph-engine';
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -21,4 +21,6 @@ export async function POST(req: Request) {
   const node = await KnowledgeGraphEngine.addEntity(body);
   return NextResponse.json({ success: true, node });
 }
+
+
 

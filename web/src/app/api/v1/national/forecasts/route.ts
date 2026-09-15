@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { ForecastingMLOpsEngine } from '@/lib/forecasting-mlops-engine';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const requestId = `req-${Date.now()}`;
@@ -58,4 +58,6 @@ export async function GET(request: Request) {
     headers: { 'X-Request-ID': requestId }
   });
 }
+
+
 

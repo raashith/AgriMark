@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { AISupervisorGovernanceEngine } from '@/lib/ai-supervisor-governance';
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   const requestId = `req-${Date.now()}`;
@@ -26,4 +26,6 @@ export async function POST(request: Request) {
     headers: { 'X-Request-ID': requestId }
   });
 }
+
+
 

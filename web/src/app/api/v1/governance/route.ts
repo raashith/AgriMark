@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { DataGovernanceEngine } from '@/lib/data-governance';
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   return NextResponse.json({
@@ -21,4 +21,6 @@ export async function POST(req: Request) {
   );
   return NextResponse.json({ success: true, log });
 }
+
+
 

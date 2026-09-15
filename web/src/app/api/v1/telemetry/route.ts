@@ -1,7 +1,7 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { ingestTelemetry, getDeviceTelemetry } from '@/lib/telemetry-ingestion-engine';
 import { evaluateSensorQuality } from '@/lib/sensor-quality-engine';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -28,4 +28,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 400 });
   }
 }
+
+
 

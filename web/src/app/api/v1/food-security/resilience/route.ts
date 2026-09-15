@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { generateResiliencePlan, computeNationalResilienceIndex } from '@/lib/resilience-planning-engine';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -20,4 +20,6 @@ export async function GET(request: Request) {
     }
   });
 }
+
+
 

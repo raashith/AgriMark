@@ -44,7 +44,14 @@ export function getSupabaseDiagnostic() {
   const rawApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://agrimark-api.onrender.com/api/v1';
   let apiBaseHost = 'agrimark-api.onrender.com';
   try { apiBaseHost = new URL(rawApiUrl.includes('supabase.co') ? 'https://agrimark-api.onrender.com/api/v1' : rawApiUrl).hostname; } catch {}
-  return { hasSupabaseUrl: Boolean(SUPABASE_URL), supabaseHost, keyType: detectKeyType(SUPABASE_PUBLISHABLE_KEY), hasAuthConfig: SUPABASE_AUTH_CONFIGURED, apiBaseHost };
+  return {
+    commitSha: process.env.VERCEL_GIT_COMMIT_SHA || process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || 'dev',
+    hasSupabaseUrl: Boolean(SUPABASE_URL),
+    supabaseHost,
+    keyType: detectKeyType(SUPABASE_PUBLISHABLE_KEY),
+    hasAuthConfig: SUPABASE_AUTH_CONFIGURED,
+    apiBaseHost,
+  };
 }
 
 export function logSupabaseDiagnostic(action: string, url: string, status: number, errorCode?: string) {

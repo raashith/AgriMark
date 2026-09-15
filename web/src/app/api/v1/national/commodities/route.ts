@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { CommodityBalanceEngine } from '@/lib/commodity-balance-engine';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const requestId = `req-${Date.now()}`;
@@ -48,4 +48,6 @@ export async function GET(request: Request) {
     }
   });
 }
+
+
 

@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { IncidentSLOEngine } from '@/lib/incident-slo-engine';
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const requestId = `req-${Date.now()}`;
@@ -15,4 +15,6 @@ export async function GET() {
     headers: { 'X-Request-ID': requestId }
   });
 }
+
+
 

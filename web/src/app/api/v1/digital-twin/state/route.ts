@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { DigitalTwinStateModel } from '@/lib/digital-twin-state-model';
-
 export const dynamic = 'force-dynamic';
+
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -17,3 +17,4 @@ export async function POST(req: Request) {
   const snapshot = await DigitalTwinStateModel.createSnapshot(body);
   return NextResponse.json({ success: true, snapshot });
 }
+

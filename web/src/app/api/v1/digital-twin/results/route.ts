@@ -1,5 +1,5 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -15,4 +15,6 @@ export async function GET(req: Request) {
     disclaimer: 'COMPUTATIONAL MODEL RESULT ONLY: Does not represent a guaranteed physical outcome.'
   });
 }
+
+
 

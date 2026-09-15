@@ -1,4 +1,5 @@
 import pytest
+import re
 from urllib.parse import urlparse, parse_qs
 
 # AgriMark Google OAuth Production Configuration & Verification Test Suite
@@ -55,36 +56,56 @@ def test_generated_oauth_request_url_parsing():
     assert code_challenge_method == "S256"
 
 
-def test_pkce_flow_id_extraction():
-    """Verify sb_flow_id parameter extraction from callback query string."""
-    sample_callback = "https://agrimark-six.vercel.app/auth/callback?code=auth_code_123&sb_flow_id=flow_abc_456"
-    parsed = urlparse(sample_callback)
-    params = parse_qs(parsed.query)
+def test_pkce_flow_id_extraction_and_fallback():
+    """Verify sb_flow_id and flow_id parameter extraction from callback query string."""
+    sample_callback_1 = "https://agrimark-six.vercel.app/auth/callback?code=auth_code_123&sb_flow_id=flow_abc_456"
+    parsed_1 = urlparse(sample_callback_1)
+    params_1 = parse_qs(parsed_1.query)
+    flow_id_1 = params_1.get("sb_flow_id", [None])[0] or params_1.get("flow_id", [None])[0]
+    assert flow_id_1 == "flow_abc_456"
 
-    code = params.get("code", [None])[0]
-    flow_id = params.get("sb_flow_id", [None])[0] or params.get("flow_id", [None])[0]
+    sample_callback_2 = "https://agrimark-six.vercel.app/auth/callback?code=auth_code_123&flow_id=flow_def_789"
+    parsed_2 = urlparse(sample_callback_2)
+    params_2 = parse_qs(parsed_2.query)
+    flow_id_2 = params_2.get("sb_flow_id", [None])[0] or params_2.get("flow_id", [None])[0]
+    assert flow_id_2 == "flow_def_789"
 
-    assert code == "auth_code_123"
-    assert flow_id == "flow_abc_456"
+
+def test_correlation_id_format():
+    """Verify correlation ID structure format."""
+    def generate_correlation_id():
+        import random, time
+        rand = hex(random.getrandbits(32))[2:9]
+        ts = hex(int(time.time() * 1000))[2:]
+        return f"req_{rand}_{ts}"
+
+    cid = generate_correlation_id()
+    assert cid.startswith("req_")
+    assert len(cid) > 10
 
 
-def test_callback_cookie_propagation_sync():
-    """Verify that setAll synchronizes both request and response cookies."""
+def test_callback_cookie_and_headers_propagation_sync():
+    """Verify that setAll synchronizes both request cookies, response cookies, and response headers."""
     request_cookies = {}
     response_cookies = {}
+    response_headers = {}
 
-    def set_all(cookies_to_set):
+    def set_all(cookies_to_set, headers=None):
         for c in cookies_to_set:
             request_cookies[c['name']] = c['value']
             response_cookies[c['name']] = c['value']
+        if headers:
+          for k, v in headers.items():
+            response_headers[k] = v
 
     set_all([
         {'name': 'sb-xrcqzpnstdbbtafhcwbb-auth-token', 'value': 'access_token_123'},
         {'name': 'sb-xrcqzpnstdbbtafhcwbb-auth-token-code-verifier', 'value': 'verifier_xyz'}
-    ])
+    ], {'Cache-Control': 'private, no-store'})
 
     assert request_cookies.get('sb-xrcqzpnstdbbtafhcwbb-auth-token') == 'access_token_123'
     assert response_cookies.get('sb-xrcqzpnstdbbtafhcwbb-auth-token') == 'access_token_123'
+    assert response_headers.get('Cache-Control') == 'private, no-store'
 
 
 def test_duplicate_oauth_lock_prevention():

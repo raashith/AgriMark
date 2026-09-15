@@ -1,7 +1,7 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+export const dynamic = 'force-dynamic';
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   pending: ['confirmed', 'cancelled'],
@@ -112,4 +112,6 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
   }
 }
+
+
 

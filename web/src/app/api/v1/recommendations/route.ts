@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { generateFarmerRecommendations } from '@/lib/farmer-recommendation-engine';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -9,4 +9,6 @@ export async function GET(request: Request) {
   const recs = await generateFarmerRecommendations(farmerId);
   return NextResponse.json({ success: true, data: recs });
 }
+
+
 

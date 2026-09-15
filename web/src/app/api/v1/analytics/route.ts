@@ -1,7 +1,7 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
@@ -60,4 +60,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
   }
 }
+
+
 

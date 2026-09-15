@@ -1,6 +1,6 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { computeScientificConsensus } from '@/lib/knowledge-conflict-consensus';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -15,4 +15,6 @@ export async function GET(request: Request) {
     }
   });
 }
+
+
 
