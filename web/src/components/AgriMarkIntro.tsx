@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { Volume2, VolumeX, SkipForward } from 'lucide-react';
+import { Volume2, VolumeX, SkipForward, Play } from 'lucide-react';
 
 export function AgriMarkIntro() {
   const pathname = usePathname();
@@ -12,6 +12,7 @@ export function AgriMarkIntro() {
   const [fadeToApp, setFadeToApp] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [showAudioToggle, setShowAudioToggle] = useState(false);
+  const [showPlayOverlay, setShowPlayOverlay] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const isDismissing = useRef(false);
@@ -31,6 +32,13 @@ export function AgriMarkIntro() {
     setTimeout(() => {
       setVisible(false);
     }, 1000); // 1000ms smooth scale/fade transition to app
+  };
+
+  const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[AgriMark Intro] Video asset failed to load or play:', e);
+    }
+    finishIntro();
   };
 
   useEffect(() => {
@@ -87,6 +95,7 @@ export function AgriMarkIntro() {
         await videoRef.current!.play();
         setIsMuted(false);
         setShowAudioToggle(true);
+        setShowPlayOverlay(false);
       } catch {
         // If unmuted autoplay is blocked by browser policy, fallback to muted autoplay
         try {
@@ -95,16 +104,30 @@ export function AgriMarkIntro() {
             await videoRef.current.play();
             setIsMuted(true);
             setShowAudioToggle(true);
+            setShowPlayOverlay(false);
           }
         } catch {
-          // If video still fails, gracefully finish intro
-          finishIntro();
+          // If muted autoplay is also blocked, display manual Play Intro button
+          setShowPlayOverlay(true);
         }
       }
     };
 
     void playVideo();
   }, [stage]);
+
+  const handleManualPlay = async () => {
+    if (!videoRef.current) return;
+    try {
+      videoRef.current.muted = false;
+      await videoRef.current.play();
+      setIsMuted(false);
+      setShowAudioToggle(true);
+      setShowPlayOverlay(false);
+    } catch {
+      finishIntro();
+    }
+  };
 
   const toggleMute = () => {
     if (!videoRef.current) return;
@@ -188,16 +211,31 @@ export function AgriMarkIntro() {
           src="/videos/make_it_as_second_video.mp4"
           playsInline
           preload="auto"
+          controls={false}
           onEnded={finishIntro}
-          onError={finishIntro}
+          onError={handleVideoError}
           className="w-full h-full object-cover max-w-none max-h-none"
         />
+
+        {/* Play Overlay if autoplay is blocked by browser */}
+        {showPlayOverlay && (
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-[100001]">
+            <button
+              type="button"
+              onClick={handleManualPlay}
+              className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-full shadow-2xl transition flex items-center gap-3 border border-emerald-400/40 text-sm tracking-wide transform hover:scale-105"
+            >
+              <span>Play Intro</span>
+              <Play className="w-5 h-5 fill-current" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* CONTROLS OVERLAY: SKIP INTRO & AUDIO MUTE TOGGLE */}
       <div className="fixed bottom-6 right-6 z-[100000] flex items-center gap-3">
         {/* Audio Mute/Unmute Toggle */}
-        {showAudioToggle && stage === 'video' && (
+        {showAudioToggle && stage === 'video' && !showPlayOverlay && (
           <button
             type="button"
             onClick={toggleMute}
