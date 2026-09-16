@@ -155,7 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         provider: 'google',
         options: {
           redirectTo,
-          scopes: GOOGLE_OAUTH_SCOPES,
+          scopes: 'openid email profile https://www.googleapis.com/auth/userinfo.email',
           queryParams: { prompt: 'select_account' },
         },
       });
