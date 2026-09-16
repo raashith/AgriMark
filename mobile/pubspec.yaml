@@ -29,5 +29,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/videos/Cinematic_second_logo_reve.mp4
+    - assets/videos/make_it_as_second_video.mp4
 

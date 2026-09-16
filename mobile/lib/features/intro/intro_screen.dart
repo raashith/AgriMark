@@ -45,7 +45,7 @@ class _AgriMarkIntroScreenState extends State<AgriMarkIntroScreen>
   Future<void> _initializeVideo() async {
     try {
       final controller = VideoPlayerController.asset(
-        'assets/videos/Cinematic_second_logo_reve.mp4',
+        'assets/videos/make_it_as_second_video.mp4',
       );
       _controller = controller;
 

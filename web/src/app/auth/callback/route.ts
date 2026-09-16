@@ -5,8 +5,8 @@ import { PRODUCTION_SITE_URL, SUPABASE_EXPECTED_HOST, getRoleDashboard } from '@
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.trim() || PRODUCTION_SITE_URL;
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || `https://${SUPABASE_EXPECTED_HOST}`;
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL && typeof process.env.NEXT_PUBLIC_SITE_URL === 'string' && process.env.NEXT_PUBLIC_SITE_URL.trim()) || PRODUCTION_SITE_URL;
+const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL && typeof process.env.NEXT_PUBLIC_SUPABASE_URL === 'string' && process.env.NEXT_PUBLIC_SUPABASE_URL.trim()) || `https://${SUPABASE_EXPECTED_HOST}`;
 
 function applyNoCacheHeaders(res: NextResponse): NextResponse {
   res.headers.set('Cache-Control', 'private, no-store, no-cache, must-revalidate');

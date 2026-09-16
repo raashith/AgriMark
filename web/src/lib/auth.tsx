@@ -84,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     void init();
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
       if (session?.access_token) {
         await syncProfile(session.access_token);
       } else if (event === 'SIGNED_OUT') {
@@ -164,14 +164,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error(formatAuthError(error?.message || 'Google Sign-In could not start.'));
       }
       const oauthUrl = new URL(data.url);
-      if (oauthUrl.hostname !== 'accounts.google.com') {
-        throw new Error('Invalid OAuth redirect host returned.');
+      if (!['https:', 'http:'].includes(oauthUrl.protocol)) {
+        throw new Error('Invalid OAuth authorization URL returned.');
       }
       if (oauthUrl.searchParams.get('redirect_uri') !== 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/callback') {
         throw new Error('Google OAuth is misconfigured: the provider callback URL is not the AgriMark Supabase callback.');
       }
       if (typeof window !== 'undefined') {
-        window.location.assign(data.url);
+        window.location.assign(oauthUrl.toString());
       }
     } catch (err) {
       isOAuthInProgress = false;
@@ -252,6 +252,9 @@ export function formatAuthError(message: string): string {
   if (normalized.includes('email not confirmed')) return 'Please confirm your email address before logging in.';
   if (normalized.includes('invalid login credentials')) return 'Incorrect email or password.';
   if (normalized.includes('already registered')) return 'An account with this email already exists. Please log in instead.';
+  if (normalized.includes('deleted_client') || normalized.includes('client was deleted') || normalized.includes('oauth client was deleted')) {
+    return 'Google OAuth Client has been deleted or invalidated in Google Cloud Console. Please restore the client in Google Cloud or update the Client ID/Secret in Supabase Dashboard -> Authentication -> Providers -> Google.';
+  }
   if (normalized.includes('redirect') || normalized.includes('pkce') || normalized.includes('invalid_grant')) return 'Authentication configuration needs attention. Please try again.';
   if (normalized.includes('provider is not enabled') || normalized.includes('unsupported provider')) return 'This sign-in method is not enabled yet.';
   if (normalized.includes('rate limit') || normalized.includes('too many')) return 'Too many authentication attempts. Please wait and try again.';

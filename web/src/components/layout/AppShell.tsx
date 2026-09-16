@@ -6,6 +6,7 @@ import { Sidebar } from './Sidebar';
 import { MobileNav } from './MobileNav';
 import { Footer } from './Footer';
 import { ToastProvider } from '@/components/ui/Toast';
+import { AgriMarkIntro } from '@/components/AgriMarkIntro';
 import { usePathname } from 'next/navigation';
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -32,6 +33,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   return (
     <ToastProvider>
+      <AgriMarkIntro />
       <div className="min-h-screen bg-[#0a0f0d] text-gray-100 flex flex-col font-sans selection:bg-emerald-600 selection:text-white">
         <Navbar />
         <div className="flex-1 flex w-full max-w-[1600px] mx-auto">
