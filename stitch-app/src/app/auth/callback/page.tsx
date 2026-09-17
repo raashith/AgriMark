@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Loader2, Leaf } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { resetTelemetrySession, trackAction } from '@/lib/telemetry';
 
-export default function AuthCallbackPage() {
+function AuthCallbackContent() {
   const params = useSearchParams();
   const [error, setError] = useState('');
 
@@ -44,4 +44,12 @@ export default function AuthCallbackPage() {
   }, [params]);
 
   return <div className="login-page"><div className="login-card" style={{textAlign:'center'}}><div className="logo" style={{margin:'0 auto'}}><Leaf/></div><div style={{fontWeight:800,fontSize:20,marginTop:16}}>{error ? 'Authentication needs attention' : 'Finishing sign-in…'}</div>{error ? <div className="error" style={{marginTop:16}}>{error}</div> : <div style={{marginTop:18,color:'#727a75'}}><Loader2 size={20}/></div>}</div></div>;
+}
+
+export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={<div className="login-page"><div className="login-card" style={{textAlign:'center'}}><div className="logo" style={{margin:'0 auto'}}><Leaf/></div><div style={{fontWeight:800,fontSize:20,marginTop:16}}>Finishing sign-in…</div><div style={{marginTop:18,color:'#727a75'}}><Loader2 size={20}/></div></div></div>}>
+      <AuthCallbackContent />
+    </Suspense>
+  );
 }
