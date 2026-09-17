@@ -13,12 +13,16 @@ export async function recordScreenView(screenName: string, role?: string) {
         timestamp: new Date().toISOString(),
       });
     }
-  } catch (_) {
-    // Telemetry errors fail silently to not block UI
-  }
+  } catch (_) {}
 }
 
-export async function recordActionEvent(actionName: string, payload?: Record<string, any>) {
+export async function recordActionEvent(
+  actionName: string,
+  payloadOrPath?: any,
+  success?: boolean,
+  latencyMs?: number,
+  extraPayload?: Record<string, any>
+) {
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = sessionData?.session?.user?.id || null;
@@ -27,11 +31,18 @@ export async function recordActionEvent(actionName: string, payload?: Record<str
       await client.from('action_events').insert({
         action_name: actionName,
         user_id: userId,
-        payload: payload || {},
+        payload: typeof payloadOrPath === 'object' ? payloadOrPath : { path: payloadOrPath, success, latencyMs, ...extraPayload },
         timestamp: new Date().toISOString(),
       });
     }
-  } catch (_) {
-    // Telemetry errors fail silently
-  }
+  } catch (_) {}
 }
+
+export function resetTelemetrySession() {
+  // Session reset helper
+}
+
+// Aliases for telemetry compatibility
+export const trackAction = recordActionEvent;
+export const trackScreenView = recordScreenView;
+export const trackScreen = recordScreenView;
