@@ -30,7 +30,9 @@ export type Cultivation = {
 
 export type ProduceLot = {
   id: string;
+  owner_id?: string;
   crop_id?: string;
+  cultivation_id?: string | null;
   quantity?: number | string;
   available_quantity?: number | string;
   unit?: string;
@@ -115,9 +117,15 @@ export const api = {
   register: (payload: Record<string, unknown>) => request<{ access_token?: string; user?: UserProfile; message?: string }>('/auth/register', { method: 'POST', body: JSON.stringify(payload) }),
   me: () => request<UserProfile>('/auth/me'),
   logout: () => request<{ message?: string }>('/auth/logout', { method: 'POST' }),
+  crops: (search?: string) => request<{ items: Array<{ id: string; name: string; category?: string | null }> }>(`/core/crops${search ? `?search=${encodeURIComponent(search)}` : ''}`),
   farms: (profileId: string) => request<Farm[]>(`/core/profiles/${profileId}/farms`),
   createFarm: (profileId: string, data: Partial<Farm>) => request<Farm>(`/core/profiles/${profileId}/farms`, { method: 'POST', body: JSON.stringify(data) }),
-  cultivations: () => request<Cultivation[]>('/core/cultivations'),
+  cultivations: (params?: { farm_id?: string; crop_id?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.farm_id) q.set('farm_id', params.farm_id);
+    if (params?.crop_id) q.set('crop_id', params.crop_id);
+    return request<Cultivation[]>(`/core/cultivations${q.toString() ? `?${q}` : ''}`);
+  },
   createCultivation: (data: Partial<Cultivation>) => request<Cultivation>('/core/cultivations', { method: 'POST', body: JSON.stringify(data) }),
   produceLots: () => request<ProduceLot[]>('/core/produce-lots'),
   createProduceLot: (data: Partial<ProduceLot>) => request<ProduceLot>('/core/produce-lots', { method: 'POST', body: JSON.stringify(data) }),
@@ -128,5 +136,6 @@ export const api = {
   createRFQ: (data: Record<string, unknown>) => request<any>('/marketplace/rfqs', { method: 'POST', body: JSON.stringify(data) }),
   marketPrices: () => request<any[]>('/marketplace/prices'),
   getLatestLocation: () => request<any>('/tracking/latest'),
+  recordLocation: (data: { latitude: number; longitude: number; accuracy_m?: number; speed_mps?: number; heading_deg?: number; payload?: Record<string, unknown> }) => request<any>('/tracking/location', { method: 'POST', body: JSON.stringify(data) }),
   askAi: (message: string, context?: string) => request<{ answer: string; model?: string }>('/ai/chat', { method: 'POST', body: JSON.stringify({ message, context }) }),
 };
