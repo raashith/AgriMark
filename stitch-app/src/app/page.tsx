@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Bot, CheckCircle2, CloudSun, Leaf, LineChart, MapPin, Menu, PackageCheck, ShieldCheck, ShoppingCart, Smartphone, Sprout, Truck, Users, X } from 'lucide-react';
+import { ArrowRight, Bot, CheckCircle2, Leaf, LineChart, MapPin, Menu, PackageCheck, ShieldCheck, ShoppingCart, Smartphone, Sprout, Truck, X } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -75,17 +75,17 @@ export default function LandingPage() {
             <div className="hero-card">
               <div style={{position:'relative',zIndex:1}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12}}>
-                  <div><div style={{fontSize:12,color:'rgba(255,255,255,.65)',fontWeight:700}}>TODAY AT AGRIMARK</div><strong style={{fontSize:24}}>The farm, connected.</strong></div>
-                  <span className="badge" style={{background:'rgba(255,255,255,.09)',color:'#fff'}}>LIVE</span>
+                  <div><div style={{fontSize:12,color:'rgba(255,255,255,.65)',fontWeight:700}}>PRODUCT PREVIEW</div><strong style={{fontSize:24}}>The farm, connected.</strong></div>
+                  <span className="badge" style={{background:'rgba(255,255,255,.09)',color:'#fff'}}>DEMO</span>
                 </div>
                 <div style={{marginTop:28,padding:15,borderRadius:18,background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.14)'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:10}}><MapPin size={18} color="#E5A93C" /><div><strong style={{fontSize:14}}>Shree Ganesh Krishi Farm</strong><div style={{fontSize:11,color:'rgba(255,255,255,.62)'}}>Tamil Nadu · 4.8 acres · Active crop cycle</div></div></div>
+                  <div style={{display:'flex',alignItems:'center',gap:10}}><MapPin size={18} color="#E5A93C" /><div><strong style={{fontSize:14}}>Your farm workspace</strong><div style={{fontSize:11,color:'rgba(255,255,255,.62)'}}>Land · crop cycle · market · logistics</div></div></div>
                 </div>
                 <div className="hero-stats">
-                  <div className="metric"><strong>24°C</strong><span>Field weather</span></div>
-                  <div className="metric"><strong>₹6,240</strong><span>Market signal / qtl</span></div>
-                  <div className="metric"><strong>3</strong><span>Tasks due today</span></div>
-                  <div className="metric"><strong>98%</strong><span>Traceability ready</span></div>
+                  <div className="metric"><strong>24°C</strong><span>Weather view</span></div>
+                  <div className="metric"><strong>₹—</strong><span>Market signal</span></div>
+                  <div className="metric"><strong>3</strong><span>Example tasks</span></div>
+                  <div className="metric"><strong>✓</strong><span>Traceability ready</span></div>
                 </div>
               </div>
             </div>
@@ -95,10 +95,10 @@ export default function LandingPage() {
         <section id="market" className="section" style={{paddingTop:24}}>
           <div className="container">
             <div className="market-strip">
-              <div className="ticker"><small>Market pulse</small><strong>Chennai · Tamil Nadu</strong></div>
-              <div className="ticker"><small>Tomato</small><strong>₹3,420</strong> <span className="up">+4.8%</span></div>
-              <div className="ticker"><small>Onion</small><strong>₹2,960</strong> <span className="up">+2.3%</span></div>
-              <div className="ticker"><small>Groundnut</small><strong>₹6,240</strong> <span className="up">+1.7%</span></div>
+              <div className="ticker"><small>Marketplace</small><strong>Discover verified produce</strong></div>
+              <div className="ticker"><small>Orders</small><strong>Protected workflow</strong></div>
+              <div className="ticker"><small>Logistics</small><strong>Track every milestone</strong></div>
+              <div className="ticker"><small>AI</small><strong>Context-aware assistance</strong></div>
             </div>
           </div>
         </section>
