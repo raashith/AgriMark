@@ -1,3 +1,5 @@
+import { supabase } from '@/lib/supabase';
+
 export type UserProfile = {
   id: string;
   full_name?: string | null;
@@ -82,24 +84,15 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   if (options.body) headers.set('Content-Type', 'application/json');
   const token = getToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
-
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      ...options,
-      headers,
-      cache: 'no-store',
-    });
+    response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers, cache: 'no-store' });
   } catch {
     throw new ApiError(0, 'Unable to reach AgriMark services. Please check your connection.');
   }
-
   const text = await response.text();
   let data: unknown = {};
-  if (text) {
-    try { data = JSON.parse(text); } catch { data = { detail: text.slice(0, 400) }; }
-  }
-
+  if (text) { try { data = JSON.parse(text); } catch { data = { detail: text.slice(0, 400) }; } }
   if (!response.ok) {
     if (response.status === 401 && typeof window !== 'undefined') {
       localStorage.removeItem('agrimark_token');
@@ -108,8 +101,19 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     const detail = typeof data === 'object' && data && 'detail' in data ? String((data as { detail?: unknown }).detail ?? '') : '';
     throw new ApiError(response.status, detail || `Request failed (${response.status})`);
   }
-
   return data as T;
+}
+
+async function supabaseInsert<T>(table: string, payload: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.from(table).insert(payload).select('*').single();
+  if (error) throw new ApiError(0, error.message);
+  return data as T;
+}
+
+async function supabaseSelect<T>(table: string, columns = '*'): Promise<T[]> {
+  const { data, error } = await supabase.from(table).select(columns);
+  if (error) throw new ApiError(0, error.message);
+  return (data || []) as T[];
 }
 
 export const api = {
@@ -121,9 +125,7 @@ export const api = {
   farms: (profileId: string) => request<Farm[]>(`/core/profiles/${profileId}/farms`),
   createFarm: (profileId: string, data: Partial<Farm>) => request<Farm>(`/core/profiles/${profileId}/farms`, { method: 'POST', body: JSON.stringify(data) }),
   cultivations: (params?: { farm_id?: string; crop_id?: string }) => {
-    const q = new URLSearchParams();
-    if (params?.farm_id) q.set('farm_id', params.farm_id);
-    if (params?.crop_id) q.set('crop_id', params.crop_id);
+    const q = new URLSearchParams(); if (params?.farm_id) q.set('farm_id', params.farm_id); if (params?.crop_id) q.set('crop_id', params.crop_id);
     return request<Cultivation[]>(`/core/cultivations${q.toString() ? `?${q}` : ''}`);
   },
   createCultivation: (data: Partial<Cultivation>) => request<Cultivation>('/core/cultivations', { method: 'POST', body: JSON.stringify(data) }),
@@ -138,4 +140,11 @@ export const api = {
   getLatestLocation: () => request<any>('/tracking/latest'),
   recordLocation: (data: { latitude: number; longitude: number; accuracy_m?: number; speed_mps?: number; heading_deg?: number; payload?: Record<string, unknown> }) => request<any>('/tracking/location', { method: 'POST', body: JSON.stringify(data) }),
   askAi: (message: string, context?: string) => request<{ answer: string; model?: string }>('/ai/chat', { method: 'POST', body: JSON.stringify({ message, context }) }),
+
+  createFieldObservation: (data: Record<string, unknown>) => supabaseInsert<Record<string, unknown>>('field_observations', data),
+  createFarmInputLog: (data: Record<string, unknown>) => supabaseInsert<Record<string, unknown>>('farm_input_logs', data),
+  createFinanceEntry: (data: Record<string, unknown>) => supabaseInsert<Record<string, unknown>>('farmer_finance_entries', data),
+  createTask: (data: Record<string, unknown>) => supabaseInsert<Record<string, unknown>>('farm_tasks', data),
+  listFinanceEntries: () => supabaseSelect<Record<string, unknown>>('farmer_finance_entries'),
+  listTasks: () => supabaseSelect<Record<string, unknown>>('farm_tasks'),
 };
