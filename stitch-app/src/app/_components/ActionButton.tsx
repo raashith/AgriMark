@@ -24,7 +24,8 @@ export default function ActionButton({ actionName, onClick, disabled, children, 
       void trackAction(actionName || 'button:click', pathname || undefined, false, Math.round(performance.now() - started), {
         error: error instanceof Error ? error.message : 'unknown',
       });
-      throw error;
+      // Keep interaction errors inside the current page so the UI can recover.
+      // Callers that need custom error rendering should catch errors in their handler.
     } finally {
       setBusy(false);
     }
