@@ -1,7 +1,80 @@
 'use client';
-import { useEffect,useState } from 'react';
+
+import React from 'react';
 import Link from 'next/link';
-import { ArrowRight, ClipboardList, Loader2 } from 'lucide-react';
-import AppShell from '@/app/_components/AppShell';
-import { api, MarketplaceOrder } from '@/lib/api';
-export default function FarmerOrders(){const[orders,setOrders]=useState<MarketplaceOrder[]>([]);const[loading,setLoading]=useState(true);useEffect(()=>{api.orders().then(setOrders).catch(()=>setOrders([])).finally(()=>setLoading(false))},[]);return <AppShell><div className="page-title"><div><div className="eyebrow">Farmer orders</div><h1>Mandi dispatch queue</h1><p style={{color:'#707873',margin:'6px 0 0'}}>Keep order status visible from confirmation through dispatch.</p></div></div>{loading?<div className="loading"><Loader2 size={24}/></div>:orders.length===0?<div className="card empty"><ClipboardList size={26}/><div style={{fontWeight:800,marginTop:9}}>No orders yet</div><p style={{marginTop:5}}>When buyers order your listed produce, their lifecycle will appear here.</p><Link href="/marketplace" className="btn btn-primary" style={{marginTop:16}}>Explore marketplace</Link></div>:<div className="table-wrap"><table><thead><tr><th>Order</th><th>Quantity</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>{orders.map(o=><tr key={o.id}><td><strong>{o.id.slice(0,10).toUpperCase()}</strong></td><td>{o.quantity} {o.unit||'kg'}</td><td>₹{Number(o.total_amount||0).toLocaleString()}</td><td><span className="badge">{o.status||'pending'}</span></td><td><Link href={`/logistics/track/${o.id}`} className="side-link" style={{padding:0}}>Track <ArrowRight size={14}/></Link></td></tr>)}</tbody></table></div>}</AppShell>}
+import { PageHeader } from '@/components/layout/PageHeader';
+import { CardPanel } from '@/components/ui/CardPanel';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { Button } from '@/components/ui/InputControls';
+import { FileText, Truck, QrCode, ArrowRight } from 'lucide-react';
+
+export default function FarmerOrdersPage() {
+  const orders = [
+    {
+      id: 'ORD-99812',
+      crop: 'Red Onion (Bhima Super)',
+      quantityKg: 5000,
+      totalAmount: '₹1,30,000',
+      buyer: 'Reliance Fresh Retail Procurement',
+      dispatchDate: '2026-09-15',
+      status: 'in_transit',
+      gatePassCode: 'GP-BHIWANDI-0915',
+    },
+    {
+      id: 'ORD-88102',
+      crop: 'Bhagwa Pomegranate',
+      quantityKg: 2000,
+      totalAmount: '₹1,70,000',
+      buyer: 'Sahyadri Farmers Producer Co.',
+      dispatchDate: '2026-09-10',
+      status: 'completed',
+      gatePassCode: 'GP-NASHIK-0910',
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Farmer Orders & Mandi Dispatches"
+        subtitle="Track confirmed Mandi buyers, dispatch gate passes, and escrow disbursals."
+      />
+
+      <CardPanel title="Order Fulfillment Feed">
+        <div className="space-y-4">
+          {orders.map((ord) => (
+            <div key={ord.id} className="p-4 bg-[#F6F4ED] border border-[#E7E5DC] rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-bold text-[#1B4D3E]">{ord.id}</span>
+                  <h3 className="font-bold text-sm text-[#19201D]">{ord.crop}</h3>
+                  <StatusBadge status={ord.status} />
+                </div>
+                <p className="text-xs text-gray-500">
+                  Buyer: {ord.buyer} • Quantity: {ord.quantityKg.toLocaleString()} kg • Dispatched: {ord.dispatchDate}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="font-mono font-extrabold text-sm text-[#19201D]">{ord.totalAmount}</span>
+
+                <Link href={`/logistics/gate-pass/${ord.id}`}>
+                  <Button size="sm" variant="secondary">
+                    <QrCode className="w-3.5 h-3.5" />
+                    <span>Gate Pass</span>
+                  </Button>
+                </Link>
+
+                <Link href={`/finance/receipt/${ord.id}`}>
+                  <Button size="sm">
+                    <span>Receipt</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardPanel>
+    </div>
+  );
+}

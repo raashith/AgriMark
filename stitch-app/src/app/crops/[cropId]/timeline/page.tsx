@@ -1,13 +1,89 @@
 'use client';
-import { useEffect, useState } from 'react';
+
+import React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CalendarDays, CheckCircle2, Circle, ClipboardList, Loader2 } from 'lucide-react';
-import AppShell from '@/app/_components/AppShell';
-import { api, Cultivation } from '@/lib/api';
-export default function CropTimeline({params}:{params:{cropId:string}}){
- const [crop,setCrop]=useState<Cultivation|null>(null);const [loading,setLoading]=useState(true);
- useEffect(()=>{api.cultivations().then(items=>setCrop(items.find(x=>x.id===params.cropId)||null)).finally(()=>setLoading(false))},[params.cropId]);
- const events=[['Plan created','Cultivation record created in AgriMark.'],['Field preparation','Review soil, water source and planned inputs.'],['Crop scouting','Capture observations from the field as the crop develops.'],['Harvest','Record the batch and create a traceable produce lot.']];
- return <AppShell>{loading?<div className="loading"><Loader2 size={24}/></div>:!crop?<div className="card empty">Crop plan not found.<Link href="/farmer/dashboard" className="btn btn-secondary" style={{marginTop:16}}>Dashboard</Link></div>:<><div className="page-title"><div><Link href={`/farm/${crop.farm_id}`} style={{display:'inline-flex',gap:7,alignItems:'center',fontSize:12,fontWeight:800,color:'#68716b'}}><ArrowLeft size={15}/> Farm passport</Link><div className="eyebrow" style={{marginTop:14}}>Smart crop timeline</div><h1>Crop cycle</h1><p style={{color:'#707873',margin:'6px 0 0'}}>Season: {crop.season||'—'} · Status: {crop.status||'planned'} · Area: {crop.area_acres??'—'} acres</p></div></div><div className="card"><div style={{display:'grid',gap:0}}>{events.map(([title,body],i)=><div key={title} style={{display:'grid',gridTemplateColumns:'42px 1fr',gap:14,padding:'17px 0',borderBottom:i===events.length-1?'none':'1px solid #eee9de'}}><div style={{width:34,height:34,borderRadius:12,display:'grid',placeItems:'center',background:i===0?'#edf4ef':'#fbfaf7',color:'#1B4D3E'}}>{i===0?<CheckCircle2 size={17}/>:i===3?<CalendarDays size={17}/>:<Circle size={17}/>}</div><div><strong>{title}</strong><div style={{color:'#707873',fontSize:12,marginTop:4,lineHeight:1.6}}>{body}</div></div></div>)}</div></div><div className="grid-3" style={{marginTop:16}}><Link className="card" href={`/crops/${crop.id}/scout`}><ClipboardList size={19} color="#3E7B54"/><h3 style={{marginTop:12}}>Scout field</h3><p>Capture pest, disease, soil and plant observations.</p></Link><Link className="card" href={`/farm/${crop.farm_id}/inputs`}><ClipboardList size={19} color="#3E7B54"/><h3 style={{marginTop:12}}>Track inputs</h3><p>Keep application, quantity and cost records linked.</p></Link><Link className="card" href={`/crops/${crop.id}/harvest/new`}><CalendarDays size={19} color="#3E7B54"/><h3 style={{marginTop:12}}>Record harvest</h3><p>Convert the crop cycle into a traceable produce lot.</p></Link></div></>}
- </AppShell>;
+import { PageHeader } from '@/components/layout/PageHeader';
+import { CardPanel } from '@/components/ui/CardPanel';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { Button } from '@/components/ui/InputControls';
+import { Users, Plus, CheckCircle2, FileSpreadsheet, AlertTriangle } from 'lucide-react';
+
+export default function SmartTimelinePage({ params }: { params: { cropId: string } }) {
+  const timeline = [
+    {
+      date: '2026-09-14',
+      title: 'Foliar Spray Application (19:19:19 NPK + Neem Oil)',
+      category: 'Spraying',
+      labourAssigned: 'Baban (Labour Lead) + 2 Workers',
+      cost: '₹1,250',
+      status: 'completed',
+    },
+    {
+      date: '2026-09-08',
+      title: 'Field Weeding & Soil Mulching Tally',
+      category: 'Weeding',
+      labourAssigned: 'Family Labour (3 Persons)',
+      cost: '₹800',
+      status: 'completed',
+    },
+    {
+      date: '2026-09-01',
+      title: 'Drip Soluble Potash Fertigation Cycle',
+      category: 'Irrigation',
+      labourAssigned: 'Automated Drip Timer',
+      cost: '₹2,100',
+      status: 'completed',
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Smart Crop Timeline & Labour Ledger"
+        subtitle="Chronological field activity log, labor voucher generator, and input cost sync."
+        action={
+          <div className="flex gap-2">
+            <Link href={`/crops/${params.cropId}/scout`}>
+              <Button variant="secondary" size="md">
+                <AlertTriangle className="w-4 h-4" />
+                <span>Log Scouting</span>
+              </Button>
+            </Link>
+            <Link href={`/crops/${params.cropId}/harvest/new`}>
+              <Button size="md">
+                <Plus className="w-4 h-4" />
+                <span>Record Harvest</span>
+              </Button>
+            </Link>
+          </div>
+        }
+      />
+
+      <CardPanel title="Field Task & Labour Ledger Entries">
+        <div className="space-y-4">
+          {timeline.map((entry, idx) => (
+            <div key={idx} className="p-4 bg-[#F6F4ED] border border-[#E7E5DC] rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-bold text-[#1B4D3E]">{entry.date}</span>
+                  <StatusBadge status={entry.category} />
+                </div>
+                <h4 className="font-bold text-sm text-[#19201D]">{entry.title}</h4>
+                <p className="text-xs text-gray-500">
+                  Labour: <span className="font-medium text-[#19201D]">{entry.labourAssigned}</span>
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="font-mono font-extrabold text-sm text-[#19201D]">{entry.cost}</span>
+                <span className="p-2 bg-emerald-100 text-[#1B4D3E] rounded-lg">
+                  <CheckCircle2 className="w-4 h-4" />
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardPanel>
+    </div>
+  );
 }

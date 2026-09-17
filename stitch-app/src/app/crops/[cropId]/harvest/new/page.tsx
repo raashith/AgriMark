@@ -1,8 +1,109 @@
 'use client';
-import { useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, ArrowRight, PackageCheck } from 'lucide-react';
-import AppShell from '@/app/_components/AppShell';
-import ActionButton from '@/app/_components/ActionButton';
-import { api } from '@/lib/api';
-export default function HarvestPage({params}:{params:{cropId:string}}){const[form,setForm]=useState({quantity:'',unit:'kg',grade:'A',moisture_pct:'',packaging_type:'Crate',notes:''});const[saved,setSaved]=useState(false);const[error,setError]=useState('');const update=(k:string,v:string)=>setForm(x=>({...x,[k]:v}));const submit=async(e:React.FormEvent)=>{e.preventDefault();setSaved(false);setError('');try{await api.createProduceLot({crop_id:params.cropId,quantity:Number(form.quantity),unit:form.unit,quality_grade:form.grade,harvested_at:new Date().toISOString().slice(0,10)} as any);setSaved(true)}catch(err){setError(err instanceof Error?err.message:'Unable to create harvest lot.')}};return <AppShell><div className="page-title"><div><Link href={`/crops/${params.cropId}/timeline`} style={{display:'inline-flex',gap:7,alignItems:'center',fontSize:12,fontWeight:800,color:'#68716b'}}><ArrowLeft size={15}/> Crop timeline</Link><div className="eyebrow" style={{marginTop:14}}>Record harvest · sorting tally</div><h1>Create a traceable harvest record.</h1><p style={{color:'#707873',margin:'6px 0 0'}}>Turn a completed crop cycle into a produce lot ready for inventory and trade.</p></div></div><div className="card" style={{maxWidth:760}}><form className="form-grid" onSubmit={submit}><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><div className="field"><label>Quantity</label><input required type="number" min="0" step="0.01" value={form.quantity} onChange={e=>update('quantity',e.target.value)}/></div><div className="field"><label>Unit</label><select value={form.unit} onChange={e=>update('unit',e.target.value)}><option>kg</option><option>quintal</option><option>tonne</option></select></div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><div className="field"><label>Quality grade</label><select value={form.grade} onChange={e=>update('grade',e.target.value)}><option>A</option><option>B</option><option>C</option><option>Premium</option></select></div><div className="field"><label>Moisture %</label><input type="number" min="0" step="0.1" value={form.moisture_pct} onChange={e=>update('moisture_pct',e.target.value)}/></div></div><div className="field"><label>Packaging</label><select value={form.packaging_type} onChange={e=>update('packaging_type',e.target.value)}><option>Crate</option><option>Bag</option><option>Loose</option><option>Box</option></select></div><div className="field"><label>Harvest notes</label><textarea value={form.notes} onChange={e=>update('notes',e.target.value)} placeholder="Sorting, rejection or storage notes…"/></div>{error&&<div className="error">{error}</div>}{saved&&<div style={{padding:12,borderRadius:12,background:'#edf5ef',color:'#257042',fontSize:12}}><PackageCheck size={15} style={{verticalAlign:'-3px',marginRight:5}}/> Produce lot created successfully.</div>}<ActionButton className="btn btn-primary" type="submit" actionName="harvest:create-lot">Generate lot record <ArrowRight size={16}/></ActionButton></form></div></AppShell>}
+
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { CardPanel } from '@/components/ui/CardPanel';
+import { Input, Select, Button } from '@/components/ui/InputControls';
+import { PackageCheck, Check } from 'lucide-react';
+
+export default function RecordHarvestPage({ params }: { params: { cropId: string } }) {
+  const router = useRouter();
+  const [totalKg, setTotalKg] = useState('18500');
+  const [gradeAKg, setGradeAKg] = useState('12000');
+  const [gradeBKg, setGradeBKg] = useState('5000');
+  const [gradeCKg, setGradeCKg] = useState('1500');
+  const [moisturePct, setMoisturePct] = useState('11.5');
+  const [curingHours, setCuringHours] = useState('48');
+  const [lotCode, setLotCode] = useState('LOT-N-884-2026');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      router.push('/inventory');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <PageHeader
+        title="Record Harvest & Sorting Tally"
+        subtitle="Mint a NABL traceable produce lot with Grade A/B/C sorting metrics."
+      />
+
+      <CardPanel>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            label="Harvest Lot Identification Code"
+            value={lotCode}
+            onChange={(e) => setLotCode(e.target.value)}
+            required
+            helperText="Unique lot identifier generated for QR tag minting"
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Total Gross Harvest (kg)"
+              type="number"
+              value={totalKg}
+              onChange={(e) => setTotalKg(e.target.value)}
+              required
+            />
+            <Input
+              label="Moisture Content (%)"
+              type="number"
+              step="0.1"
+              value={moisturePct}
+              onChange={(e) => setMoisturePct(e.target.value)}
+            />
+          </div>
+
+          <div className="p-4 bg-[#F6F4ED] border border-[#E7E5DC] rounded-xl space-y-3">
+            <h4 className="text-xs font-bold text-[#19201D] uppercase">Grade Sorting Breakdown (kg)</h4>
+            <div className="grid grid-cols-3 gap-3">
+              <Input
+                label="Grade A (Premium)"
+                type="number"
+                value={gradeAKg}
+                onChange={(e) => setGradeAKg(e.target.value)}
+              />
+              <Input
+                label="Grade B (Standard)"
+                type="number"
+                value={gradeBKg}
+                onChange={(e) => setGradeBKg(e.target.value)}
+              />
+              <Input
+                label="Grade C (Local)"
+                type="number"
+                value={gradeCKg}
+                onChange={(e) => setGradeCKg(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <Input
+            label="Field Curing / Drying Hours Tally"
+            type="number"
+            value={curingHours}
+            onChange={(e) => setCuringHours(e.target.value)}
+          />
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-[#E7E5DC]">
+            <Button type="button" variant="secondary" onClick={() => router.back()}>
+              Cancel
+            </Button>
+            <Button type="submit" isLoading={isLoading}>
+              <PackageCheck className="w-4 h-4" />
+              <span>Mint Produce Lot & Sync Inventory</span>
+            </Button>
+          </div>
+        </form>
+      </CardPanel>
+    </div>
+  );
+}

@@ -1,12 +1,28 @@
 import './globals.css';
-import type { Metadata } from 'next';
-import Telemetry from '@/app/_components/Telemetry';
+import React from 'react';
+import { I18nProvider } from '@/lib/i18n';
+import { AuthProvider } from '@/lib/auth';
+import { AppShell } from '@/components/layout/AppShell';
 
-export const metadata: Metadata = {
-  title: 'AgriMark — Indian Agriculture Ecosystem',
-  description: 'Farmer-first agriculture operations, marketplace, logistics and AgriAI experience.',
+export const metadata = {
+  title: 'AgriMark — Bharat Agricultural OS & Intelligence',
+  description: 'Direct agricultural produce marketplace, crop intelligence, Khaata ledger, and escrow trade OS.',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="en-IN"><body><Telemetry route="__shell__" />{children}</body></html>;
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body className="bg-[#FBF9F2] text-[#19201D] min-h-screen">
+        <I18nProvider>
+          <AuthProvider>
+            <AppShell>{children}</AppShell>
+          </AuthProvider>
+        </I18nProvider>
+      </body>
+    </html>
+  );
 }

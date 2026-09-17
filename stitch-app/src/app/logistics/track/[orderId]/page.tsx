@@ -1,7 +1,88 @@
 'use client';
-import { useEffect,useState } from 'react';
+
+import React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle2, Loader2, MapPin, Thermometer, Truck } from 'lucide-react';
-import AppShell from '@/app/_components/AppShell';
-import { api } from '@/lib/api';
-export default function TrackPage({params}:{params:{orderId:string}}){const[location,setLocation]=useState<any>(null);const[loading,setLoading]=useState(true);useEffect(()=>{api.getLatestLocation?.().then?.(setLocation).catch(()=>setLocation(null)).finally(()=>setLoading(false))},[]);return <AppShell><div className="page-title"><div><Link href="/farmer/orders" style={{display:'inline-flex',alignItems:'center',gap:7,fontSize:12,fontWeight:800,color:'#68716b'}}><ArrowLeft size={15}/> Orders</Link><div className="eyebrow" style={{marginTop:14}}>In-transit reefer & GPS tracking</div><h1>Order {params.orderId.slice(0,10).toUpperCase()}</h1><p style={{color:'#707873',margin:'6px 0 0'}}>Track the latest location and cold-chain signals available to AgriMark.</p></div><span className="badge"><Truck size={12} style={{marginRight:4}}/> In transit</span></div><div className="grid-3"><div className="card" style={{gridColumn:'span 2',minHeight:350,background:'linear-gradient(135deg,#eaf2ed,#f7f5ee)'}}><div style={{height:260,borderRadius:18,border:'1px dashed #b5c4bb',display:'grid',placeItems:'center',color:'#66716b',textAlign:'center'}}><div><MapPin size={34} color="#3E7B54"/><div style={{fontWeight:800,marginTop:9}}>Live route map surface</div><div style={{fontSize:12,marginTop:5}}>Plug the map provider into this shared tracking shell without changing the logistics data contract.</div></div></div></div><div className="card"><div className="icon-tile"><Thermometer size={19}/></div><h3>Cold-chain telemetry</h3>{loading?<Loader2 size={20}/>:<><div style={{fontFamily:'JetBrains Mono',fontSize:26,marginTop:10}}>{location?.temperature_c ?? '—'}°C</div><p style={{marginTop:5}}>Latest reported temperature</p></>}<div style={{marginTop:18,paddingTop:14,borderTop:'1px solid #e2ddd1',fontSize:12}}><CheckCircle2 size={14} color="#257042" style={{verticalAlign:'-2px',marginRight:5}}/>Shipment status is driven by the existing logistics backend.</div></div></div></AppShell>}
+import { PageHeader } from '@/components/layout/PageHeader';
+import { CardPanel } from '@/components/ui/CardPanel';
+import { MetricCard } from '@/components/ui/MetricCard';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { Button } from '@/components/ui/InputControls';
+import { Truck, MapPin, Thermometer, ShieldCheck, QrCode } from 'lucide-react';
+
+export default function ReeferTrackingPage({ params }: { params: { orderId: string } }) {
+  const shipment = {
+    orderId: params.orderId || 'ORD-99812',
+    driverName: 'Santosh Shinde',
+    vehicleNo: 'MH-15-EG-4412 (Eicher Reefer)',
+    tempC: '+4.2°C',
+    humidity: '88%',
+    doorStatus: 'Closed / Locked',
+    origin: 'Pimpalgaon Baswant, Nashik',
+    destination: 'Bhiwandi Cold Chain Terminal Bay #2',
+    eta: 'Today, 04:30 PM (28 km remaining)',
+    status: 'in_transit',
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title={`In-Transit Reefer GPS Tracking: ${shipment.orderId}`}
+        subtitle={`Vehicle ${shipment.vehicleNo} • Driver: ${shipment.driverName}`}
+        badge="IoT Sensor Active"
+        action={
+          <Link href={`/logistics/gate-pass/${shipment.orderId}`}>
+            <Button size="md">
+              <QrCode className="w-4 h-4" />
+              <span>Show Gate Pass QR</span>
+            </Button>
+          </Link>
+        }
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <MetricCard title="Reefer Temperature" value={shipment.tempC} subtitle="Target range: +3°C to +5°C" icon={<Thermometer className="w-5 h-5" />} />
+        <MetricCard title="Relative Humidity" value={shipment.humidity} subtitle="Optimal for Allium Curing" icon={<Truck className="w-5 h-5" />} />
+        <MetricCard title="Container Door Sensor" value={shipment.doorStatus} subtitle="Zero Unscheduled Openings" icon={<ShieldCheck className="w-5 h-5" />} />
+        <MetricCard title="Estimated Arrival" value="04:30 PM" subtitle={shipment.eta} icon={<MapPin className="w-5 h-5" />} />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 space-y-6">
+          <CardPanel title="Live GPS Route Progress Map">
+            <div className="bg-[#19201D] text-white p-6 rounded-xl space-y-4 text-xs font-mono border border-emerald-950">
+              <div className="flex items-center justify-between text-amber-300 font-bold">
+                <span>GPS TELEMETRY FEED: ONLINE</span>
+                <span>LAT: 19.2812 N • LON: 73.0488 E</span>
+              </div>
+              <div className="p-4 bg-black/40 rounded-lg space-y-2">
+                <div className="flex justify-between">
+                  <span>Origin: {shipment.origin}</span>
+                  <span className="text-emerald-400">PASSED [09:30 AM]</span>
+                </div>
+                <div className="flex justify-between font-bold text-amber-300">
+                  <span>Current Location: Kasara Ghat Bypass</span>
+                  <span>EN ROUTE [54 km/h]</span>
+                </div>
+                <div className="flex justify-between text-gray-400">
+                  <span>Destination: {shipment.destination}</span>
+                  <span>ETA: 04:30 PM</span>
+                </div>
+              </div>
+            </div>
+          </CardPanel>
+        </div>
+
+        <div className="space-y-6">
+          <CardPanel title="Discharge Yard Instructions">
+            <div className="space-y-3 text-xs">
+              <p className="text-gray-600">Present Gate Pass QR upon arrival at Bhiwandi Terminal Bay #2 for weight sampling & NABL re-check.</p>
+              <Link href={`/logistics/gate-pass/${shipment.orderId}`}>
+                <Button size="md" className="w-full">Open Dock Gate Pass</Button>
+              </Link>
+            </div>
+          </CardPanel>
+        </div>
+      </div>
+    </div>
+  );
+}

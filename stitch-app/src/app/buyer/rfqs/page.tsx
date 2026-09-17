@@ -1,8 +1,101 @@
 'use client';
-import { useState } from 'react';
-import { ArrowLeft, ArrowRight, FileText } from 'lucide-react';
-import Link from 'next/link';
-import AppShell from '@/app/_components/AppShell';
-import ActionButton from '@/app/_components/ActionButton';
-import { api } from '@/lib/api';
-export default function RfqPage(){const[form,setForm]=useState({crop_id:'',quantity:'',unit:'kg',target_price:'',delivery_district:'',delivery_state:'Tamil Nadu',deadline:''});const[message,setMessage]=useState('');const update=(k:string,v:string)=>setForm(x=>({...x,[k]:v}));const submit=async(e:React.FormEvent)=>{e.preventDefault();setMessage('');try{await api.createRFQ(form as any);setMessage('RFQ submitted to the AgriMark procurement workflow.')}catch(err){setMessage(err instanceof Error?err.message:'Unable to submit RFQ.')}};return <AppShell><div className="page-title"><div><Link href="/buyer/marketplace" style={{display:'inline-flex',gap:7,alignItems:'center',fontSize:12,fontWeight:800,color:'#68716b'}}><ArrowLeft size={15}/> Procurement</Link><div className="eyebrow" style={{marginTop:14}}>Buyer RFQ</div><h1>Tell the market what you need.</h1><p style={{color:'#707873',margin:'6px 0 0'}}>Create a structured requirement with quantity, price target and delivery context.</p></div></div><div className="card" style={{maxWidth:760}}><form onSubmit={submit} className="form-grid"><div className="field"><label>Crop ID or commodity reference</label><input value={form.crop_id} onChange={e=>update('crop_id',e.target.value)} placeholder="Crop identifier"/></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><div className="field"><label>Quantity</label><input required type="number" min="1" value={form.quantity} onChange={e=>update('quantity',e.target.value)}/></div><div className="field"><label>Unit</label><select value={form.unit} onChange={e=>update('unit',e.target.value)}><option>kg</option><option>quintal</option><option>tonne</option></select></div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><div className="field"><label>Target price</label><input type="number" min="0" value={form.target_price} onChange={e=>update('target_price',e.target.value)} placeholder="Optional"/></div><div className="field"><label>Delivery district</label><input value={form.delivery_district} onChange={e=>update('delivery_district',e.target.value)} placeholder="District"/></div></div><div className="field"><label>Deadline</label><input type="date" value={form.deadline} onChange={e=>update('deadline',e.target.value)}/></div>{message&&<div style={{padding:12,borderRadius:12,background:message.includes('submitted')?'#edf5ef':'#fff1f1',color:message.includes('submitted')?'#257042':'#b91c1c',fontSize:12}}><FileText size={15} style={{verticalAlign:'-3px',marginRight:5}}/>{message}</div>}<ActionButton className="btn btn-primary" type="submit" actionName="rfq:submit">Submit RFQ <ArrowRight size={16}/></ActionButton></form></div></AppShell>}
+
+import React, { useState } from 'react';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { CardPanel } from '@/components/ui/CardPanel';
+import { Input, Select, Button } from '@/components/ui/InputControls';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { Plus, Users, Check } from 'lucide-react';
+
+export default function BuyerRFQPage() {
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [cropName, setCropName] = useState('Grade A Red Onion');
+  const [targetQty, setTargetQty] = useState('25000');
+  const [targetPrice, setTargetPrice] = useState('25');
+  const [district, setDistrict] = useState('Nashik');
+  const [deadline, setDeadline] = useState('2026-10-01');
+
+  const rfqs = [
+    {
+      id: 'RFQ-2026-091',
+      crop: 'Grade A Red Onion',
+      quantityKg: 25000,
+      targetPrice: '₹25 / kg',
+      district: 'Nashik',
+      deadline: '2026-10-01',
+      bidsCount: 4,
+      status: 'open',
+    },
+    {
+      id: 'RFQ-2026-042',
+      crop: 'Organic Bhagwa Pomegranate',
+      quantityKg: 10000,
+      targetPrice: '₹82 / kg',
+      district: 'Solapur',
+      deadline: '2026-09-25',
+      bidsCount: 2,
+      status: 'open',
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Buyer RFQ Procurement Desk"
+        subtitle="Issue targeted Requests For Quotation to verified farmers and FPOs."
+        action={
+          <Button size="md" onClick={() => setShowNewModal(true)}>
+            <Plus className="w-4 h-4" />
+            <span>Issue New RFQ</span>
+          </Button>
+        }
+      />
+
+      <CardPanel title="Active Open Procurement RFQs">
+        <div className="space-y-4">
+          {rfqs.map((rfq) => (
+            <div key={rfq.id} className="p-4 bg-[#F6F4ED] border border-[#E7E5DC] rounded-xl flex items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-bold text-[#1B4D3E]">{rfq.id}</span>
+                  <h3 className="font-bold text-sm text-[#19201D]">{rfq.crop}</h3>
+                  <StatusBadge status={rfq.status} />
+                </div>
+                <p className="text-xs text-gray-500">
+                  Target: {rfq.quantityKg.toLocaleString()} kg @ {rfq.targetPrice} • Preferred Yard: {rfq.district} • Deadline: {rfq.deadline}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-xs font-bold bg-emerald-100 text-emerald-900 px-3 py-1 rounded-full">
+                  {rfq.bidsCount} Farmer Bids
+                </span>
+                <Button size="sm">View Bids</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardPanel>
+
+      {showNewModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-lg w-full space-y-4">
+            <h3 className="text-lg font-bold text-[#19201D]">Create New Procurement RFQ</h3>
+            <Input label="Commodity / Requirement" value={cropName} onChange={(e) => setCropName(e.target.value)} />
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="Target Quantity (kg)" type="number" value={targetQty} onChange={(e) => setTargetQty(e.target.value)} />
+              <Input label="Target Price (₹/kg)" type="number" value={targetPrice} onChange={(e) => setTargetPrice(e.target.value)} />
+            </div>
+            <Input label="Preferred District" value={district} onChange={(e) => setDistrict(e.target.value)} />
+            <Input label="Delivery Deadline" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="secondary" onClick={() => setShowNewModal(false)}>Cancel</Button>
+              <Button onClick={() => setShowNewModal(false)}><Check className="w-4 h-4" /> Publish RFQ</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

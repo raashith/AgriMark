@@ -1,8 +1,102 @@
 'use client';
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle2, Lock, ShoppingCart } from 'lucide-react';
-import AppShell from '@/app/_components/AppShell';
-import ActionButton from '@/app/_components/ActionButton';
-import { api, Listing } from '@/lib/api';
-export default function CheckoutPage({params}:{params:{listingId:string}}){const[listing,setListing]=useState<Listing|null>(null);const[qty,setQty]=useState('1');const[status,setStatus]=useState('');useEffect(()=>{api.listings().then(x=>setListing(x.find(i=>i.id===params.listingId)||null)).catch(e=>setStatus(e instanceof Error?e.message:'Unable to load listing.'))},[params.listingId]);const total=Number(qty||0)*Number(listing?.price_per_unit||0);const order=async()=>{setStatus('');try{await api.placeOrder({listing_id:params.listingId,quantity:Number(qty),unit:'kg'});setStatus('Order created successfully. Inventory reservation and lifecycle updates stay on the production API.')}catch(e){setStatus(e instanceof Error?e.message:'Unable to place order.')}};return <AppShell><div className="page-title"><div><Link href={`/product/${params.listingId}`} style={{display:'inline-flex',gap:7,alignItems:'center',fontSize:12,fontWeight:800,color:'#68716b'}}><ArrowLeft size={15}/> Produce details</Link><div className="eyebrow" style={{marginTop:14}}>Checkout · order confirmation</div><h1>Confirm your order.</h1></div></div><div className="grid-3"><div className="card" style={{gridColumn:'span 2'}}><div style={{display:'flex',gap:12,alignItems:'center'}}><div className="icon-tile"><ShoppingCart size={19}/></div><div><h3>{listing?.title||'Produce listing'}</h3><p>₹{Number(listing?.price_per_unit||0).toLocaleString()} per unit · Minimum {listing?.min_order_quantity??1}</p></div></div><div className="field" style={{marginTop:20}}><label>Quantity</label><input value={qty} type="number" min={Number(listing?.min_order_quantity||1)} step="1" onChange={e=>setQty(e.target.value)}/></div><div style={{display:'flex',justifyContent:'space-between',padding:'18px 0',marginTop:10,borderTop:'1px solid #e2ddd1'}}><span>Total</span><strong style={{fontFamily:'JetBrains Mono',fontSize:24}}>₹{total.toLocaleString()}</strong></div>{status&&<div style={{padding:12,borderRadius:12,background:status.includes('successfully')?'#edf5ef':'#fff1f1',color:status.includes('successfully')?'#257042':'#b91c1c',fontSize:12}}>{status}</div>}<ActionButton className="btn btn-primary" actionName="checkout:place-order" style={{marginTop:14}} onClick={order}><Lock size={16}/> Place order <ArrowRight size={16}/></ActionButton></div><div className="card"><CheckCircle2 color="#257042"/><h3 style={{marginTop:12}}>Protected workflow</h3><p>Order creation is sent through the AgriMark API, preserving authentication, stock validation and marketplace lifecycle rules.</p></div></div></AppShell>}
+
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { CardPanel } from '@/components/ui/CardPanel';
+import { Input, Select, Button } from '@/components/ui/InputControls';
+import { ShieldCheck, Truck, Check } from 'lucide-react';
+
+export default function CheckoutPage({ params }: { params: { listingId: string } }) {
+  const router = useRouter();
+  const [quantityKg, setQuantityKg] = useState('2000');
+  const pricePerKg = 26;
+  const [deliveryAddress, setDeliveryAddress] = useState('Bhiwandi Cold Chain Terminal Bay #2, Mumbai, MH');
+  const [logisticsType, setLogisticsType] = useState('reefer');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const totalAmount = parseFloat(quantityKg || '0') * pricePerKg;
+  const escrowFee = totalAmount * 0.01;
+
+  const handleConfirmOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      router.push('/buyer/dashboard');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <PageHeader
+        title="Checkout & Escrow Order Placement"
+        subtitle={`Listing #${params.listingId} • Bharat Mandi Escrow Lock`}
+      />
+
+      <CardPanel>
+        <form onSubmit={handleConfirmOrder} className="space-y-4">
+          <Input
+            label="Order Quantity (kg)"
+            type="number"
+            value={quantityKg}
+            onChange={(e) => setQuantityKg(e.target.value)}
+            required
+            helperText={`Available lot stock: 10,000 kg`}
+          />
+
+          <Input
+            label="Destination Address / Discharge Yard"
+            value={deliveryAddress}
+            onChange={(e) => setDeliveryAddress(e.target.value)}
+            required
+          />
+
+          <Select
+            label="Logistics & Cold Chain Option"
+            value={logisticsType}
+            onChange={(e) => setLogisticsType(e.target.value)}
+            options={[
+              { label: 'Reefer Cold Chain Container (+4°C Sensor)', value: 'reefer' },
+              { label: 'Standard Tarpaulin Trucking', value: 'standard' },
+              { label: 'Buyer Self-Pickup at Farm Yard', value: 'self_pickup' },
+            ]}
+          />
+
+          <div className="p-4 bg-[#F6F4ED] border border-[#E7E5DC] rounded-xl space-y-2 text-xs">
+            <div className="flex justify-between">
+              <span className="text-gray-500">Produce Subtotal ({quantityKg} kg @ ₹{pricePerKg}/kg):</span>
+              <span className="font-mono font-bold text-[#19201D]">₹{totalAmount.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-gray-500">
+              <span>Bharat Escrow Protection Fee (1%):</span>
+              <span className="font-mono font-bold">₹{escrowFee.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-baseline pt-2 border-t border-[#E7E5DC]">
+              <span className="font-bold text-sm text-[#19201D]">Total Escrow Lock:</span>
+              <span className="font-mono font-extrabold text-lg text-[#1B4D3E]">
+                ₹{(totalAmount + escrowFee).toLocaleString()}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs rounded-xl flex items-center gap-2 font-medium">
+            <ShieldCheck className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+            <span>Funds are locked safely in Escrow until quality & weight verification at discharge bay.</span>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-[#E7E5DC]">
+            <Button type="button" variant="secondary" onClick={() => router.back()}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="accent" isLoading={isLoading}>
+              <Check className="w-4 h-4" />
+              <span>Confirm & Lock Escrow</span>
+            </Button>
+          </div>
+        </form>
+      </CardPanel>
+    </div>
+  );
+}

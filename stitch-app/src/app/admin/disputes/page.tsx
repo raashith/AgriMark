@@ -1,4 +1,62 @@
 'use client';
-import AppShell from '@/app/_components/AppShell';
-import { AlertTriangle, FileSearch, ShieldCheck } from 'lucide-react';
-export default function DisputesPage(){return <AppShell><div className="page-title"><div><div className="eyebrow">Admin · arbitrator desk</div><h1>Dispute resolution</h1><p style={{color:'#707873',margin:'6px 0 0'}}>Keep evidence, order state and resolution actions together for privileged users.</p></div><span className="badge"><ShieldCheck size={12} style={{marginRight:4}}/> Admin surface</span></div><div className="card empty"><AlertTriangle size={28} color="#D97706"/><div style={{fontWeight:800,marginTop:9}}>No open disputes</div><p style={{marginTop:5}}>When a marketplace dispute is opened, the evidence and escrow context should render here.</p></div><div className="grid-3" style={{marginTop:16}}>{[['Evidence','Review uploaded documents and notes.'],['Order state','Inspect the full marketplace lifecycle.'],['Escrow','Release or freeze funds according to the resolution workflow.']].map(([t,b])=><div className="card" key={t}><div className="icon-tile"><FileSearch size={18}/></div><h3>{t}</h3><p>{b}</p></div>)}</div></AppShell>}
+
+import React from 'react';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { CardPanel } from '@/components/ui/CardPanel';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { Button } from '@/components/ui/InputControls';
+import { ShieldAlert, Check, X, FileText } from 'lucide-react';
+
+export default function AdminDisputesPage() {
+  const disputes = [
+    {
+      id: 'DSP-2026-0842',
+      orderId: 'ORD-99812',
+      buyer: 'Reliance Fresh Retail',
+      seller: 'Ramesh Patil (Ganesh Farm)',
+      reason: 'Weight Variance (180 kg moisture scale difference)',
+      escrowLocked: '₹1,30,000',
+      status: 'under_review',
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Admin Dispute Resolution Desk"
+        subtitle="Review APMC weighbridge slips, NABL assay reports, and arbitrate escrow claims."
+        badge="Admin Desk"
+      />
+
+      <CardPanel title="Active Arbitration Queue">
+        <div className="space-y-4">
+          {disputes.map((d) => (
+            <div key={d.id} className="p-4 bg-[#F6F4ED] border border-[#E7E5DC] rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-bold text-[#1B4D3E]">{d.id}</span>
+                  <h3 className="font-bold text-sm text-[#19201D]">{d.reason}</h3>
+                  <StatusBadge status={d.status} />
+                </div>
+                <p className="text-xs text-gray-500">
+                  Buyer: {d.buyer} • Seller: {d.seller} • Escrow: <span className="font-bold text-[#19201D]">{d.escrowLocked}</span>
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="secondary">
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Assay Evidence</span>
+                </Button>
+                <Button size="sm">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Approve Settlement</span>
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardPanel>
+    </div>
+  );
+}

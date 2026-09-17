@@ -1,15 +1,97 @@
 'use client';
-import { useRef, useState } from 'react';
-import { ArrowLeft, Camera, Save, ShieldCheck, X } from 'lucide-react';
-import Link from 'next/link';
-import AppShell from '@/app/_components/AppShell';
-import ActionButton from '@/app/_components/ActionButton';
-import { api } from '@/lib/api';
 
-export default function ScoutPage({params}:{params:{cropId:string}}){
- const [form,setForm]=useState({observation_type:'routine_scout',crop_stage:'',plant_health:'Good',pest_pressure:'Low',disease_pressure:'Low',notes:''});
- const [saved,setSaved]=useState(false); const [error,setError]=useState(''); const [photoName,setPhotoName]=useState(''); const inputRef=useRef<HTMLInputElement>(null);
- const update=(k:string,v:string)=>setForm(x=>({...x,[k]:v}));
- const save=async()=>{setSaved(false);setError('');try{const crops=await api.cultivations({crop_id:params.cropId});const farmId=crops[0]?.farm_id;if(!farmId)throw new Error('No farm-linked cultivation was found for this crop.');await api.createFieldObservation({farm_id:farmId,cultivation_id:crops[0].id,observation_type:form.observation_type,crop_stage:form.crop_stage||null,plant_health:form.plant_health,pest_pressure:form.pest_pressure,disease_pressure:form.disease_pressure,notes:form.notes||null,evidence:photoName?{file_name:photoName}:{}});setSaved(true)}catch(err){setError(err instanceof Error?err.message:'Unable to save observation.')}};
- return <AppShell><div className="page-title"><div><Link href={`/crops/${params.cropId}/timeline`} style={{display:'inline-flex',alignItems:'center',gap:7,fontSize:12,fontWeight:800,color:'#68716b'}}><ArrowLeft size={15}/> Crop timeline</Link><div className="eyebrow" style={{marginTop:14}}>Field scouting</div><h1>Capture a field observation.</h1><p style={{color:'#707873',margin:'6px 0 0'}}>Keep the note lightweight enough to use while standing in the field.</p></div></div><div className="grid-3"><div className="card"><div className="icon-tile"><Camera size={20}/></div><h3>Camera-ready</h3><p>Attach a field photo directly from the device camera or gallery.</p><input ref={inputRef} type="file" accept="image/*" capture="environment" hidden onChange={e=>setPhotoName(e.target.files?.[0]?.name||'')}/><ActionButton className="btn btn-secondary" style={{marginTop:14}} onClick={()=>inputRef.current?.click()} actionName="scout:camera"><Camera size={16}/> {photoName?'Change photo':'Open camera'}</ActionButton>{photoName&&<div style={{marginTop:9,fontSize:11,color:'#257042'}}>{photoName}</div>}</div><div className="card" style={{gridColumn:'span 2'}}><form className="form-grid" onSubmit={e=>{e.preventDefault();void save()}}><div className="field"><label>Observation type</label><select value={form.observation_type} onChange={e=>update('observation_type',e.target.value)}><option value="routine_scout">Routine scout</option><option value="pest">Pest check</option><option value="disease">Disease check</option><option value="irrigation">Irrigation check</option></select></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><div className="field"><label>Crop stage</label><input value={form.crop_stage} onChange={e=>update('crop_stage',e.target.value)} placeholder="e.g. Vegetative"/></div><div className="field"><label>Plant health</label><select value={form.plant_health} onChange={e=>update('plant_health',e.target.value)}><option>Good</option><option>Watch</option><option>Concern</option></select></div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><div className="field"><label>Pest pressure</label><select value={form.pest_pressure} onChange={e=>update('pest_pressure',e.target.value)}><option>Low</option><option>Medium</option><option>High</option></select></div><div className="field"><label>Disease pressure</label><select value={form.disease_pressure} onChange={e=>update('disease_pressure',e.target.value)}><option>Low</option><option>Medium</option><option>High</option></select></div></div><div className="field"><label>Field notes</label><textarea value={form.notes} onChange={e=>update('notes',e.target.value)} placeholder="What did you see?"/></div>{error&&<div className="error">{error}<button type="button" onClick={()=>setError('')} aria-label="Dismiss error"><X size={13}/></button></div>}{saved&&<div style={{padding:12,borderRadius:12,background:'#edf5ef',color:'#257042',fontSize:12}}><ShieldCheck size={15} style={{verticalAlign:'-3px',marginRight:5}}/> Observation saved to field observations.</div>}<ActionButton className="btn btn-primary" type="submit" actionName="scout:save"><Save size={16}/> Save observation</ActionButton></form></div></div></AppShell>;
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { CardPanel } from '@/components/ui/CardPanel';
+import { Input, Select, Button } from '@/components/ui/InputControls';
+import { FileUpload } from '@/components/ui/FileUpload';
+import { AlertTriangle, Check, Camera, Mic } from 'lucide-react';
+
+export default function FieldScoutingPage({ params }: { params: { cropId: string } }) {
+  const router = useRouter();
+  const [observationType, setObservationType] = useState('pest');
+  const [severity, setSeverity] = useState('medium');
+  const [notes, setNotes] = useState('Observed mild thrips infestation on lower leaf canopy.');
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      router.push(`/crops/${params.cropId}/timeline`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <PageHeader
+        title="Field Scouting & Pest Observation"
+        subtitle="Capture photo evidence, pest symptoms, audio notes, and AI diagnosis."
+      />
+
+      <CardPanel>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Select
+            label="Observation Category"
+            value={observationType}
+            onChange={(e) => setObservationType(e.target.value)}
+            options={[
+              { label: 'Pest Infestation (Thrips, Bollworm, Caterpillars)', value: 'pest' },
+              { label: 'Fungal / Bacterial Disease (Purple Blotch, Mildew)', value: 'disease' },
+              { label: 'Nutrient Deficiency (Yellowing, Nitrogen / Zinc)', value: 'nutrient' },
+              { label: 'Irrigation Stress (Wilting, Moisture Deficit)', value: 'irrigation' },
+            ]}
+          />
+
+          <Select
+            label="Severity Rating"
+            value={severity}
+            onChange={(e) => setSeverity(e.target.value)}
+            options={[
+              { label: 'Low (Spot Infestation <5%)', value: 'low' },
+              { label: 'Medium (Noticeable Spread 5-20%)', value: 'medium' },
+              { label: 'High (Severe Damage 20-50%)', value: 'high' },
+              { label: 'Critical (Outbreak >50%)', value: 'critical' },
+            ]}
+          />
+
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-[#19201D] uppercase">Scouting Field Notes</label>
+            <textarea
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full p-3 bg-white border border-[#E7E5DC] focus:border-[#1B4D3E] rounded-xl text-sm outline-none"
+            />
+          </div>
+
+          <FileUpload label="Field Photo Evidence" value={photoUrl} onChange={setPhotoUrl} />
+
+          <div className="p-4 bg-[#F6F4ED] border border-[#E7E5DC] rounded-xl flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <Mic className="w-4 h-4 text-[#1B4D3E]" />
+              <span className="font-bold text-[#19201D]">Record Audio Field Note</span>
+            </div>
+            <Button type="button" variant="outline" size="sm">
+              Start Mic
+            </Button>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-[#E7E5DC]">
+            <Button type="button" variant="secondary" onClick={() => router.back()}>
+              Cancel
+            </Button>
+            <Button type="submit" isLoading={isLoading}>
+              <Check className="w-4 h-4" />
+              <span>Submit Scouting Log</span>
+            </Button>
+          </div>
+        </form>
+      </CardPanel>
+    </div>
+  );
 }

@@ -1,166 +1,272 @@
 'use client';
 
-import { ArrowRight, Bot, CheckCircle2, Leaf, LineChart, MapPin, Menu, PackageCheck, ShieldCheck, ShoppingCart, Smartphone, Sprout, Truck, X } from 'lucide-react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
+import { recordScreenView } from '@/lib/telemetry';
+import { MetricCard } from '@/components/ui/MetricCard';
+import { CardPanel } from '@/components/ui/CardPanel';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import {
+  Sprout,
+  Store,
+  TrendingUp,
+  ShieldCheck,
+  ArrowRight,
+  PackageCheck,
+  CloudSun,
+  FileSpreadsheet,
+  AlertTriangle,
+  PlusCircle,
+  Truck,
+  Bot,
+} from 'lucide-react';
 
-const features = [
-  ['Farmer OS', Sprout, 'Plan farms, crops, field activities, harvests and tasks from one low-bandwidth friendly workspace.'],
-  ['Live Marketplace', ShoppingCart, 'Move verified produce from farm lots to buyers with transparent pricing and order workflows.'],
-  ['AgriAI', Bot, 'Ask practical farming questions and get a multilingual assistant connected to your AgriMark context.'],
-  ['Traceable Logistics', Truck, 'Track dispatches, cold-chain telemetry, gate passes and delivery milestones in one flow.'],
-  ['Farm Intelligence', LineChart, 'Turn field, finance, weather and market signals into a clearer operating picture.'],
-  ['Trust Layer', ShieldCheck, 'Keep farmer, buyer, FPO and logistics workflows tied to role-aware data and traceability.'],
-];
+export default function HomePage() {
+  const { isAuthenticated, role, user } = useAuth();
+  const { t } = useI18n();
 
-const journey = [
-  ['01', 'Create your farm', 'Add land, location, soil and irrigation details with a simple guided flow.'],
-  ['02', 'Plan & grow', 'Track crops, scouting, inputs, tasks and harvest readiness as the season progresses.'],
-  ['03', 'List & trade', 'Create produce lots, discover buyers, place RFQs and manage orders.'],
-  ['04', 'Move & learn', 'Track logistics and use AgriAI, market and farm data to improve the next decision.'],
-];
-
-export default function LandingPage() {
-  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    void recordScreenView('farmer_dashboard', role || 'guest');
+  }, [role]);
 
   return (
-    <div className="shell">
-      <header className="topbar">
-        <div className="topbar-inner">
-          <Link href="/" className="brand" aria-label="AgriMark home">
-            <span className="logo"><Leaf /></span>
-            <span>AgriMark<small>Indian Agriculture Ecosystem</small></span>
-          </Link>
-          <nav className="nav">
-            <a href="#platform">Platform</a>
-            <a href="#workflow">How it works</a>
-            <a href="#market">Marketplace</a>
-            <a href="#trust">Why AgriMark</a>
-          </nav>
-          <div className="actions">
-            <Link href="/auth/login" className="btn btn-secondary">Log in</Link>
-            <Link href="/auth/register" className="btn btn-primary">Get started <ArrowRight size={16} /></Link>
-            <button className="btn btn-secondary" style={{padding:'0 13px'}} onClick={() => setOpen((v) => !v)} aria-label="Toggle menu">
-              {open ? <X size={18} /> : <Menu size={18} />}
-            </button>
+    <div className="space-[#19201D] space-y-8 py-2">
+      {/* Hero / Command Deck Header */}
+      <div className="bg-gradient-to-r from-[#1B4D3E] via-[#143B30] to-[#19201D] text-white p-6 md:p-8 rounded-3xl shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-[#143B30]">
+        <div className="space-y-3 max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 border border-amber-400/40 rounded-full text-xs font-mono font-bold text-amber-300">
+            <Sprout className="w-4 h-4" /> Bharat Agricultural OS • NABL Assayed Trade
+          </div>
+          <h1 className="text-2xl md:text-4xl font-extrabold tracking-tight leading-tight">
+            {isAuthenticated ? `Welcome back, ${user?.full_name}` : 'Direct Farm-to-Mandi Intelligence & Escrow Trade OS'}
+          </h1>
+          <p className="text-xs md:text-sm text-emerald-100/90 leading-relaxed">
+            Real-time APMC Mandi prices, cadastral 7/12 land passport, NABL lot verification, cold-chain GPS reefer tracking, and AI advisory.
+          </p>
+
+          <div className="flex flex-wrap gap-3 pt-2">
+            {!isAuthenticated ? (
+              <>
+                <Link
+                  href="/onboarding/role-select"
+                  className="px-5 py-3 bg-[#D97706] hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-2 transition"
+                >
+                  <span>Get Started / Choose Role</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+                <Link
+                  href="/login"
+                  className="px-5 py-3 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs rounded-xl transition"
+                >
+                  {t('login')}
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/marketplace/new"
+                  className="px-5 py-3 bg-[#D97706] hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-2 transition"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>List Produce on Mandi</span>
+                </Link>
+                <Link
+                  href="/farm/new"
+                  className="px-5 py-3 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-2"
+                >
+                  <Sprout className="w-4 h-4" />
+                  <span>Register Farm</span>
+                </Link>
+              </>
+            )}
           </div>
         </div>
-        {open && <div className="container" style={{paddingBottom:14}}>
-          <div className="card" style={{display:'grid',gap:8}}>
-            <a href="#platform" onClick={() => setOpen(false)}>Platform</a>
-            <a href="#workflow" onClick={() => setOpen(false)}>How it works</a>
-            <a href="#market" onClick={() => setOpen(false)}>Marketplace</a>
-            <a href="#trust" onClick={() => setOpen(false)}>Why AgriMark</a>
-          </div>
-        </div>}
-      </header>
 
-      <main>
-        <section className="hero">
-          <div className="container hero-grid">
-            <div>
-              <span className="eyebrow">Agricultural Modernism · Built for India</span>
-              <h1>From soil to sale, one connected farm ecosystem.</h1>
-              <p>AgriMark brings farm operations, crop intelligence, produce trading, logistics, finance and AgriAI into a single experience designed around how farmers actually work.</p>
-              <div className="cta-row">
-                <Link href="/auth/register" className="btn btn-primary">Start with AgriMark <ArrowRight size={17} /></Link>
-                <Link href="/marketplace" className="btn btn-secondary">Explore marketplace</Link>
-              </div>
-              <div style={{display:'flex',gap:16,flexWrap:'wrap',marginTop:22,color:'#63706a',fontSize:12,fontWeight:700}}>
-                <span><CheckCircle2 size={14} style={{verticalAlign:'-2px',marginRight:5,color:'#257042'}} />Farmer-first workflows</span>
-                <span><CheckCircle2 size={14} style={{verticalAlign:'-2px',marginRight:5,color:'#257042'}} />Role-aware access</span>
-                <span><CheckCircle2 size={14} style={{verticalAlign:'-2px',marginRight:5,color:'#257042'}} />Real backend integration</span>
-              </div>
-            </div>
-            <div className="hero-card">
-              <div style={{position:'relative',zIndex:1}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12}}>
-                  <div><div style={{fontSize:12,color:'rgba(255,255,255,.65)',fontWeight:700}}>PRODUCT PREVIEW</div><strong style={{fontSize:24}}>The farm, connected.</strong></div>
-                  <span className="badge" style={{background:'rgba(255,255,255,.09)',color:'#fff'}}>DEMO</span>
-                </div>
-                <div style={{marginTop:28,padding:15,borderRadius:18,background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.14)'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:10}}><MapPin size={18} color="#E5A93C" /><div><strong style={{fontSize:14}}>Your farm workspace</strong><div style={{fontSize:11,color:'rgba(255,255,255,.62)'}}>Land · crop cycle · market · logistics</div></div></div>
-                </div>
-                <div className="hero-stats">
-                  <div className="metric"><strong>24°C</strong><span>Weather view</span></div>
-                  <div className="metric"><strong>₹—</strong><span>Market signal</span></div>
-                  <div className="metric"><strong>3</strong><span>Example tasks</span></div>
-                  <div className="metric"><strong>✓</strong><span>Traceability ready</span></div>
-                </div>
-              </div>
-            </div>
+        {/* Live Weather & Mandi Chip */}
+        <div className="bg-white/10 backdrop-blur border border-white/20 p-4 rounded-2xl space-y-2 w-full md:w-64 text-xs">
+          <div className="flex items-center justify-between text-amber-300 font-bold font-mono">
+            <span className="flex items-center gap-1.5"><CloudSun className="w-4 h-4" /> Nashik APMC</span>
+            <span>28°C</span>
           </div>
-        </section>
-
-        <section id="market" className="section" style={{paddingTop:24}}>
-          <div className="container">
-            <div className="market-strip">
-              <div className="ticker"><small>Marketplace</small><strong>Discover verified produce</strong></div>
-              <div className="ticker"><small>Orders</small><strong>Protected workflow</strong></div>
-              <div className="ticker"><small>Logistics</small><strong>Track every milestone</strong></div>
-              <div className="ticker"><small>AI</small><strong>Context-aware assistance</strong></div>
-            </div>
+          <p className="text-emerald-100">Humidity: 64% • Light Rain expected in 48h</p>
+          <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px]">
+            <span className="text-gray-300">Red Onion Grade A:</span>
+            <span className="font-mono font-bold text-emerald-300">₹2,450 / Qtl</span>
           </div>
-        </section>
-
-        <section id="platform" className="section">
-          <div className="container">
-            <div className="section-head"><div><span className="eyebrow">One platform, many farm moments</span><h2>Everything your agricultural workflow needs to move.</h2><p>Designed as a coherent system—not a collection of disconnected utilities.</p></div></div>
-            <div className="grid-3">
-              {features.map(([title, Icon, body]) => {
-                const FeatureIcon = Icon as typeof Sprout;
-                return <div className="card" key={String(title)}><div className="icon-tile"><FeatureIcon size={21} /></div><h3>{String(title)}</h3><p>{String(body)}</p></div>;
-              })}
-            </div>
-          </div>
-        </section>
-
-        <section id="workflow" className="section" style={{paddingTop:20}}>
-          <div className="container">
-            <div className="section-head"><div><span className="eyebrow">Simple by design</span><h2>A clearer journey from field to market.</h2></div></div>
-            <div className="steps">
-              {journey.map(([num, title, body]) => <div className="step" key={num}><div className="step-num">{num}</div><h3>{title}</h3><p>{body}</p></div>)}
-            </div>
-          </div>
-        </section>
-
-        <section id="trust" className="section">
-          <div className="container">
-            <div className="card" style={{padding:28,background:'linear-gradient(135deg,#fff 0%,#f0f5f1 100%)'}}>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:28,alignItems:'center'}}>
-                <div>
-                  <span className="eyebrow">Built for real-world agriculture</span>
-                  <h2 style={{fontSize:32,letterSpacing:'-.04em',margin:'10px 0'}}>One identity. One data foundation. Multiple experiences.</h2>
-                  <p style={{color:'#69716c',lineHeight:1.75,maxWidth:650}}>The AgriMark web product and Stitch app are separate experiences sharing the same AgriMark API and Supabase foundation. The result is a consistent identity, data model and workflow across farmer, buyer, FPO and logistics journeys.</p>
-                  <div className="cta-row"><Link href="/auth/onboarding" className="btn btn-primary">Set up your role <ArrowRight size={16} /></Link><Link href="/ai-assistant" className="btn btn-gold"><Bot size={16} />Meet AgriAI</Link></div>
-                </div>
-                <div style={{display:'grid',gap:10}}>
-                  {[['Web','Canonical production experience',Smartphone],['App','Stitch-designed field experience',Leaf],['API','Shared business workflows',PackageCheck],['Supabase','Auth + PostgreSQL + storage',ShieldCheck]].map(([name,copy,Icon]) => { const ItemIcon = Icon as typeof Leaf; return <div key={String(name)} style={{display:'flex',gap:12,alignItems:'center',padding:15,background:'#fff',border:'1px solid #e2ddd1',borderRadius:16}}><div className="icon-tile" style={{margin:0,width:38,height:38}}><ItemIcon size={18}/></div><div><strong>{String(name)}</strong><div style={{fontSize:12,color:'#737b76',marginTop:2}}>{String(copy)}</div></div></div> })}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="section" style={{paddingTop:6}}>
-          <div className="container">
-            <div className="card" style={{background:'#1B4D3E',color:'#fff',padding:'30px 28px'}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:18,flexWrap:'wrap'}}>
-                <div><div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.16em',fontWeight:800,color:'rgba(255,255,255,.6)'}}>Ready when your farm is</div><h2 style={{fontSize:30,margin:'8px 0 5px'}}>Build the next season with AgriMark.</h2><p style={{margin:0,color:'rgba(255,255,255,.7)'}}>Start simple. Add intelligence as your operation grows.</p></div>
-                <Link href="/auth/register" className="btn btn-gold">Create your account <ArrowRight size={16}/></Link>
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      <footer className="footer">
-        <div className="container footer-grid">
-          <div><div className="brand"><span className="logo"><Leaf /></span><span>AgriMark<small>Indian Agriculture Ecosystem</small></span></div><p style={{marginTop:14,maxWidth:470,lineHeight:1.7}}>A farmer-first digital agriculture ecosystem connecting operations, markets, intelligence and logistics.</p></div>
-          <div><strong>Explore</strong><div style={{display:'grid',gap:9,marginTop:12,fontSize:13}}><Link href="/marketplace">Marketplace</Link><Link href="/ai-assistant">AgriAI</Link><Link href="/farmer/dashboard">Farmer dashboard</Link></div></div>
-          <div><strong>Get started</strong><div style={{display:'grid',gap:9,marginTop:12,fontSize:13}}><Link href="/auth/register">Create account</Link><Link href="/auth/login">Log in</Link><Link href="/auth/onboarding">Choose your role</Link></div></div>
         </div>
-      </footer>
+      </div>
+
+      {/* Metric Cards Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard
+          title="Active Cultivations"
+          value="4.5 Acres"
+          subtitle="Shree Ganesh Krishi Farm"
+          change="12% vs last season"
+          isPositive={true}
+          icon={<Sprout className="w-5 h-5" />}
+          badge="Kharif 2026"
+        />
+        <MetricCard
+          title="Mandi Produce Lots"
+          value="18,500 kg"
+          subtitle="Grade A Nashik Red Onion"
+          change="₹2,450 / Qtl"
+          isPositive={true}
+          icon={<PackageCheck className="w-5 h-5" />}
+          badge="Escrow Verified"
+        />
+        <MetricCard
+          title="Season Net Profit (Khaata)"
+          value="₹1,84,200"
+          subtitle="Gross ₹3.2L • Expenses ₹1.35L"
+          change="24% ROI"
+          isPositive={true}
+          icon={<FileSpreadsheet className="w-5 h-5" />}
+          badge="NABARD Verified"
+        />
+        <MetricCard
+          title="Reefer Cold Chain"
+          value="In-Transit"
+          subtitle="Bhiwandi Terminal • Gate Bay 2"
+          change="+4.2°C Stable"
+          isPositive={true}
+          icon={<Truck className="w-5 h-5" />}
+          badge="GPS Telemetry"
+        />
+      </div>
+
+      {/* Main Focus Command Deck & Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left 2 Cols: Active Tasks & Cultivation Summary */}
+        <div className="lg:col-span-2 space-y-6">
+          <CardPanel
+            title="Today's Field Focus & Advisory"
+            subtitle="Prioritized agronomic actions for active crop passport"
+            action={
+              <Link href="/crops/crop-001/timeline" className="text-xs font-bold text-[#1B4D3E] hover:underline">
+                View Full Timeline →
+              </Link>
+            }
+          >
+            <div className="space-y-3">
+              {[
+                {
+                  crop: 'Red Onion (Bhima Super)',
+                  action: 'Foliar Spray Application (19:19:19 NPK + Neem Oil)',
+                  stage: 'Bulb Swelling Stage (Day 62)',
+                  priority: 'High',
+                  assignedTo: 'Baban (Labour Lead)',
+                },
+                {
+                  crop: 'Bt Cotton (RCH-659)',
+                  action: 'Field Scouting & Pink Bollworm Trap Inspection',
+                  stage: 'Boll Development (Day 85)',
+                  priority: 'Critical',
+                  assignedTo: 'Self Inspection',
+                },
+                {
+                  crop: 'Pomegranate (Bhagwa)',
+                  action: 'Drip Irrigation Discharge Check & Soluble Potash',
+                  stage: 'Fruiting Stage',
+                  priority: 'Medium',
+                  assignedTo: 'Automated Drip Timer',
+                },
+              ].map((task, idx) => (
+                <div
+                  key={idx}
+                  className="p-4 bg-[#F6F4ED] border border-[#E7E5DC] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-[#1B4D3E]/40 transition"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-xs text-[#1B4D3E]">{task.crop}</span>
+                      <StatusBadge status={task.priority} />
+                    </div>
+                    <p className="text-sm font-bold text-[#19201D]">{task.action}</p>
+                    <p className="text-xs text-gray-500">{task.stage} • Assigned to: {task.assignedTo}</p>
+                  </div>
+                  <Link
+                    href="/crops/crop-001/scout"
+                    className="px-3.5 py-2 bg-white border border-[#1B4D3E] text-[#1B4D3E] hover:bg-[#1B4D3E] hover:text-white text-xs font-bold rounded-lg transition text-center whitespace-nowrap"
+                  >
+                    Log Observation
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </CardPanel>
+
+          {/* Mandi Price Comparison Ticker */}
+          <CardPanel title="Transparent 3-Tier Mandi Price Intelligence">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-[#F6F4ED] rounded-xl border border-[#E7E5DC]">
+                <span className="text-[10px] font-mono font-bold uppercase text-amber-700">1. Mandi Reference</span>
+                <h4 className="font-bold text-sm text-[#19201D] mt-1">Observed APMC Mandi</h4>
+                <p className="text-xs font-mono font-bold text-emerald-800 mt-1">₹2,450 / Qtl (Nashik)</p>
+                <p className="text-[11px] text-gray-500 mt-1">Modal rate updated 2 hours ago</p>
+              </div>
+
+              <div className="p-4 bg-[#F6F4ED] rounded-xl border border-[#E7E5DC]">
+                <span className="text-[10px] font-mono font-bold uppercase text-emerald-700">2. Farmer Ask Price</span>
+                <h4 className="font-bold text-sm text-[#19201D] mt-1">Authentic Produce Lot</h4>
+                <p className="text-xs font-mono font-bold text-[#1B4D3E] mt-1">₹2,600 / Qtl (Grade A)</p>
+                <p className="text-[11px] text-gray-500 mt-1">Direct seller lot code #LOT-N-884</p>
+              </div>
+
+              <div className="p-4 bg-[#F6F4ED] rounded-xl border border-[#E7E5DC]">
+                <span className="text-[10px] font-mono font-bold uppercase text-purple-700">3. AI Price Forecast</span>
+                <h4 className="font-bold text-sm text-[#19201D] mt-1">7-Day Demand Outlook</h4>
+                <p className="text-xs font-mono font-bold text-purple-800 mt-1">₹2,720 (+4.8%)</p>
+                <p className="text-[11px] text-gray-500 mt-1">High demand in Mumbai & Bhiwandi</p>
+              </div>
+            </div>
+          </CardPanel>
+        </div>
+
+        {/* Right Col: Quick Actions & AgriAI Widget */}
+        <div className="space-y-6">
+          <CardPanel title="Quick Field Actions">
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { title: 'Add Farm', href: '/farm/new', icon: Sprout },
+                { title: 'Record Harvest', href: '/crops/crop-001/harvest/new', icon: PackageCheck },
+                { title: 'Field Scouting', href: '/crops/crop-001/scout', icon: AlertTriangle },
+                { title: 'Farm Khaata', href: '/finance', icon: FileSpreadsheet },
+                { title: 'Reefer GPS', href: '/logistics/track/ORD-99812', icon: Truck },
+                { title: 'AgriAI Chat', href: '/ai-assistant', icon: Bot },
+              ].map((act, i) => (
+                <Link
+                  key={i}
+                  href={act.href}
+                  className="p-3 bg-[#F6F4ED] hover:bg-[#1B4D3E] hover:text-white border border-[#E7E5DC] rounded-xl flex flex-col items-center justify-center text-center space-y-1.5 transition group"
+                >
+                  <act.icon className="w-5 h-5 text-[#1B4D3E] group-hover:text-amber-300 transition" />
+                  <span className="text-xs font-bold">{act.title}</span>
+                </Link>
+              ))}
+            </div>
+          </CardPanel>
+
+          {/* AgriAI Multilingual Assistant Box */}
+          <div className="bg-gradient-to-br from-[#19201D] to-[#1B4D3E] text-white p-5 rounded-2xl border border-emerald-800 space-y-3 shadow-md">
+            <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
+              <Bot className="w-5 h-5" /> AgriAI Farmer Assistant
+            </div>
+            <p className="text-xs text-emerald-100/90 leading-relaxed">
+              Ask in Marathi, Hindi, Tamil, or English about pest control, weather forecast, or mandi price recommendations.
+            </p>
+            <Link
+              href="/ai-assistant"
+              className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center gap-2 transition"
+            >
+              <span>Ask AgriAI Now</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

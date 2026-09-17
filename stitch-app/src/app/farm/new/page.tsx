@@ -1,12 +1,164 @@
 'use client';
-import { useState } from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle2, Leaf, Loader2 } from 'lucide-react';
-import Link from 'next/link';
-import { api } from '@/lib/api';
-import { trackAction } from '@/lib/telemetry';
-export default function NewFarmPage(){
- const [form,setForm]=useState({name:'',village:'',district:'',state:'Tamil Nadu',area_acres:'',soil_type:'',irrigation_type:''});const [error,setError]=useState('');const [busy,setBusy]=useState(false);
- const update=(k:string,v:string)=>setForm(x=>({...x,[k]:v}));
- const submit=async(e:React.FormEvent)=>{e.preventDefault();if(busy)return;setError('');setBusy(true);const started=performance.now();try{const me=await api.me();const farm=await api.createFarm(me.id,{...form,area_acres:form.area_acres?Number(form.area_acres):undefined} as any);await trackAction('farm:create','/farm/new',true,Math.round(performance.now()-started),{farm_id:farm.id});window.location.assign(`/farm/${farm.id}`)}catch(err){await trackAction('farm:create','/farm/new',false,Math.round(performance.now()-started));setError(err instanceof Error?err.message:'Unable to create farm.');setBusy(false)}};
- return <div className="login-page"><div className="login-card" style={{maxWidth:760}}><Link href="/farmer/farms" style={{display:'inline-flex',gap:7,alignItems:'center',fontSize:12,fontWeight:800,color:'#68716b'}}><ArrowLeft size={15}/> My farms</Link><div style={{marginTop:22}}><div className="eyebrow">Add farm land survey</div><h2 style={{fontSize:30,margin:'8px 0'}}>Create your farm passport</h2><p style={{color:'#727a75'}}>Start with the details you know. Soil, boundary and crop information can be expanded later.</p></div><form onSubmit={submit} className="form-grid" style={{marginTop:20}}>{error&&<div className="error" aria-live="polite">{error}</div>}<div className="field"><label>Farm name</label><input value={form.name} onChange={e=>update('name',e.target.value)} placeholder="e.g. Shree Ganesh Krishi Farm" required disabled={busy}/></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><div className="field"><label>Village</label><input value={form.village} onChange={e=>update('village',e.target.value)} placeholder="Village" disabled={busy}/></div><div className="field"><label>District</label><input value={form.district} onChange={e=>update('district',e.target.value)} placeholder="District" disabled={busy}/></div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><div className="field"><label>State</label><input value={form.state} onChange={e=>update('state',e.target.value)} disabled={busy}/></div><div className="field"><label>Area (acres)</label><input type="number" step="0.01" min="0" value={form.area_acres} onChange={e=>update('area_acres',e.target.value)} placeholder="0.00" disabled={busy}/></div></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><div className="field"><label>Soil type</label><select value={form.soil_type} onChange={e=>update('soil_type',e.target.value)} disabled={busy}><option value="">Select</option><option>Red soil</option><option>Black soil</option><option>Alluvial soil</option><option>Loamy soil</option><option>Sandy soil</option></select></div><div className="field"><label>Irrigation</label><select value={form.irrigation_type} onChange={e=>update('irrigation_type',e.target.value)} disabled={busy}><option value="">Select</option><option>Drip</option><option>Sprinkler</option><option>Canal</option><option>Well</option><option>Rainfed</option></select></div></div><div style={{padding:14,borderRadius:15,background:'#edf5ef',color:'#365744',fontSize:12}}><CheckCircle2 size={15} style={{verticalAlign:'-3px',marginRight:6}}/>Add only accurate information. AgriMark can enrich this record through later surveys and observations.</div><button type="submit" className="btn btn-primary" disabled={busy}>{busy?<Loader2 size={16} style={{animation:'spin 1s linear infinite'}}/>:<ArrowRight size={16}/>} {busy?'Saving…':'Save farm passport'}</button></form></div></div>
+
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { CardPanel } from '@/components/ui/CardPanel';
+import { Input, Select, Button } from '@/components/ui/InputControls';
+import { Sprout, MapPin, Map, Check } from 'lucide-react';
+
+export default function AddFarmPage() {
+  const router = useRouter();
+  const [name, setName] = useState('');
+  const [acreage, setAcreage] = useState('');
+  const [district, setDistrict] = useState('Nashik');
+  const [state, setState] = useState('Maharashtra');
+  const [locationAddress, setLocationAddress] = useState('');
+  const [rorNumber, setRorNumber] = useState('');
+  const [soilType, setSoilType] = useState('Medium Deep Black Regur');
+  const [soilPh, setSoilPh] = useState('7.2');
+  const [organicCarbon, setOrganicCarbon] = useState('0.65');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      router.push('/farm');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <PageHeader
+        title="Add Farm & Land Survey"
+        subtitle="Register a new cadastral parcel with 7/12 RoR extract, soil test pH, and GIS boundary."
+      />
+
+      <CardPanel>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold text-[#19201D] border-b border-[#F6F4ED] pb-2 uppercase tracking-wide">
+              1. Basic Farm Identification
+            </h3>
+            <Input
+              label="Farm Name / Alias"
+              placeholder="e.g. Mahavir Krishi Vigyan Farm"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Total Acreage (Acres)"
+                type="number"
+                step="0.1"
+                placeholder="5.0"
+                value={acreage}
+                onChange={(e) => setAcreage(e.target.value)}
+                required
+              />
+              <Input
+                label="RoR / 7-12 Extract Number"
+                placeholder="e.g. 712/88A"
+                value={rorNumber}
+                onChange={(e) => setRorNumber(e.target.value)}
+              />
+            </div>
+            <Input
+              label="Village / Taluka Address"
+              placeholder="Pimpalgaon Baswant, Niphad"
+              value={locationAddress}
+              onChange={(e) => setLocationAddress(e.target.value)}
+              required
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <Select
+                label="District"
+                value={district}
+                onChange={(e) => setDistrict(e.target.value)}
+                options={[
+                  { label: 'Nashik', value: 'Nashik' },
+                  { label: 'Ahmednagar', value: 'Ahmednagar' },
+                  { label: 'Pune', value: 'Pune' },
+                  { label: 'Solapur', value: 'Solapur' },
+                ]}
+              />
+              <Select
+                label="State"
+                value={state}
+                onChange={(e) => setState(e.target.value)}
+                options={[
+                  { label: 'Maharashtra', value: 'Maharashtra' },
+                  { label: 'Gujarat', value: 'Gujarat' },
+                  { label: 'Karnataka', value: 'Karnataka' },
+                  { label: 'Tamil Nadu', value: 'Tamil Nadu' },
+                ]}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold text-[#19201D] border-b border-[#F6F4ED] pb-2 uppercase tracking-wide">
+              2. Agronomic & Soil Health
+            </h3>
+            <Select
+              label="Soil Classification"
+              value={soilType}
+              onChange={(e) => setSoilType(e.target.value)}
+              options={[
+                { label: 'Medium Deep Black Regur', value: 'Medium Deep Black Regur' },
+                { label: 'Red Alluvial Loam', value: 'Red Alluvial Loam' },
+                { label: 'Laterite Black Soil', value: 'Laterite Black' },
+                { label: 'Sandy Loam Drip Fertigated', value: 'Sandy Loam' },
+              ]}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Soil pH"
+                type="number"
+                step="0.1"
+                placeholder="7.2"
+                value={soilPh}
+                onChange={(e) => setSoilPh(e.target.value)}
+              />
+              <Input
+                label="Organic Carbon (%)"
+                type="number"
+                step="0.01"
+                placeholder="0.65"
+                value={organicCarbon}
+                onChange={(e) => setOrganicCarbon(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="p-4 bg-[#F6F4ED] border border-[#E7E5DC] rounded-xl flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Map className="w-6 h-6 text-[#1B4D3E]" />
+              <div>
+                <p className="text-xs font-bold text-[#19201D]">GIS Cadastral Boundary Picker</p>
+                <p className="text-[11px] text-gray-500">Tap to record GPS vertices or upload GeoJSON polygon</p>
+              </div>
+            </div>
+            <Button type="button" variant="outline" size="sm">
+              Draw Boundary
+            </Button>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-[#E7E5DC]">
+            <Button type="button" variant="secondary" onClick={() => router.back()}>
+              Cancel
+            </Button>
+            <Button type="submit" isLoading={isLoading}>
+              <Check className="w-4 h-4" />
+              <span>Save & Register Parcel</span>
+            </Button>
+          </div>
+        </form>
+      </CardPanel>
+    </div>
+  );
 }

@@ -1,35 +1,164 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Filter, Loader2, MapPin, Search, ShieldCheck, ShoppingCart, Tag, X } from 'lucide-react';
-import AppShell from '@/app/_components/AppShell';
-import ActionButton from '@/app/_components/ActionButton';
-import { api, Listing } from '@/lib/api';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { CardPanel } from '@/components/ui/CardPanel';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { Button, Input } from '@/components/ui/InputControls';
+import { Store, Search, Filter, ShieldCheck, MapPin, Tag, ArrowRight } from 'lucide-react';
 
-export default function MarketplacePage() {
-  const [items, setItems] = useState<Listing[]>([]);
-  const [prices, setPrices] = useState<any[]>([]);
-  const [q, setQ] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [showFilters, setShowFilters] = useState(false);
-  const [error, setError] = useState('');
-  const load = async () => {
-    setError('');
-    try {
-      const [list, market] = await Promise.all([api.listings(), api.marketPrices().catch(() => [])]);
-      setItems(list); setPrices(market);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load marketplace.');
-    } finally { setLoading(false); }
-  };
-  useEffect(()=>{ void load(); },[]);
-  const filtered = useMemo(()=>items.filter(x=>`${x.title||''}`.toLowerCase().includes(q.toLowerCase())),[items,q]);
-  return <AppShell>
-    <div className="page-title"><div><div className="eyebrow">Agrimark live marketplace</div><h1>Buy and sell with context.</h1><p style={{color:'#707873',margin:'6px 0 0'}}>Produce listings connect back to lot records, farmer identity and operational workflows.</p></div><Link href="/produce" prefetch className="btn btn-primary">List produce <ArrowRight size={16}/></Link></div>
-    <div className="card" style={{padding:12,marginBottom:18}}><div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:10}}><div style={{position:'relative'}}><Search size={17} style={{position:'absolute',left:14,top:16,color:'#7d8580'}}/><input aria-label="Search marketplace" value={q} onChange={e=>setQ(e.target.value)} placeholder="Search produce, crop, grade…" style={{width:'100%',minHeight:48,border:'1px solid #e2ddd1',borderRadius:13,paddingLeft:42}}/></div><div style={{display:'flex',gap:8}}><ActionButton className="btn btn-secondary" onClick={()=>setShowFilters(v=>!v)} actionName="marketplace:filters"><Filter size={16}/> Filters</ActionButton><ActionButton className="btn btn-secondary" onClick={load} disabled={loading} actionName="marketplace:refresh">Refresh</ActionButton></div></div>{showFilters&&<div style={{marginTop:10,padding:12,borderTop:'1px solid #eee9de',display:'flex',justifyContent:'space-between',alignItems:'center',fontSize:12,color:'#66706a'}}>Filters are ready for crop/grade/location refinements.<button className="btn btn-secondary" style={{minHeight:38,padding:'0 11px'}} onClick={()=>setShowFilters(false)} aria-label="Close filters"><X size={15}/></button></div>}</div>
-    {error && <div className="error" style={{marginBottom:16}} aria-live="polite">{error}</div>}
-    {prices.length>0 && <div className="market-strip" style={{marginBottom:18}}>{prices.slice(0,4).map((p:any,index)=> <div className="ticker" key={p.id||index}><small>{p.market_name||p.crop_name||'Market signal'}</small><strong>₹{Number(p.modal_price ?? p.price ?? 0).toLocaleString()}</strong></div>)}</div>}
-    {loading ? <div className="loading"><Loader2 size={24}/></div> : filtered.length===0 ? <div className="card empty"><ShoppingCart size={26} style={{marginBottom:9}}/><div style={{fontWeight:800,color:'#2f3833'}}>No active listings found</div><div style={{marginTop:5}}>Try another search or list your own produce lot.</div><Link href="/produce" prefetch className="btn btn-primary" style={{marginTop:18}}>List produce</Link></div> : <div className="grid-3">{filtered.map((item)=><Link className="card" href={`/product/${item.id}`} prefetch key={item.id}><div style={{display:'flex',justifyContent:'space-between',gap:12}}><div><span className="badge"><ShieldCheck size={12} style={{marginRight:4}}/>Verified workflow</span><h3 style={{marginTop:12}}>{item.title || 'Produce listing'}</h3></div><Tag size={17} color="#E5A93C"/></div><div style={{marginTop:18,display:'flex',justifyContent:'space-between',alignItems:'end'}}><div><div style={{fontSize:11,color:'#7a827d'}}>PRICE</div><strong style={{fontFamily:'JetBrains Mono',fontSize:23}}>₹{Number(item.price_per_unit||0).toLocaleString()}</strong><span style={{fontSize:11,color:'#737b76'}}> / {item.currency||'unit'}</span></div><span className="side-link" style={{padding:0}}>View <ArrowRight size={14}/></span></div><div style={{marginTop:12,fontSize:12,color:'#6f7772'}}><MapPin size={13} style={{verticalAlign:'-2px'}}/> Farm-linked lot · Min order {item.min_order_quantity ?? 1}</div></Link>)}</div>}
-  </AppShell>;
+export default function LiveMarketplacePage() {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedGrade, setSelectedGrade] = useState('all');
+
+  const listings = [
+    {
+      id: 'LST-9921',
+      crop: 'Red Onion (Bhima Super)',
+      quantityKg: 10000,
+      pricePerKg: 26,
+      mandiRefPrice: 24.5,
+      grade: 'Grade A',
+      seller: 'Ramesh Patil (Ganesh Farm)',
+      district: 'Nashik',
+      state: 'Maharashtra',
+      trustScore: 98,
+      moisturePct: 11.5,
+      photo: 'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=400',
+    },
+    {
+      id: 'LST-8812',
+      crop: 'Bhagwa Pomegranate',
+      quantityKg: 3500,
+      pricePerKg: 85,
+      mandiRefPrice: 80,
+      grade: 'Grade A',
+      seller: 'Suresh More (Solapur Agro)',
+      district: 'Solapur',
+      state: 'Maharashtra',
+      trustScore: 95,
+      moisturePct: 14.0,
+      photo: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=400',
+    },
+    {
+      id: 'LST-7714',
+      crop: 'Sharbati Wheat',
+      quantityKg: 25000,
+      pricePerKg: 32,
+      mandiRefPrice: 30.5,
+      grade: 'Grade B',
+      seller: 'Narmada Kisan FPO',
+      district: 'Hoshangabad',
+      state: 'Madhya Pradesh',
+      trustScore: 92,
+      moisturePct: 10.2,
+      photo: 'https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=400',
+    },
+  ];
+
+  const filteredListings = listings.filter((item) => {
+    const matchesSearch = item.crop.toLowerCase().includes(searchTerm.toLowerCase()) || item.district.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesGrade = selectedGrade === 'all' || item.grade === selectedGrade;
+    return matchesSearch && matchesGrade;
+  });
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="AgriMark Live Mandi Marketplace"
+        subtitle="Direct trade of NABL assayed produce lots with Bharat Mandi Escrow protection."
+        action={
+          <Link href="/marketplace/new">
+            <Button size="md">
+              <Tag className="w-4 h-4" />
+              <span>List Your Produce</span>
+            </Button>
+          </Link>
+        }
+      />
+
+      {/* Search & Filter Bar */}
+      <div className="bg-white border border-[#E7E5DC] p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+        <div className="relative w-full sm:w-96">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
+          <input
+            type="text"
+            placeholder="Search crop, variety, or district..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-[#F6F4ED] border border-[#E7E5DC] rounded-xl text-xs outline-none focus:border-[#1B4D3E]"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Filter className="w-4 h-4 text-[#1B4D3E]" />
+          <span className="text-xs font-bold text-[#19201D]">Grade:</span>
+          {['all', 'Grade A', 'Grade B'].map((g) => (
+            <button
+              key={g}
+              onClick={() => setSelectedGrade(g)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition capitalize ${
+                selectedGrade === g
+                  ? 'bg-[#1B4D3E] text-white'
+                  : 'bg-[#F6F4ED] text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Listings Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {filteredListings.map((item) => (
+          <CardPanel key={item.id} className="hover:border-[#1B4D3E]/40 transition space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs font-bold text-[#1B4D3E]">{item.id}</span>
+                <StatusBadge status={item.grade} />
+              </div>
+
+              <div>
+                <h3 className="text-lg font-bold text-[#19201D]">{item.crop}</h3>
+                <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                  <MapPin className="w-3.5 h-3.5 text-[#1B4D3E]" /> {item.district}, {item.state}
+                </p>
+              </div>
+
+              <div className="p-3 bg-[#F6F4ED] rounded-xl space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Available Lot:</span>
+                  <span className="font-mono font-extrabold text-[#19201D]">{item.quantityKg.toLocaleString()} kg</span>
+                </div>
+                <div className="flex justify-between items-baseline">
+                  <span className="text-gray-500">Asking Price:</span>
+                  <span className="font-mono font-extrabold text-base text-[#1B4D3E]">₹{item.pricePerKg} / kg</span>
+                </div>
+                <div className="flex justify-between text-[11px] text-gray-500 border-t border-[#E7E5DC] pt-1">
+                  <span>Mandi Reference:</span>
+                  <span className="font-mono font-bold text-emerald-700">₹{item.mandiRefPrice} / kg</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs pt-1">
+                <span className="text-gray-600 font-medium">{item.seller}</span>
+                <span className="font-mono text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">
+                  Trust: {item.trustScore}%
+                </span>
+              </div>
+            </div>
+
+            <Link href={`/marketplace/listing/${item.id}`} className="pt-2">
+              <Button size="md" className="w-full">
+                <span>Inspect Passport & Buy</span>
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </Link>
+          </CardPanel>
+        ))}
+      </div>
+    </div>
+  );
 }

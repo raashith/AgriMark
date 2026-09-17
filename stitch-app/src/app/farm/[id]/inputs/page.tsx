@@ -1,8 +1,76 @@
 'use client';
-import { useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, CheckCircle2, Package, Save } from 'lucide-react';
-import AppShell from '@/app/_components/AppShell';
-import ActionButton from '@/app/_components/ActionButton';
-import { api } from '@/lib/api';
-export default function InputsPage({params}:{params:{id:string}}){const[form,setForm]=useState({input_type:'fertilizer',product_name:'',quantity:'',unit:'kg',cost:'',notes:''});const[saved,setSaved]=useState(false);const[error,setError]=useState('');const update=(k:string,v:string)=>setForm(x=>({...x,[k]:v}));const save=async()=>{setSaved(false);setError('');try{const me=await api.me();await api.createFarmInputLog({farm_id:params.id,input_type:form.input_type,product_name:form.product_name||null,quantity:form.quantity?Number(form.quantity):null,unit:form.unit,cost:form.cost?Number(form.cost):null,compliance_notes:form.notes||null,metadata:{source:'stitch_app',user_id:me.id}});setSaved(true)}catch(err){setError(err instanceof Error?err.message:'Unable to save input record.')}};return <AppShell><div className="page-title"><div><Link href={`/farm/${params.id}`} style={{display:'inline-flex',alignItems:'center',gap:7,fontSize:12,fontWeight:800,color:'#68716b'}}><ArrowLeft size={15}/> Farm passport</Link><div className="eyebrow" style={{marginTop:14}}>Input inventory & application</div><h1>Record farm input usage.</h1><p style={{color:'#707873',margin:'6px 0 0'}}>Keep product, quantity, cost and field-use notes together.</p></div></div><div className="card" style={{maxWidth:760}}><form onSubmit={e=>{e.preventDefault();void save()}} className="form-grid"><div className="field"><label>Input type</label><select value={form.input_type} onChange={e=>update('input_type',e.target.value)}><option value="fertilizer">Fertilizer</option><option value="seed">Seed</option><option value="bio_product">Bio product</option><option value="crop_protection">Crop protection</option><option value="other">Other</option></select></div><div className="field"><label>Product / material name</label><input value={form.product_name} onChange={e=>update('product_name',e.target.value)} placeholder="Product name"/></div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><div className="field"><label>Quantity</label><input type="number" min="0" step="0.01" value={form.quantity} onChange={e=>update('quantity',e.target.value)}/></div><div className="field"><label>Unit</label><select value={form.unit} onChange={e=>update('unit',e.target.value)}><option>kg</option><option>litre</option><option>pack</option><option>bag</option></select></div></div><div className="field"><label>Cost (₹)</label><input type="number" min="0" step="0.01" value={form.cost} onChange={e=>update('cost',e.target.value)}/></div><div className="field"><label>Application notes</label><textarea value={form.notes} onChange={e=>update('notes',e.target.value)} placeholder="Date, method, operator or compliance notes…"/></div>{error&&<div className="error">{error}</div>}{saved&&<div style={{padding:12,borderRadius:12,background:'#edf5ef',color:'#257042',fontSize:12}}><CheckCircle2 size={15} style={{verticalAlign:'-3px',marginRight:5}}/> Input record saved to the farm ledger.</div>}<ActionButton className="btn btn-primary" type="submit" actionName="inputs:save"><Save size={16}/> Save input record</ActionButton></form></div><div className="grid-3" style={{marginTop:16}}>{[['Stock','Keep quantities visible before the next application.'],['Cost','Link each usage record to farm economics.'],['Compliance','Preserve batch and withdrawal notes when needed.']].map(([t,b])=><div className="card" key={t}><div className="icon-tile"><Package size={18}/></div><h3>{t}</h3><p>{b}</p></div>)}</div></AppShell>}
+
+import React from 'react';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { CardPanel } from '@/components/ui/CardPanel';
+import { MetricCard } from '@/components/ui/MetricCard';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { Button } from '@/components/ui/InputControls';
+import { Package, Plus, QrCode, FileText } from 'lucide-react';
+
+export default function InputTrackerPage({ params }: { params: { id: string } }) {
+  const inputs = [
+    {
+      name: '19:19:19 Water Soluble NPK',
+      category: 'Fertilizer',
+      quantity: 50,
+      unit: 'kg',
+      cost: '₹3,500',
+      supplier: 'IFFCO Agro Center Nashik',
+      date: '2026-08-15',
+    },
+    {
+      name: 'Cold-Pressed Organic Neem Oil 10000 PPM',
+      category: 'Pesticide',
+      quantity: 5,
+      unit: 'Liters',
+      cost: '₹1,200',
+      supplier: 'MahaAgri Input Kendra',
+      date: '2026-08-20',
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Input Inventory & Application Tracker"
+        subtitle="Track fertilizers, bio-inputs, QR batch verification, and farm shed stock."
+        action={
+          <Button size="md">
+            <Plus className="w-4 h-4" />
+            <span>Add Input Purchase</span>
+          </Button>
+        }
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <MetricCard title="Total Input Expenses" value="₹4,700" subtitle="Kharif 2026 Season" icon={<Package className="w-5 h-5" />} />
+        <MetricCard title="Verified Bio-Inputs" value="2 Products" subtitle="100% QR Scanned" icon={<QrCode className="w-5 h-5" />} />
+        <MetricCard title="Shed Stock Status" value="Optimal" subtitle="Next Refill in 15 days" icon={<FileText className="w-5 h-5" />} />
+      </div>
+
+      <CardPanel title="Recorded Agro-Inputs Shed Ledger">
+        <div className="space-y-3">
+          {inputs.map((inp, idx) => (
+            <div key={idx} className="p-4 bg-[#F6F4ED] border border-[#E7E5DC] rounded-xl flex items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-bold text-sm text-[#19201D]">{inp.name}</h4>
+                  <StatusBadge status={inp.category} />
+                </div>
+                <p className="text-xs text-gray-500">
+                  Purchased on {inp.date} • Supplier: {inp.supplier}
+                </p>
+              </div>
+
+              <div className="text-right">
+                <p className="font-mono font-extrabold text-sm text-[#1B4D3E]">{inp.quantity} {inp.unit}</p>
+                <p className="text-xs font-bold text-gray-700">{inp.cost}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardPanel>
+    </div>
+  );
+}

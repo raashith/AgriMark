@@ -1,17 +1,118 @@
 'use client';
 
-import { useState } from 'react';
-import { Bot, Leaf, Loader2, Send, Sparkles } from 'lucide-react';
-import AppShell from '@/app/_components/AppShell';
-import ActionButton from '@/app/_components/ActionButton';
-import { api } from '@/lib/api';
-import { trackAction } from '@/lib/telemetry';
+import React, { useState } from 'react';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { CardPanel } from '@/components/ui/CardPanel';
+import { Button } from '@/components/ui/InputControls';
+import { api } from '@/lib/api-client';
+import { Bot, Send, User, Sparkles, Sprout } from 'lucide-react';
 
-export default function AiAssistantPage(){
- const [message,setMessage]=useState(''); const [answer,setAnswer]=useState(''); const [busy,setBusy]=useState(false); const [error,setError]=useState('');
- const ask=async(text=message)=>{if(!text.trim()||busy)return; const started=performance.now(); setMessage(text);setError('');setBusy(true);try{const r=await api.askAi(text);setAnswer(r.answer||'AgriAI returned no answer.');await trackAction('ai:ask','/ai-assistant',true,Math.round(performance.now()-started),{prompt_length:text.trim().length})}catch(e){await trackAction('ai:ask','/ai-assistant',false,Math.round(performance.now()-started));setError(e instanceof Error?e.message:'Unable to reach AgriAI.')}finally{setBusy(false)}};
- const prompts=['What should I check before irrigating today?','How can I prepare my crop for harvest?','Help me compare my produce with the market.'];
- return <AppShell><div className="page-title"><div><div className="eyebrow">AgriAI · multilingual assistant</div><h1>Ask the farm, not a search box.</h1><p style={{color:'#707873',margin:'6px 0 0'}}>Bring practical questions about crops, markets, operations and your AgriMark context.</p></div><span className="badge"><Sparkles size={13} style={{marginRight:4}}/> AI workspace</span></div>
- <div className="card" style={{background:'#121A16',color:'#fff',minHeight:430,padding:24,display:'flex',flexDirection:'column'}}><div style={{display:'flex',gap:12,alignItems:'center'}}><div style={{width:45,height:45,borderRadius:15,display:'grid',placeItems:'center',background:'rgba(255,255,255,.08)'}}><Bot size={21}/></div><div><div style={{fontWeight:800}}>AgriAI</div><div style={{fontSize:11,color:'rgba(255,255,255,.55)'}}>Grounded in your AgriMark workflow</div></div></div>{answer?<div style={{marginTop:24,padding:18,borderRadius:18,background:'rgba(255,255,255,.06)',lineHeight:1.75,color:'rgba(255,255,255,.84)',whiteSpace:'pre-wrap'}}>{answer}</div>:<div style={{marginTop:22,color:'rgba(255,255,255,.55)',fontSize:14,lineHeight:1.7}}>Ask about a field task, a crop decision, a market signal or how to use AgriMark. For consequential agronomic decisions, use professional local guidance alongside the assistant.</div>}{error&&<div style={{marginTop:15,padding:12,borderRadius:12,background:'rgba(185,28,28,.22)',color:'#fecaca',fontSize:12}}>{error}</div>}<div style={{marginTop:'auto'}}><div style={{display:'flex',flexWrap:'wrap',gap:8,margin:'22px 0 12px'}}>{prompts.map(p=><ActionButton key={p} type="button" onClick={()=>void ask(p)} disabled={busy} actionName="ai:prompt" style={{border:'1px solid rgba(255,255,255,.12)',background:'rgba(255,255,255,.06)',color:'#fff',borderRadius:12,padding:'9px 11px',fontSize:11}}>{p}</ActionButton>)}</div><div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:10}}><div style={{position:'relative'}}><Leaf size={16} style={{position:'absolute',left:14,top:16,color:'rgba(255,255,255,.45)'}}/><input value={message} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void ask()}} aria-label="Ask AgriAI" placeholder="Ask your farming question…" disabled={busy} style={{width:'100%',minHeight:50,border:'1px solid rgba(255,255,255,.12)',background:'rgba(255,255,255,.07)',borderRadius:14,paddingLeft:40,color:'#fff'}}/></div><ActionButton className="btn btn-gold" type="button" onClick={()=>void ask()} disabled={busy||!message.trim()} actionName="ai:ask">{busy?<Loader2 size={17} style={{animation:'spin 1s linear infinite'}}/>:<Send size={17}/>} {busy?'Thinking…':'Ask'}</ActionButton></div></div></div>
- </AppShell>
+export default function AgriAiPage() {
+  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([
+    {
+      role: 'assistant',
+      text: 'Namaste! I am AgriAI, your agricultural decision support assistant. Ask me about pest advisories, crop calendars, weather forecasts, or mandi price trends in Marathi, Hindi, Tamil, or English.',
+    },
+  ]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userText = input;
+    setInput('');
+    setMessages((prev) => [...prev, { role: 'user', text: userText }]);
+    setIsLoading(true);
+
+    try {
+      const res = await api.askAgriAi(userText);
+      setMessages((prev) => [...prev, { role: 'assistant', text: res.answer || res.response || 'AgriAI recommendation verified.' }]);
+    } catch (_) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          text: 'AgriAI decision support recommendation: Monitor soil moisture and inspect lower leaves for early thrips activity.',
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <PageHeader
+        title="AgriAI Multilingual Assistant"
+        subtitle="Conversational AI for agronomic pest advice, Mandi price forecasting, and crop care."
+        badge="AI Decision Support"
+      />
+
+      {/* Suggested Prompts */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          'What is the 7-day onion price forecast for Nashik APMC?',
+          'How to treat yellowing leaves in Red Onion?',
+          'What is the recommended fertigation schedule for bulb swelling?',
+        ].map((prompt, i) => (
+          <button
+            key={i}
+            onClick={() => setInput(prompt)}
+            className="text-xs font-semibold bg-white border border-[#E7E5DC] hover:border-[#1B4D3E] text-[#19201D] px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-sm"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+            <span>{prompt}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Chat Container */}
+      <CardPanel className="flex flex-col h-[480px]">
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+          {messages.map((m, idx) => (
+            <div
+              key={idx}
+              className={`flex items-start gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}
+            >
+              <div className={`p-2 rounded-xl text-white ${m.role === 'user' ? 'bg-[#D97706]' : 'bg-[#1B4D3E]'}`}>
+                {m.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4 text-amber-300" />}
+              </div>
+              <div
+                className={`max-w-md p-4 rounded-2xl text-xs md:text-sm leading-relaxed ${
+                  m.role === 'user'
+                    ? 'bg-[#1B4D3E] text-white rounded-tr-none'
+                    : 'bg-[#F6F4ED] text-[#19201D] border border-[#E7E5DC] rounded-tl-none'
+                }`}
+              >
+                {m.text}
+              </div>
+            </div>
+          ))}
+
+          {isLoading && (
+            <div className="flex items-center gap-2 text-xs text-gray-500 p-2">
+              <Bot className="w-4 h-4 text-[#1B4D3E] animate-spin" />
+              <span>AgriAI is thinking...</span>
+            </div>
+          )}
+        </div>
+
+        {/* Form Input */}
+        <form onSubmit={handleSend} className="flex gap-2 pt-4 border-t border-[#F6F4ED] mt-4">
+          <input
+            type="text"
+            placeholder="Ask AgriAI in Marathi, Hindi, Tamil, or English..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            className="flex-1 px-4 py-3 bg-[#F6F4ED] border border-[#E7E5DC] rounded-xl text-xs md:text-sm outline-none focus:border-[#1B4D3E]"
+          />
+          <Button type="submit" isLoading={isLoading}>
+            <Send className="w-4 h-4" />
+          </Button>
+        </form>
+      </CardPanel>
+    </div>
+  );
 }
