@@ -65,12 +65,6 @@ export default function HomePage() {
   const { isAuthenticated, role, user } = useAuth();
   const depthRef = usePointerDepth();
   const [scrolled, setScrolled] = useState(false);
-  const [scene, setScene] = useState(0);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setScene((current) => (current + 1) % 3), 8500);
-    return () => window.clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
@@ -101,43 +95,10 @@ export default function HomePage() {
   return (
     <main ref={depthRef} className="cinematic-landing relative overflow-hidden">
       <div className="cinematic-noise" aria-hidden="true" />
-      <div className="agri-scene-stage" aria-hidden="true">
-        <div className="agri-scene agri-scene-field">
-          <div className="scene-sky" />
-          <div className="field-horizon" />
-          <div className="crop-field">
-            {Array.from({ length: 36 }).map((_, i) => <span key={i} className="scene-crop-row" style={{ ['--i' as string]: i } as React.CSSProperties} />)}
-          </div>
-          <div className="scene-sun" />
-          <div className="scene-heat-haze" />
-          <div className="scene-particles scene-fireflies" />
-        </div>
-        <div className="agri-scene agri-scene-rain">
-          <div className="rain-sky" />
-          <div className="rain-cloud cloud-a" />
-          <div className="rain-cloud cloud-b" />
-          <div className="rain-mountain rain-mountain-back" />
-          <div className="rain-mountain rain-mountain-front" />
-          <div className="rain-field-reflection" />
-          <div className="rain-sheet" />
-          <div className="rain-splash-layer" />
-          <div className="scene-mist" />
-        </div>
-        <div className="agri-scene agri-scene-mountain">
-          <div className="mountain-sky" />
-          <div className="mountain-range range-back" />
-          <div className="mountain-range range-mid" />
-          <div className="mountain-range range-front" />
-          <div className="upper-ridge-tree" />
-          <div className="mountain-mist" />
-          <div className="mountain-birds" />
-        </div>
-        <div className="scene-vignette" />
-      </div>
-      <div className="scene-dots" aria-hidden="true">
-        {[0, 1, 2].map((index) => (
-          <button key={index} type="button" aria-label={`Show agricultural scene ${index + 1}`} className={`scene-dot ${scene === index ? 'scene-dot-active' : ''}`} onClick={() => setScene(index)} />
-        ))}
+      <div className="cinematic-depth-bg" aria-hidden="true">
+        <div className="depth-blob depth-blob-one" />
+        <div className="depth-blob depth-blob-two" />
+        <div className="depth-grid" />
       </div>
       <div className="hero-orbit hero-orbit-a" aria-hidden="true" />
       <div className="hero-orbit hero-orbit-b" aria-hidden="true" />
