@@ -95,7 +95,7 @@ export const CinematicHero: React.FC = () => {
             <div className="absolute -inset-8 rounded-[2rem] bg-amber-400/10 blur-3xl [transform:translateZ(-50px)]" />
             <div className="absolute -inset-1 bg-gradient-to-r from-[#E5A93C] via-emerald-500 to-[#3E7B54] rounded-3xl blur-xl opacity-30 animate-pulse [transform:translateZ(-10px)]" />
 
-            <div className="relative bg-[#19201D]/90 border border-emerald-700/60 rounded-3xl p-6 shadow-2xl backdrop-blur-xl space-y-5 [transform:rotateX(2deg)_rotateY(-5deg)_translateZ(45px)] transition-transform duration-700 hover:[transform:rotateX(0deg)_rotateY(-2deg)_translateZ(60px)]">
+            <div className="relative animate-[agrimark-float_8s_ease-in-out_infinite] bg-[#19201D]/90 border border-emerald-700/60 rounded-3xl p-6 shadow-2xl backdrop-blur-xl space-y-5 [transform:rotateX(2deg)_rotateY(-5deg)_translateZ(45px)] transition-transform duration-700 hover:[transform:rotateX(0deg)_rotateY(-2deg)_translateZ(60px)]">
               <div className="flex items-center justify-between pb-4 border-b border-emerald-900/60">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 bg-emerald-900/90 rounded-xl border border-emerald-700/50">
