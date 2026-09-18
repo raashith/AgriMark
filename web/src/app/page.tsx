@@ -1,102 +1,71 @@
 'use client';
 
-import React, { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, MapPinned, ShieldCheck, Sparkles, Sprout, Truck, Users } from 'lucide-react';
-import { useI18n } from '@/lib/i18n';
+import { ArrowRight, CheckCircle2, Leaf, Menu, Sparkles, Workflow, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
 
 export default function HomePage() {
   const { t } = useI18n();
   const { isAuthenticated, role, user } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (document.getElementById('agrimark-reference-css')) return;
-    const link = document.createElement('link');
-    link.id = 'agrimark-reference-css';
-    link.rel = 'stylesheet';
-    link.href = '/agrimark-landing-reference.css';
-    document.head.appendChild(link);
-    return () => link.remove();
+    const onResize = () => { if (window.innerWidth >= 901) setMenuOpen(false); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false); };
+    window.addEventListener('resize', onResize);
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('resize', onResize); window.removeEventListener('keydown', onKey); };
   }, []);
 
-  const primaryHref = useMemo(() => {
-    if (isAuthenticated) return role === 'farmer' ? '/farmer/dashboard' : '/buyer/marketplace';
-    return '/auth/register';
-  }, [isAuthenticated, role]);
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [menuOpen]);
 
-  const primaryLabel = useMemo(() => {
-    if (isAuthenticated) return `Open ${(user?.role || role || 'user').toUpperCase()} Workspace`;
-    return t('register');
-  }, [isAuthenticated, role, t, user?.role]);
-
-  const roleLinks = [
-    { title: 'FARMERS', href: '/farmer/dashboard', icon: Sprout, text: 'Grow with field intelligence' },
-    { title: 'BUYERS', href: '/buyer/marketplace', icon: Users, text: 'Source trusted produce' },
-    { title: 'LOGISTICS', href: '/logistics/deliveries', icon: Truck, text: 'Move every order clearly' },
-  ];
+  const primaryHref = useMemo(() => isAuthenticated ? (role === 'farmer' ? '/farmer/dashboard' : '/buyer/marketplace') : '/auth/register', [isAuthenticated, role]);
+  const primaryLabel = isAuthenticated ? `Open ${(user?.role || role || 'user').toUpperCase()} Workspace` : t('register');
 
   return (
-    <main className="agri-reference-stage">
-      <div className="agri-reference-halo" aria-hidden="true" />
-      <div className="agri-reference-nav">
-        <Link href="/" className="agri-reference-brand" aria-label="AgriMark home">agri<span>mark</span></Link>
-        <nav className="agri-reference-links" aria-label="Primary">
-          <a className="active" href="#platform">Platform</a>
-          <a href="#market">Market</a>
-          <a href="#roles">Roles</a>
-          <Link href="/ai-assistant">AgriAI</Link>
-          <Link className="agri-reference-enroll" href={primaryHref}>{isAuthenticated ? 'WORKSPACE' : 'JOIN AGRIMARK'}</Link>
+    <main className={`vesper-landing ${menuOpen ? 'menu-open' : ''}`}>
+      <div className="vesper-photo" aria-hidden="true" />
+      <div className="vesper-scrim" aria-hidden="true" />
+      <div className="vesper-grain" aria-hidden="true" />
+      <header className="vesper-header">
+        <Link href="/" className="vesper-logo" aria-label="AgriMark home"><span className="vesper-logo-mark"><Leaf size={17} /></span><span>AgriMark<span className="vesper-logo-suffix">.ai</span></span></Link>
+        <nav className="vesper-nav" aria-label="Primary">
+          <a href="#benefits" onClick={() => setMenuOpen(false)}>Platform</a>
+          <a href="#how-it-works" onClick={() => setMenuOpen(false)}>How It Works</a>
+          <a href="#ai" onClick={() => setMenuOpen(false)}>AI Insights</a>
+          <a href="#marketplace" onClick={() => setMenuOpen(false)}>Marketplace</a>
         </nav>
-        <div className="md:hidden flex items-center gap-2">
-          <Link href="/auth/login" className="text-white text-xs px-3 py-2 rounded-full border border-white/15">{t('login')}</Link>
+        <div className="vesper-header-actions">
+          <Link href={primaryHref} className="vesper-btn vesper-btn-solid">{isAuthenticated ? 'Workspace' : 'Start for Free'}</Link>
+          <button type="button" className="vesper-burger" aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen} onClick={() => setMenuOpen(v => !v)}>{menuOpen ? <X size={18} /> : <Menu size={18} />}</button>
         </div>
-      </div>
-
-      <section className="agri-reference-main" id="platform">
-        <div className="agri-reference-orb agri-reference-orb-left" aria-hidden="true">
-          <div className="h-full w-full rounded-full border border-emerald-200/20 bg-[radial-gradient(circle_at_35%_30%,#b8e69a,#3e7b54_48%,#0a2618_82%)] shadow-[0_30px_80px_rgba(0,0,0,.45)]" />
-        </div>
-        <div className="agri-reference-orb agri-reference-orb-right" aria-hidden="true">
-          <div className="h-full w-full rounded-full border border-amber-200/15 bg-[radial-gradient(circle_at_35%_30%,#efd58b,#a36c20_48%,#261506_84%)] shadow-[0_30px_80px_rgba(0,0,0,.45)]" />
-        </div>
-        <span className="agri-reference-label agri-reference-label-left">FARMER</span>
-        <span className="agri-reference-label agri-reference-label-right">BUYER</span>
-
-        <div className="agri-reference-copy">
-          <div className="agri-reference-eyebrow">AGRICULTURAL INTELLIGENCE</div>
-          <h1 className="agri-reference-title">AGRIMARK</h1>
-          <div className="agri-reference-rule" />
-          <p className="agri-reference-lede">
-            Connect farms, markets, AI and logistics in one calm digital agriculture experience.
-            Discover produce, understand market signals, trace every lot and move from harvest to trade with confidence.
-          </p>
-          <Link href={primaryHref} className="agri-reference-cta">
-            {primaryLabel.toUpperCase()} <ArrowRight className="ml-2 h-5 w-5" />
-          </Link>
-        </div>
-
-        <div className="agri-reference-stats" id="market">
-          <span className="agri-reference-stat"><ShieldCheck className="inline h-3 w-3 mr-1" /> VERIFIED WORKFLOWS</span>
-          <span className="agri-reference-stat"><MapPinned className="inline h-3 w-3 mr-1" /> LOCATION-AWARE</span>
-          <span className="agri-reference-stat"><Sparkles className="inline h-3 w-3 mr-1" /> AI-ASSISTED</span>
+      </header>
+      <div className={`vesper-menu-backdrop ${menuOpen ? 'is-open' : ''}`} onClick={() => setMenuOpen(false)} aria-hidden="true" />
+      <section className="vesper-hero" id="top">
+        <div className="vesper-copy">
+          <div className="vesper-badge"><Sparkles className="vesper-badge-star" size={17} /><span>Connected Agricultural Intelligence</span></div>
+          <h1>
+            <span>Turn <em>agricultural intelligence</em> into</span>
+            <span>action, from field to market.</span>
+          </h1>
+          <p className="vesper-lede">Deploy intelligent workflows that connect farms, market signals, traceability and logistics across your agricultural operation.</p>
+          <div className="vesper-actions">
+            <Link href={primaryHref} className="vesper-btn vesper-hero-btn vesper-btn-solid">{primaryLabel}<ArrowRight size={16} /></Link>
+            <a href="#how-it-works" className="vesper-btn vesper-hero-btn vesper-btn-ghost">See it in action</a>
+          </div>
         </div>
       </section>
-
-      <section id="roles" className="relative z-[3] px-6 pb-16 md:px-12">
-        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-3 md:grid-cols-3">
-          {roleLinks.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link key={item.title} href={item.href} className="group rounded-2xl border border-white/10 bg-black/15 p-5 backdrop-blur-xl transition hover:-translate-y-1 hover:border-amber-300/25">
-                <div className="flex items-center justify-between"><span className="text-[11px] tracking-[.25em] text-amber-200/70">{item.title}</span><Icon className="h-5 w-5 text-amber-200/80" /></div>
-                <p className="mt-3 text-sm text-white/60">{item.text}</p>
-                <span className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-amber-200">EXPLORE <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
+      <footer className="vesper-stats">
+        <div className="vesper-stat" id="benefits"><span className="vesper-stat-icon"><Workflow size={19} /></span><span>Connected farm-to-market workflows</span></div>
+        <div className="vesper-stat" id="how-it-works"><span className="vesper-stat-icon vesper-stat-tile"><CheckCircle2 size={18} /></span><span>Evidence-first operational intelligence</span></div>
+        <div className="vesper-stat" id="ai"><span className="vesper-avatar-stack"><i className="avatar-a" /><i className="avatar-b" /><i className="avatar-c">A</i></span><span>Built for farmers, buyers &amp; FPOs</span></div>
+      </footer>
+      <span id="marketplace" className="vesper-anchor" />
     </main>
   );
 }
