@@ -4,11 +4,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, normalizePhone, formatAuthError } from '@/lib/auth';
 import { getDefaultAddress } from '@/lib/delivery-addresses';
+import { sendFirstPartyOtp, verifyFirstPartyOtp } from '@/lib/first-party-otp';
 import Link from 'next/link';
 import { Sprout, Smartphone, ArrowRight, ArrowLeft, AlertCircle, ShieldCheck, CheckCircle2 } from 'lucide-react';
 
 export default function LoginPage() {
-  const { user, isAuthenticated, isLoading: authLoading, sendPhoneOtp, verifyPhoneOtp } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
   // Flow step: 'phone' | 'otp'
@@ -16,6 +17,7 @@ export default function LoginPage() {
 
   // Input states
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [challengeId, setChallengeId] = useState<string | null>(null);
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [resendTimer, setResendTimer] = useState<number>(0);
   const [formattedPhoneDisplay, setFormattedPhoneDisplay] = useState('');
@@ -125,9 +127,10 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await sendPhoneOtp(phoneNumber);
+      const res = await sendFirstPartyOtp(phoneNumber);
+      setChallengeId(res.challenge_id);
       setStep('otp');
-      setResendTimer(60);
+      setResendTimer(res.resend_cooldown_seconds || 60);
       setOtpDigits(['', '', '', '', '', '']);
       setFormattedPhoneDisplay(normalized.replace(/(\+\d{2})(\d{5})(\d{5})/, '$1 $2 $3'));
       // Auto-focus first OTP box
@@ -199,7 +202,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const userProfile = await verifyPhoneOtp(phoneNumber, code);
+      const userProfile = await verifyFirstPartyOtp(phoneNumber, code, challengeId || undefined);
       await handlePostAuthRouting(userProfile);
     } catch (err: any) {
       setError(formatAuthError(err.message));

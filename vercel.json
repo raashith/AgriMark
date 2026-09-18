@@ -1,0 +1,4 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "if [ \"$VERCEL_PROJECT_NAME\" = \"agrimark\" ]; then git diff --quiet HEAD^ HEAD -- web/ backend/ database/ scripts/ package.json; else exit 1; fi"
+}

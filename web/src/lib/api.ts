@@ -72,6 +72,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 export const api = {
   login: (data: any) => request<{ access_token: string; refresh_token?: string; token_type: string; user: UserProfile }>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   register: (data: any) => request<any>('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  sendOtp: (data: { phone: string }) => request<{ challenge_id: string; phone_e164: string; expires_at: string; resend_cooldown_seconds: number }>('/auth/otp/send', { method: 'POST', body: JSON.stringify(data) }),
+  verifyOtp: (data: { challenge_id: string; phone: string; otp: string }) => request<{ access_token: string; token_type: string; user: UserProfile }>('/auth/otp/verify', { method: 'POST', body: JSON.stringify(data) }),
   getMe: () => request<UserProfile>('/auth/me'),
   logout: () => request<{ message: string }>('/auth/logout', { method: 'POST' }),
 
