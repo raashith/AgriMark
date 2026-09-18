@@ -1,82 +1,27 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { ArrowRight, MapPinned, ShieldCheck, Sparkles, Sprout, Truck, Users } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
-import {
-  ArrowRight,
-  BarChart3,
-  Bot,
-  Leaf,
-  MapPinned,
-  ShieldCheck,
-  ShoppingCart,
-  Sparkles,
-  Sprout,
-  Truck,
-  Users,
-} from 'lucide-react';
-
-function usePointerDepth() {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const finePointer = window.matchMedia('(pointer: fine)').matches;
-    if (reduceMotion || !finePointer) return;
-
-    let tx = 0;
-    let ty = 0;
-    let x = 0;
-    let y = 0;
-    let raf = 0;
-
-    const onMove = (event: PointerEvent) => {
-      tx = event.clientX / window.innerWidth - 0.5;
-      ty = event.clientY / window.innerHeight - 0.5;
-    };
-
-    const tick = () => {
-      x += (tx - x) * 0.045;
-      y += (ty - y) * 0.045;
-      node.style.setProperty('--mx', x.toFixed(4));
-      node.style.setProperty('--my', y.toFixed(4));
-      raf = requestAnimationFrame(tick);
-    };
-
-    window.addEventListener('pointermove', onMove, { passive: true });
-    tick();
-
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('pointermove', onMove);
-    };
-  }, []);
-
-  return ref;
-}
 
 export default function HomePage() {
   const { t } = useI18n();
   const { isAuthenticated, role, user } = useAuth();
-  const depthRef = usePointerDepth();
-  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 16);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    if (document.getElementById('agrimark-reference-css')) return;
+    const link = document.createElement('link');
+    link.id = 'agrimark-reference-css';
+    link.rel = 'stylesheet';
+    link.href = '/agrimark-landing-reference.css';
+    document.head.appendChild(link);
+    return () => link.remove();
   }, []);
 
   const primaryHref = useMemo(() => {
-    if (isAuthenticated) {
-      return role === 'farmer' ? '/farmer/dashboard' : '/buyer/marketplace';
-    }
+    if (isAuthenticated) return role === 'farmer' ? '/farmer/dashboard' : '/buyer/marketplace';
     return '/auth/register';
   }, [isAuthenticated, role]);
 
@@ -85,201 +30,73 @@ export default function HomePage() {
     return t('register');
   }, [isAuthenticated, role, t, user?.role]);
 
-  const roles = [
-    { title: 'Farmers', icon: Sprout, href: '/farmer/dashboard', body: 'Plan crops, record harvests, list verified lots and follow market signals.' },
-    { title: 'Buyers', icon: ShoppingCart, href: '/buyer/marketplace', body: 'Discover produce, compare price intelligence and place direct orders.' },
-    { title: 'FPO / Co-op', icon: Users, href: '/fpo/dashboard', body: 'Aggregate supply, coordinate members and manage bulk trade workflows.' },
-    { title: 'Logistics', icon: Truck, href: '/logistics/deliveries', body: 'Coordinate pickups, delivery jobs and live movement updates.' },
+  const roleLinks = [
+    { title: 'FARMERS', href: '/farmer/dashboard', icon: Sprout, text: 'Grow with field intelligence' },
+    { title: 'BUYERS', href: '/buyer/marketplace', icon: Users, text: 'Source trusted produce' },
+    { title: 'LOGISTICS', href: '/logistics/deliveries', icon: Truck, text: 'Move every order clearly' },
   ];
 
   return (
-    <main ref={depthRef} className="cinematic-landing relative overflow-hidden">
-      <div className="cinematic-noise" aria-hidden="true" />
-      <div className="cinematic-depth-bg" aria-hidden="true">
-        <div className="depth-blob depth-blob-one" />
-        <div className="depth-blob depth-blob-two" />
-        <div className="depth-grid" />
+    <main className="agri-reference-stage">
+      <div className="agri-reference-halo" aria-hidden="true" />
+      <div className="agri-reference-nav">
+        <Link href="/" className="agri-reference-brand" aria-label="AgriMark home">agri<span>mark</span></Link>
+        <nav className="agri-reference-links" aria-label="Primary">
+          <a className="active" href="#platform">Platform</a>
+          <a href="#market">Market</a>
+          <a href="#roles">Roles</a>
+          <Link href="/ai-assistant">AgriAI</Link>
+          <Link className="agri-reference-enroll" href={primaryHref}>{isAuthenticated ? 'WORKSPACE' : 'JOIN AGRIMARK'}</Link>
+        </nav>
+        <div className="md:hidden flex items-center gap-2">
+          <Link href="/auth/login" className="text-white text-xs px-3 py-2 rounded-full border border-white/15">{t('login')}</Link>
+        </div>
       </div>
-      <div className="hero-orbit hero-orbit-a" aria-hidden="true" />
-      <div className="hero-orbit hero-orbit-b" aria-hidden="true" />
-      <div className="hero-glow hero-glow-a" aria-hidden="true" />
-      <div className="hero-glow hero-glow-b" aria-hidden="true" />
 
-      <nav className={`cinematic-nav ${scrolled ? 'cinematic-nav-scrolled' : ''}`}>
-        <Link href="/" className="brand-lockup" aria-label="AgriMark home">
-          <span className="brand-mark"><Leaf className="h-5 w-5" /></span>
-          <span>
-            <strong>AgriMark</strong>
-            <small>AGRICULTURAL INTELLIGENCE</small>
-          </span>
-        </Link>
-        <div className="hidden md:flex items-center gap-7 text-sm text-emerald-100/75">
-          <a href="#platform">Platform</a>
-          <a href="#intelligence">Intelligence</a>
-          <a href="#ecosystem">Ecosystem</a>
-          <Link href="/about">About</Link>
+      <section className="agri-reference-main" id="platform">
+        <div className="agri-reference-orb agri-reference-orb-left" aria-hidden="true">
+          <div className="h-full w-full rounded-full border border-emerald-200/20 bg-[radial-gradient(circle_at_35%_30%,#b8e69a,#3e7b54_48%,#0a2618_82%)] shadow-[0_30px_80px_rgba(0,0,0,.45)]" />
         </div>
-        <div className="flex items-center gap-2">
-          <Link href="/auth/login" className="cinematic-nav-link">{t('login')}</Link>
-          <Link href={primaryHref} className="cinematic-nav-cta">{isAuthenticated ? 'Workspace' : t('register')}</Link>
+        <div className="agri-reference-orb agri-reference-orb-right" aria-hidden="true">
+          <div className="h-full w-full rounded-full border border-amber-200/15 bg-[radial-gradient(circle_at_35%_30%,#efd58b,#a36c20_48%,#261506_84%)] shadow-[0_30px_80px_rgba(0,0,0,.45)]" />
         </div>
-      </nav>
+        <span className="agri-reference-label agri-reference-label-left">FARMER</span>
+        <span className="agri-reference-label agri-reference-label-right">BUYER</span>
 
-      <section className="hero-stage">
-        <div className="hero-copy-wrap">
-          <div className="hero-eyebrow">
-            <span className="pulse-dot" />
-            <span>REAL-TIME FARM • MARKET • LOGISTICS INTELLIGENCE</span>
-          </div>
-
-          <div className="hero-title-wrap">
-            <p className="hero-kicker">THE DIGITAL AGRICULTURAL OPERATING SYSTEM</p>
-            <h1 className="hero-title">
-              <span className="hero-title-line">From <em>soil</em></span>
-              <span className="hero-title-line hero-title-accent">to smart trade.</span>
-            </h1>
-            <p className="hero-description">
-              AgriMark connects farmers, buyers, FPOs and logistics through trusted market intelligence,
-              traceable produce workflows and AI-assisted agricultural decisions.
-            </p>
-          </div>
-
-          <div className="hero-actions">
-            <Link href={primaryHref} className="hero-primary">
-              <span>{primaryLabel}</span>
-              <ArrowRight className="h-5 w-5" />
-            </Link>
-            <a href="#platform" className="hero-secondary">
-              Explore platform
-              <Sparkles className="h-4 w-4" />
-            </a>
-          </div>
-
-          <div className="hero-trust-row">
-            <span><ShieldCheck className="h-4 w-4" /> Verified workflows</span>
-            <span><MapPinned className="h-4 w-4" /> Location-aware delivery</span>
-            <span><Bot className="h-4 w-4" /> AI decision support</span>
-          </div>
+        <div className="agri-reference-copy">
+          <div className="agri-reference-eyebrow">AGRICULTURAL INTELLIGENCE</div>
+          <h1 className="agri-reference-title">AGRIMARK</h1>
+          <div className="agri-reference-rule" />
+          <p className="agri-reference-lede">
+            Connect farms, markets, AI and logistics in one calm digital agriculture experience.
+            Discover produce, understand market signals, trace every lot and move from harvest to trade with confidence.
+          </p>
+          <Link href={primaryHref} className="agri-reference-cta">
+            {primaryLabel.toUpperCase()} <ArrowRight className="ml-2 h-5 w-5" />
+          </Link>
         </div>
 
-        <div className="hero-visual" aria-hidden="true">
-          <div className="hero-visual-backdrop" />
-          <div className="hero-ring hero-ring-outer" />
-          <div className="hero-ring hero-ring-inner" />
-          <div className="hero-card hero-card-float">
-            <div className="hero-card-top">
-              <div>
-                <span>AGRI COMMAND</span>
-                <strong>Today&apos;s field signal</strong>
-              </div>
-              <span className="hero-live-dot">LIVE</span>
-            </div>
-            <div className="hero-metric"><strong>+18.6%</strong><span>Tomato reference</span></div>
-            <div className="mini-chart">
-              <i /><i /><i /><i /><i /><i /><i /><i /><i />
-            </div>
-            <div className="hero-card-grid">
-              <div><small>Harvest</small><b>86%</b></div>
-              <div><small>Demand</small><b>High</b></div>
-              <div><small>Trace</small><b>100%</b></div>
-            </div>
-          </div>
-          <div className="hero-chip chip-one"><Sprout className="h-4 w-4" /><span>Field health</span><b>92%</b></div>
-          <div className="hero-chip chip-two"><BarChart3 className="h-4 w-4" /><span>Market pulse</span><b>+12.4%</b></div>
-          <div className="hero-chip chip-three"><Truck className="h-4 w-4" /><span>Dispatch</span><b>On route</b></div>
-          <div className="hero-flare" />
+        <div className="agri-reference-stats" id="market">
+          <span className="agri-reference-stat"><ShieldCheck className="inline h-3 w-3 mr-1" /> VERIFIED WORKFLOWS</span>
+          <span className="agri-reference-stat"><MapPinned className="inline h-3 w-3 mr-1" /> LOCATION-AWARE</span>
+          <span className="agri-reference-stat"><Sparkles className="inline h-3 w-3 mr-1" /> AI-ASSISTED</span>
         </div>
       </section>
 
-      <section id="platform" className="section-shell">
-        <div className="section-heading">
-          <span className="section-number">01</span>
-          <div>
-            <p className="section-kicker">ONE CONNECTED FLOW</p>
-            <h2>Every agricultural role, in one operating layer.</h2>
-          </div>
-        </div>
-
-        <div className="role-grid">
-          {roles.map((item) => (
-            <Link key={item.title} href={item.href} className="role-3d-card">
-              <div className="role-icon"><item.icon className="h-6 w-6" /></div>
-              <div>
-                <span className="role-label">AGRIMARK ROLE</span>
-                <h3>{item.title}</h3>
-                <p>{item.body}</p>
-              </div>
-              <ArrowRight className="role-arrow h-5 w-5" />
-            </Link>
-          ))}
+      <section id="roles" className="relative z-[3] px-6 pb-16 md:px-12">
+        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-3 md:grid-cols-3">
+          {roleLinks.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link key={item.title} href={item.href} className="group rounded-2xl border border-white/10 bg-black/15 p-5 backdrop-blur-xl transition hover:-translate-y-1 hover:border-amber-300/25">
+                <div className="flex items-center justify-between"><span className="text-[11px] tracking-[.25em] text-amber-200/70">{item.title}</span><Icon className="h-5 w-5 text-amber-200/80" /></div>
+                <p className="mt-3 text-sm text-white/60">{item.text}</p>
+                <span className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-amber-200">EXPLORE <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></span>
+              </Link>
+            );
+          })}
         </div>
       </section>
-
-      <section id="intelligence" className="section-shell intelligence-section">
-        <div className="intelligence-panel">
-          <div className="intelligence-copy">
-            <span className="section-kicker">MARKET INTELLIGENCE</span>
-            <h2>See the market before you make the move.</h2>
-            <p>
-              Surface observed mandi prices, farmer listing data and clearly-labelled AI signals in one visual layer.
-              Keep evidence, timestamps and confidence visible instead of hiding them behind a black box.
-            </p>
-            <Link href="/market-prices" className="text-link">Open market intelligence <ArrowRight className="h-4 w-4" /></Link>
-          </div>
-          <div className="signal-stack">
-            <div className="signal-card signal-card-main">
-              <div className="signal-label"><span>MARKET PULSE</span><b>LIVE</b></div>
-              <div className="signal-price">₹ 4,860 <small>/ quintal</small></div>
-              <div className="signal-line"><span /><span /><span /><span /><span /></div>
-              <div className="signal-footer"><span>Reference range</span><b>+12.4%</b></div>
-            </div>
-            <div className="signal-card signal-card-side side-a"><span>AI CONFIDENCE</span><strong>87%</strong></div>
-            <div className="signal-card signal-card-side side-b"><span>TRACEABILITY</span><strong>100%</strong></div>
-          </div>
-        </div>
-      </section>
-
-      <section id="ecosystem" className="section-shell ecosystem-section">
-        <div className="section-heading">
-          <span className="section-number">02</span>
-          <div>
-            <p className="section-kicker">BUILT FOR THE REAL FIELD</p>
-            <h2>Designed to feel calm when the work is complex.</h2>
-          </div>
-        </div>
-
-        <div className="feature-grid">
-          {[
-            ['01', 'Trace every lot', 'Harvest, quality, listing and transaction context stay connected.'],
-            ['02', 'Act on evidence', 'Market observations and AI signals remain visibly separated.'],
-            ['03', 'Move with confidence', 'Orders, pickup workflows and delivery status stay in one system.'],
-          ].map(([number, title, body]) => (
-            <article className="feature-3d-card" key={number}>
-              <span>{number}</span>
-              <h3>{title}</h3>
-              <p>{body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="final-cta">
-        <div className="final-cta-orb" aria-hidden="true" />
-        <div>
-          <span className="section-kicker">AGRIMARK • CONNECTED AGRICULTURE</span>
-          <h2>Turn field data into the next smart move.</h2>
-          <p>Start with a farmer, buyer, FPO or logistics workflow and grow from there.</p>
-        </div>
-        <Link href={primaryHref} className="hero-primary">
-          <span>{primaryLabel}</span>
-          <ArrowRight className="h-5 w-5" />
-        </Link>
-      </section>
-
-      <footer className="cinematic-footer">
-        <span>© AgriMark</span>
-        <span>Farm • Market • AI • Traceability • Logistics</span>
-      </footer>
     </main>
   );
 }
