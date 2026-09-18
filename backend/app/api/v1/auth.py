@@ -78,8 +78,11 @@ def verify_otp(request: VerifyOtpRequest):
             }
             try:
                 get_supabase().table("profiles").upsert(profile_data).execute()
-            except Exception:
-                pass
+            except Exception as err:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Unable to establish user profile. Please try again."
+                ) from err
 
         return {
             "access_token": f"agrimark_token_{profile_data['id']}",

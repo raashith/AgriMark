@@ -177,13 +177,27 @@ export async function deleteDeliveryAddress(id: string): Promise<void> {
     throw new Error(`Failed to delete address: ${error.message}`);
   }
 
-  // If deleted address was default, promote remaining address
+  // Update local cache for remaining addresses
   const remaining = addresses.filter((a) => a.id !== id);
+  persistAddressesLocally(remaining);
+
+  if (typeof window !== 'undefined') {
+    const rawStored = localStorage.getItem(ADDRESS_STORAGE_KEY);
+    if (rawStored) {
+      try {
+        const parsed = JSON.parse(rawStored);
+        if (parsed?.id === id) {
+          localStorage.removeItem(ADDRESS_STORAGE_KEY);
+        }
+      } catch {
+        localStorage.removeItem(ADDRESS_STORAGE_KEY);
+      }
+    }
+  }
+
+  // If deleted address was default, promote remaining address
   if (target?.is_default && remaining.length > 0) {
     await setDefaultAddress(remaining[0].id);
-  } else if (remaining.length === 0 && typeof window !== 'undefined') {
-    localStorage.removeItem(ADDRESS_STORAGE_KEY);
-    localStorage.removeItem('agrimark_delivery_addresses');
   }
 }
 
@@ -193,16 +207,22 @@ export async function setDefaultAddress(addressId: string): Promise<void> {
 
   const addresses = await getDeliveryAddresses();
   const target = addresses.find((a) => a.id === addressId);
-  if (target && typeof window !== 'undefined') {
-    localStorage.setItem(ADDRESS_STORAGE_KEY, JSON.stringify({ ...target, is_default: true }));
+
+  if (!userId) {
+    if (target && typeof window !== 'undefined') {
+      localStorage.setItem(ADDRESS_STORAGE_KEY, JSON.stringify({ ...target, is_default: true }));
+    }
+    return;
   }
 
-  if (!userId) return;
-
-  await supabase
+  const { error: resetError } = await supabase
     .from('delivery_addresses')
     .update({ is_default: false })
     .eq('user_id', userId);
+
+  if (resetError) {
+    throw new Error(`Failed to reset default address: ${resetError.message}`);
+  }
 
   const { error } = await supabase
     .from('delivery_addresses')
@@ -212,6 +232,10 @@ export async function setDefaultAddress(addressId: string): Promise<void> {
 
   if (error) {
     throw new Error(`Failed to set default address: ${error.message}`);
+  }
+
+  if (target && typeof window !== 'undefined') {
+    localStorage.setItem(ADDRESS_STORAGE_KEY, JSON.stringify({ ...target, is_default: true }));
   }
 }
 

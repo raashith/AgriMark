@@ -246,9 +246,10 @@ export const LocationSelectorModal: React.FC<LocationSelectorModalProps> = ({
               </button>
               <button
                 onClick={handleConfirmDelete}
-                className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-2xl text-xs font-bold shadow"
+                disabled={deletingId === addressToDelete.id}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-2xl text-xs font-bold shadow"
               >
-                Delete
+                {deletingId === addressToDelete.id ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
