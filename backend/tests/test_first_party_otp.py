@@ -4,138 +4,151 @@ import secrets
 import hmac
 import hashlib
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
 
 from backend.app.services.otp_service import (
-  OtpManager,
-  MockDeliveryProvider,
-  normalize_phone,
-  validate_coordinates,
+    OtpManager,
+    MockDeliveryProvider,
+    normalize_phone,
+    validate_coordinates,
 )
 
-# Secret used for testing HMAC
 TEST_HMAC_SECRET = "test_hmac_secret_key_agrimark_123456"
 
-@pytest.fixture
-def otp_manager():
+@pytest.fixture(autouse=True)
+def reset_otp_store():
     OtpManager.reset_store()
-    return OtpManager
+    yield
+    OtpManager.reset_store()
 
 # =====================================================================
 # AUTH TESTS (1 - 17)
 # =====================================================================
 
-def test_1_otp_generation_uses_secure_randomness(otp_manager):
-    """1. OTP generation uses secure randomness (secrets module)."""
-    otp1 = otp_manager.generate_otp_code()
-    otp2 = otp_manager.generate_otp_code()
+def test_1_otp_generation_uses_secure_randomness():
+    """1. OTP generation uses secure randomness."""
+    otp1 = OtpManager.generate_otp_code()
+    otp2 = OtpManager.generate_otp_code()
     assert len(otp1) == 6
     assert len(otp2) == 6
     assert otp1.isdigit()
 
-def test_2_otp_is_exactly_6_digits(otp_manager):
+def test_2_otp_is_exactly_6_digits():
     """2. OTP is exactly 6 digits."""
     for _ in range(100):
-        code = otp_manager.generate_otp_code()
+        code = OtpManager.generate_otp_code()
         assert len(code) == 6
         assert code.isdigit()
         assert 0 <= int(code) <= 999999
 
-def test_3_otp_hash_is_stored_not_plaintext(otp_manager):
+def test_3_otp_hash_is_stored_not_plaintext():
     """3. OTP hash is stored using HMAC-SHA-256, plaintext is not stored."""
     phone = "+919876543210"
-    challenge_id = "test-challenge-uuid-123"
-    otp = "123456"
-    
-    otp_hash = otp_manager.compute_otp_hash(phone, challenge_id, otp)
-    assert otp not in otp_hash
-    assert len(otp_hash) == 64  # Hex string of SHA-256
+    challenge, code = OtpManager.create_challenge(phone)
+    assert code not in challenge.otp_hash
+    assert len(challenge.otp_hash) == 64
 
-def test_4_otp_expires_after_5_minutes(otp_manager):
+def test_4_otp_expires_after_5_minutes():
     """4. OTP expires after 5 minutes (300 seconds)."""
+    phone = "+919876543210"
+    challenge, _ = OtpManager.create_challenge(phone, ttl_minutes=5)
     now = datetime.now(timezone.utc)
-    expires_at = now + timedelta(seconds=300)
-    assert (expires_at - now).seconds == 300
+    assert (challenge.expires_at - challenge.created_at).total_seconds() == 300
 
-def test_5_expired_otp_cannot_authenticate(otp_manager):
+def test_5_expired_otp_cannot_authenticate():
     """5. Expired OTP cannot authenticate."""
-    past = datetime.now(timezone.utc) - timedelta(seconds=10)
-    challenge = {
-        "id": "c1",
-        "phone_e164": "+919876543210",
-        "expires_at": past.isoformat(),
-        "consumed_at": None,
-        "locked_until": None,
-        "attempt_count": 0,
-        "max_attempts": 5,
-        "otp_hash": otp_manager.compute_otp_hash("+919876543210", "c1", "123456"),
-    }
-    
-    # Mocking check on expired challenge
-    now = datetime.now(timezone.utc)
-    exp = datetime.fromisoformat(challenge["expires_at"].replace("Z", "+00:00"))
-    assert now > exp
+    phone = "+919876543210"
+    challenge, code = OtpManager.create_challenge(phone, ttl_minutes=-1) # Expired 1 min ago
+    with pytest.raises(ValueError, match="expired"):
+        OtpManager.verify_challenge(challenge.id, phone, code)
 
-def test_6_successful_otp_is_consumed(otp_manager):
+def test_6_successful_otp_is_consumed():
     """6. Successful OTP is atomically marked as consumed."""
-    now_iso = datetime.now(timezone.utc).isoformat()
-    challenge = {
-        "id": "c2",
-        "consumed_at": now_iso
-    }
-    assert challenge["consumed_at"] is not None
+    phone = "+919876543210"
+    challenge, code = OtpManager.create_challenge(phone)
+    success = OtpManager.verify_challenge(challenge.id, phone, code)
+    assert success is True
+    assert challenge.consumed_at is not None
 
-def test_7_consumed_otp_cannot_be_reused(otp_manager):
+def test_7_consumed_otp_cannot_be_reused():
     """7. Consumed OTP cannot be reused."""
-    challenge = {
-        "id": "c3",
-        "consumed_at": datetime.now(timezone.utc).isoformat()
-    }
-    assert challenge["consumed_at"] is not None, "Challenge is already consumed"
+    phone = "+919876543210"
+    challenge, code = OtpManager.create_challenge(phone)
+    OtpManager.verify_challenge(challenge.id, phone, code)
+    with pytest.raises(ValueError, match="already been used"):
+        OtpManager.verify_challenge(challenge.id, phone, code)
 
-def test_8_maximum_5_verification_attempts(otp_manager):
+def test_8_maximum_5_verification_attempts():
     """8. Maximum 5 verification attempts per challenge."""
-    challenge = {
-        "attempt_count": 5,
-        "max_attempts": 5,
-    }
-    assert challenge["attempt_count"] >= challenge["max_attempts"]
+    phone = "+919876543210"
+    challenge, code = OtpManager.create_challenge(phone)
+    for _ in range(5):
+        with pytest.raises(ValueError, match="Incorrect verification code"):
+            OtpManager.verify_challenge(challenge.id, phone, "000000")
+    
+    with pytest.raises(ValueError, match="Maximum verification attempts exceeded"):
+        OtpManager.verify_challenge(challenge.id, phone, code)
 
-def test_9_resend_cooldown_60_seconds(otp_manager):
+def test_9_resend_cooldown_60_seconds():
     """9. Resend cooldown 60 seconds minimum."""
-    recent_created = datetime.now(timezone.utc) - timedelta(seconds=30)
-    time_diff = (datetime.now(timezone.utc) - recent_created).seconds
-    assert time_diff < 60  # Cooldown still active
+    phone = "+919876543210"
+    OtpManager.create_challenge(phone)
+    with pytest.raises(ValueError, match="wait 60 seconds"):
+        OtpManager.create_challenge(phone)
 
-def test_10_hourly_phone_rate_limit(otp_manager):
+def test_10_hourly_phone_rate_limit():
     """10. Maximum 5 OTP sends per hour per phone."""
-    sends_last_hour = 5
-    max_hourly_sends = 5
-    assert sends_last_hour >= max_hourly_sends
-
-def test_11_daily_phone_rate_limit(otp_manager):
-    """11. Maximum 10 OTP sends per 24 hours per phone."""
-    sends_last_24h = 10
-    max_daily_sends = 10
-    assert sends_last_24h >= max_daily_sends
-
-def test_12_ip_rate_limit(otp_manager):
-    """12. Maximum 10 OTP requests per hour per IP."""
-    sends_last_hour_ip = 10
-    max_ip_sends = 10
-    assert sends_last_hour_ip >= max_ip_sends
-
-def test_13_lockout_behavior(otp_manager):
-    """13. Lockout behavior after repeated failed verifications."""
-    lock_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+    phone = "+919876543210"
     now = datetime.now(timezone.utc)
-    assert lock_until > now
+    for i in range(5):
+        c, _ = OtpManager.create_challenge(phone, ttl_minutes=5)
+        # Fast-forward created_at by 61 seconds each to bypass 60s resend cooldown
+        c.created_at = now - timedelta(seconds=3600 - (i * 61))
+    
+    with pytest.raises(ValueError, match="Unable to send a verification code right now"):
+        OtpManager.create_challenge(phone)
 
-def test_14_concurrent_verification_cannot_double_authenticate(otp_manager):
-    """14. Guarded update prevents concurrent double-authentication."""
-    # Simulated atomic update query logic: UPDATE auth_otp_challenges SET consumed_at = NOW() WHERE id = ? AND consumed_at IS NULL
-    query_condition = "consumed_at IS NULL"
-    assert "consumed_at IS NULL" in query_condition
+def test_11_daily_phone_rate_limit():
+    """11. Maximum 10 OTP sends per 24 hours per phone."""
+    phone = "+919876543210"
+    now = datetime.now(timezone.utc)
+    for i in range(10):
+        c, _ = OtpManager.create_challenge(phone, ttl_minutes=5)
+        c.created_at = now - timedelta(minutes=1400 - (i * 100))
+
+    with pytest.raises(ValueError, match="Unable to send a verification code right now"):
+        OtpManager.create_challenge(phone)
+
+def test_12_ip_rate_limit():
+    """12. Maximum 10 OTP requests per hour per IP."""
+    ip = "192.168.1.100"
+    now = datetime.now(timezone.utc)
+    for i in range(10):
+        phone = f"+91987654320{i}"
+        c, _ = OtpManager.create_challenge(phone, ip_address=ip)
+        c.created_at = now - timedelta(minutes=50)
+
+    with pytest.raises(ValueError, match="Unable to send a verification code right now"):
+        OtpManager.create_challenge("+919999999999", ip_address=ip)
+
+def test_13_lockout_behavior():
+    """13. Lockout behavior after repeated failed verifications."""
+    phone = "+919876543210"
+    challenge, _ = OtpManager.create_challenge(phone)
+    for _ in range(5):
+        try:
+            OtpManager.verify_challenge(challenge.id, phone, "000000")
+        except ValueError:
+            pass
+    assert challenge.attempt_count >= 5
+
+def test_14_concurrent_verification_cannot_double_authenticate():
+    """14. Guarded single-use check prevents double authentication."""
+    phone = "+919876543210"
+    challenge, code = OtpManager.create_challenge(phone)
+    res1 = OtpManager.verify_challenge(challenge.id, phone, code)
+    assert res1 is True
+    with pytest.raises(ValueError, match="already been used"):
+        OtpManager.verify_challenge(challenge.id, phone, code)
 
 def test_15_phone_normalization():
     """15. Phone normalization for E.164 Indian mobile format."""
@@ -211,7 +224,7 @@ def test_26_manual_fallback():
     assert step == "form"
 
 # =====================================================================
-# ADDRESS TESTS (27 - 37)
+# ADDRESS & CHECKOUT INTEGRITY TESTS (27 - 42)
 # =====================================================================
 
 def test_27_create_address():
@@ -292,7 +305,6 @@ def test_36_deleting_default_selects_replacement():
         {"id": "a1", "is_default": True},
         {"id": "a2", "is_default": False}
     ]
-    # Delete a1
     addresses = [a for a in addresses if a["id"] != "a1"]
     if addresses and not any(a["is_default"] for a in addresses):
         addresses[0]["is_default"] = True
@@ -304,10 +316,6 @@ def test_37_deleting_last_address_results_in_no_address_state():
     addresses = [{"id": "a1", "is_default": True}]
     addresses = [a for a in addresses if a["id"] != "a1"]
     assert len(addresses) == 0
-
-# =====================================================================
-# CHECKOUT TESTS (38 - 42)
-# =====================================================================
 
 def test_38_authenticated_user_can_use_own_address():
     """38. Authenticated user can use own delivery address for checkout."""
