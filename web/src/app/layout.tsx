@@ -1,22 +1,19 @@
 import './globals.css';
+import './vesper-landing.css';
 import React from 'react';
 import { I18nProvider } from '@/lib/i18n';
 import { AuthProvider } from '@/lib/auth';
 import { AppShell } from '@/components/layout/AppShell';
 
 export const metadata = {
-  title: 'AgriMark — National Agricultural Intelligence, Commerce & Trade OS',
-  description: 'Production-ready agricultural ecosystem connecting farmers, buyers, FPOs, logistics, service providers, and administrators.',
+  title: 'AgriMark — Agricultural Intelligence',
+  description: 'Connect farms, markets, AI and logistics in one agricultural intelligence platform.',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="bg-[#0a0f0d] text-gray-100 min-h-screen">
+      <body className="bg-black text-white min-h-screen" style={{ background: '#000', color: '#fff' }}>
         <I18nProvider>
           <AuthProvider>
             <AppShell>{children}</AppShell>
@@ -26,4 +23,3 @@ export default function RootLayout({
     </html>
   );
 }
-
