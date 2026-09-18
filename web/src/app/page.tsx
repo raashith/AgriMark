@@ -95,6 +95,23 @@ export default function HomePage() {
   return (
     <main ref={depthRef} className="cinematic-landing relative overflow-hidden">
       <div className="cinematic-noise" aria-hidden="true" />
+      <div className="rain-canvas" aria-hidden="true">
+        <div className="moon" />
+        <div className="moon-haze" />
+        <div className="mountain mountain-back" />
+        <div className="mountain mountain-mid" />
+        <div className="mountain mountain-front" />
+        <div className="tree-line">
+          {Array.from({ length: 24 }).map((_, i) => <span key={i} className="tree" style={{ ['--i' as string]: i } as React.CSSProperties} />)}
+        </div>
+        <div className="field-plane">
+          {Array.from({ length: 26 }).map((_, i) => <span key={i} className="crop-row" style={{ ['--i' as string]: i } as React.CSSProperties} />)}
+        </div>
+        <div className="puddle-glow" />
+        <div className="rain-streaks" />
+        <div className="rain-streaks rain-streaks-far" />
+        <div className="mist-band" />
+      </div>
       <div className="hero-orbit hero-orbit-a" aria-hidden="true" />
       <div className="hero-orbit hero-orbit-b" aria-hidden="true" />
       <div className="hero-glow hero-glow-a" aria-hidden="true" />
