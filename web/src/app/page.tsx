@@ -1,14 +1,24 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Leaf, MapPinned, ShieldCheck, Sparkles, Sprout, Truck, Users } from 'lucide-react';
+import { ArrowRight, MapPinned, ShieldCheck, Sparkles, Sprout, Truck, Users } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 
 export default function HomePage() {
   const { t } = useI18n();
   const { isAuthenticated, role, user } = useAuth();
+
+  useEffect(() => {
+    if (document.getElementById('agrimark-reference-css')) return;
+    const link = document.createElement('link');
+    link.id = 'agrimark-reference-css';
+    link.rel = 'stylesheet';
+    link.href = '/agrimark-landing-reference.css';
+    document.head.appendChild(link);
+    return () => link.remove();
+  }, []);
 
   const primaryHref = useMemo(() => {
     if (isAuthenticated) return role === 'farmer' ? '/farmer/dashboard' : '/buyer/marketplace';
@@ -35,7 +45,7 @@ export default function HomePage() {
           <a className="active" href="#platform">Platform</a>
           <a href="#market">Market</a>
           <a href="#roles">Roles</a>
-          <a href="/ai-assistant">AgriAI</a>
+          <Link href="/ai-assistant">AgriAI</Link>
           <Link className="agri-reference-enroll" href={primaryHref}>{isAuthenticated ? 'WORKSPACE' : 'JOIN AGRIMARK'}</Link>
         </nav>
         <div className="md:hidden flex items-center gap-2">
