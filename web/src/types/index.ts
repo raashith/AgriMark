@@ -1,5 +1,27 @@
 export type UserRole = 'farmer' | 'fpo' | 'buyer' | 'logistics' | 'service_provider' | 'admin';
 
+export interface DeliveryAddress {
+  id: string;
+  user_id: string;
+  label: 'Home' | 'Farm' | 'Other' | string;
+  full_name: string;
+  phone: string;
+  house_number: string;
+  street: string;
+  area: string;
+  landmark?: string | null;
+  city: string;
+  state: string;
+  postal_code: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  location_accuracy?: number | null;
+  is_default: boolean;
+  delivery_instructions?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface UserProfile {
   id: string;
   email?: string;
@@ -14,6 +36,7 @@ export interface UserProfile {
   avatar_url?: string;
   kyc_status?: 'unverified' | 'pending' | 'verified' | 'rejected';
   needs_onboarding?: boolean;
+  default_address?: DeliveryAddress | null;
   created_at?: string;
 }
 
