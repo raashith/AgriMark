@@ -1,3 +1,4 @@
 {
-  "ignoreCommand": "if [ \"$VERCEL_PROJECT_NAME\" = \"stitch-app\" ]; then exit 1; else exit 0; fi"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "if [ \"$VERCEL_PROJECT_NAME\" = \"agrimark\" ]; then git diff --quiet HEAD^ HEAD -- web/ backend/ database/ scripts/ package.json; else exit 1; fi"
 }
