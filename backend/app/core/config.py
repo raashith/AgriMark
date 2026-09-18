@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     supabase_service_role_key: str | None = None
     supabase_publishable_key: str | None = None
     openai_api_key: str | None = None
-    cors_origins: str = "https://agrimark-six.vercel.app,http://localhost:5173,http://localhost:3000"
+    cors_origins: str = "https://agrimark-six.vercel.app,https://agrimark-stitch-web.onrender.com,http://localhost:5173,http://localhost:3000"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
