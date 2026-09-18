@@ -167,9 +167,13 @@ describe('One-default invariant', () => {
 
 describe('deleteDeliveryAddress', () => {
   it('deletes address from Supabase', async () => {
-    mockDelete.mockReturnThis();
-    mockEq.mockReturnThis();
-    mockEq.mockResolvedValue({ error: null });
+    const chain: any = {
+      eq: jest.fn(),
+    };
+    chain.eq.mockReturnValue(chain);
+    chain.then = (resolve: any) => resolve({ error: null });
+
+    mockDelete.mockReturnValue(chain);
 
     const { deleteDeliveryAddress } = await import('../lib/delivery-addresses');
     await expect(deleteDeliveryAddress('addr-001')).resolves.not.toThrow();

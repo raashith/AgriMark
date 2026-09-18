@@ -94,7 +94,10 @@ class OtpChallenge:
 class OtpManager:
     @classmethod
     def get_server_secret(cls) -> bytes:
-        secret = os.getenv("AGRI_OTP_SECRET", "agrimark_production_otp_secret_key_2026")
+        secret = os.getenv("AGRI_OTP_SECRET") or os.getenv("JWT_SECRET") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        if not secret:
+            # Fallback for non-production unit testing environments
+            secret = "agrimark_production_otp_secret_key_2026"
         return secret.encode("utf-8")
 
     # In-memory challenge repository with rate limiting counters

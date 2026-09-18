@@ -27,6 +27,10 @@ export async function sendFirstPartyOtp(phone: string): Promise<SendOtpResult> {
       };
     }
   } catch (err: any) {
+    const isNetworkError = err?.statusCode === 0 || err?.message === 'Failed to fetch' || err?.name === 'TypeError';
+    if (!isNetworkError) {
+      throw new Error(formatAuthError(err?.message || 'Failed to send OTP code.'));
+    }
     console.warn('[AgriMark OTP] Primary API send failed, trying Supabase auth fallback:', err?.message);
   }
 
@@ -75,7 +79,7 @@ export async function verifyFirstPartyOtp(
       }
     } catch (err: any) {
       // Re-throw authentication rejections (e.g. 400 bad request / incorrect OTP / expired)
-      const isNetworkError = err?.message === 'Failed to fetch' || err?.name === 'TypeError';
+      const isNetworkError = err?.statusCode === 0 || err?.message === 'Failed to fetch' || err?.name === 'TypeError';
       if (!isNetworkError) {
         throw new Error(formatAuthError(err?.message || 'OTP verification failed.'));
       }

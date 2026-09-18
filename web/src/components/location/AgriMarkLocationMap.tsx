@@ -121,6 +121,7 @@ export function AgriMarkLocationMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
+  const lastEmittedRef = useRef<{ lat: number; lng: number } | null>(null);
   const onPinChangeRef = useRef(onPinChange);
 
   // Keep callback ref fresh without re-running map effects
@@ -175,21 +176,32 @@ export function AgriMarkLocationMap({
         .setLngLat([center.lng, center.lat])
         .addTo(map);
 
+      const notifyPinChange = (lat: number, lng: number) => {
+        lastEmittedRef.current = { lat, lng };
+        onPinChangeRef.current(lat, lng);
+      };
+
       marker.on('drag', () => {
         const { lng: mLng, lat: mLat } = marker.getLngLat();
-        onPinChangeRef.current(mLat, mLng);
+        notifyPinChange(mLat, mLng);
       });
 
       marker.on('dragend', () => {
         const { lng: mLng, lat: mLat } = marker.getLngLat();
-        onPinChangeRef.current(mLat, mLng);
+        notifyPinChange(mLat, mLng);
       });
 
       // Clicking map moves the pin
       map.on('click', (e) => {
         marker.setLngLat(e.lngLat);
-        onPinChangeRef.current(e.lngLat.lat, e.lngLat.lng);
+        notifyPinChange(e.lngLat.lat, e.lngLat.lng);
       });
+
+      if (cancelled) {
+        marker.remove();
+        map.remove();
+        return;
+      }
 
       mapRef.current = map;
       markerRef.current = marker;
@@ -214,6 +226,16 @@ export function AgriMarkLocationMap({
     const map = mapRef.current;
     const marker = markerRef.current;
     if (!map || !marker) return;
+
+    // Check if update came from pin drag to prevent flyTo stutter
+    const lastEmitted = lastEmittedRef.current;
+    if (
+      lastEmitted &&
+      Math.abs(lastEmitted.lat - center.lat) < 1e-6 &&
+      Math.abs(lastEmitted.lng - center.lng) < 1e-6
+    ) {
+      return;
+    }
 
     map.flyTo({ center: [center.lng, center.lat], zoom, speed: 1.2 });
     marker.setLngLat([center.lng, center.lat]);

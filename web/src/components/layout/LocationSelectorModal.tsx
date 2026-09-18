@@ -38,8 +38,9 @@ export const LocationSelectorModal: React.FC<LocationSelectorModalProps> = ({
     try {
       const list = await getDeliveryAddresses();
       setAddresses(list);
-    } catch {
+    } catch (err: any) {
       setAddresses([]);
+      setErrorMsg(err?.message || 'Failed to load saved delivery addresses.');
     } finally {
       setLoading(false);
     }

@@ -96,6 +96,8 @@ export default function EditAddressPage() {
           setSelectedPin({ lat: found.latitude, lng: found.longitude });
           setMapCenter({ lat: found.latitude, lng: found.longitude });
         }
+      } catch {
+        setNotFound(true);
       } finally {
         setLoading(false);
       }
