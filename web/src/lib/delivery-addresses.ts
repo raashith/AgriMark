@@ -19,14 +19,12 @@ export async function getDeliveryAddresses(): Promise<DeliveryAddress[]> {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.warn('[AgriMark Addresses] Supabase fetch warning:', error.message);
+      console.warn('[AgriMark Addresses] Supabase fetch error:', error.message);
       return getStoredAddressesLocally();
     }
 
     const addresses = (data as DeliveryAddress[]) || [];
-    if (addresses.length > 0) {
-      persistAddressesLocally(addresses);
-    }
+    persistAddressesLocally(addresses);
     return addresses;
   } catch (err) {
     console.warn('[AgriMark Addresses] Fetch failed:', err);
@@ -53,9 +51,7 @@ export async function saveDeliveryAddress(
   const tempId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `addr_${Date.now()}`;
   const now = new Date().toISOString();
 
-  const newAddress: DeliveryAddress = {
-    id: tempId,
-    user_id: userId || 'local_user',
+  const payload: Partial<DeliveryAddress> = {
     label: address.label || 'Home',
     full_name: address.full_name,
     phone: address.phone,
@@ -71,61 +67,123 @@ export async function saveDeliveryAddress(
     location_accuracy: address.location_accuracy ?? null,
     is_default: address.is_default ?? true,
     delivery_instructions: address.delivery_instructions || null,
-    created_at: now,
-    updated_at: now,
   };
 
   if (!userId) {
-    saveLocalAddress(newAddress);
-    return newAddress;
+    const localAddr: DeliveryAddress = {
+      id: tempId,
+      user_id: 'local_user',
+      ...payload,
+      created_at: now,
+      updated_at: now,
+    } as DeliveryAddress;
+    saveLocalAddress(localAddr);
+    return localAddr;
   }
 
-  try {
-    if (newAddress.is_default) {
-      await supabase
-        .from('delivery_addresses')
-        .update({ is_default: false })
-        .eq('user_id', userId);
-    }
-
-    const { data, error } = await supabase
+  if (payload.is_default) {
+    await supabase
       .from('delivery_addresses')
-      .insert([
-        {
-          user_id: userId,
-          label: newAddress.label,
-          full_name: newAddress.full_name,
-          phone: newAddress.phone,
-          house_number: newAddress.house_number,
-          street: newAddress.street,
-          area: newAddress.area,
-          landmark: newAddress.landmark,
-          city: newAddress.city,
-          state: newAddress.state,
-          postal_code: newAddress.postal_code,
-          latitude: newAddress.latitude,
-          longitude: newAddress.longitude,
-          location_accuracy: newAddress.location_accuracy,
-          is_default: newAddress.is_default,
-          delivery_instructions: newAddress.delivery_instructions,
-        },
-      ])
-      .select()
-      .single();
+      .update({ is_default: false })
+      .eq('user_id', userId);
+  }
 
-    if (error) {
-      console.warn('[AgriMark Addresses] Insert fallback to local due to error:', error.message);
-      saveLocalAddress(newAddress);
-      return newAddress;
+  const { data, error } = await supabase
+    .from('delivery_addresses')
+    .insert([
+      {
+        user_id: userId,
+        ...payload,
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to save delivery address: ${error.message}`);
+  }
+
+  const saved = data as DeliveryAddress;
+  saveLocalAddress(saved);
+  return saved;
+}
+
+export async function updateDeliveryAddress(
+  id: string,
+  address: Partial<Omit<DeliveryAddress, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
+): Promise<DeliveryAddress> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user?.id;
+
+  if (!userId) {
+    const existing = getStoredAddressesLocally();
+    const target = existing.find((a) => a.id === id);
+    if (!target) throw new Error('Address not found.');
+    const updated = { ...target, ...address, updated_at: new Date().toISOString() };
+    saveLocalAddress(updated);
+    return updated;
+  }
+
+  if (address.is_default) {
+    await supabase
+      .from('delivery_addresses')
+      .update({ is_default: false })
+      .eq('user_id', userId);
+  }
+
+  const { data, error } = await supabase
+    .from('delivery_addresses')
+    .update({ ...address, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update address: ${error.message}`);
+  }
+
+  const updated = data as DeliveryAddress;
+  saveLocalAddress(updated);
+  return updated;
+}
+
+export async function deleteDeliveryAddress(id: string): Promise<void> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user?.id;
+
+  if (!userId) {
+    const existing = getStoredAddressesLocally();
+    const updated = existing.filter((a) => a.id !== id);
+    persistAddressesLocally(updated);
+    if (updated.length > 0 && !updated.some((a) => a.is_default)) {
+      updated[0].is_default = true;
+      persistAddressesLocally(updated);
     }
+    return;
+  }
 
-    const saved = data as DeliveryAddress;
-    saveLocalAddress(saved);
-    return saved;
-  } catch (err) {
-    console.warn('[AgriMark Addresses] Remote save error:', err);
-    saveLocalAddress(newAddress);
-    return newAddress;
+  // Check if target is default
+  const addresses = await getDeliveryAddresses();
+  const target = addresses.find((a) => a.id === id);
+
+  const { error } = await supabase
+    .from('delivery_addresses')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', userId);
+
+  if (error) {
+    throw new Error(`Failed to delete address: ${error.message}`);
+  }
+
+  // If deleted address was default, promote remaining address
+  const remaining = addresses.filter((a) => a.id !== id);
+  if (target?.is_default && remaining.length > 0) {
+    await setDefaultAddress(remaining[0].id);
+  } else if (remaining.length === 0 && typeof window !== 'undefined') {
+    localStorage.removeItem(ADDRESS_STORAGE_KEY);
+    localStorage.removeItem('agrimark_delivery_addresses');
   }
 }
 
@@ -141,19 +199,19 @@ export async function setDefaultAddress(addressId: string): Promise<void> {
 
   if (!userId) return;
 
-  try {
-    await supabase
-      .from('delivery_addresses')
-      .update({ is_default: false })
-      .eq('user_id', userId);
+  await supabase
+    .from('delivery_addresses')
+    .update({ is_default: false })
+    .eq('user_id', userId);
 
-    await supabase
-      .from('delivery_addresses')
-      .update({ is_default: true })
-      .eq('id', addressId)
-      .eq('user_id', userId);
-  } catch (err) {
-    console.warn('[AgriMark Addresses] Set default failed:', err);
+  const { error } = await supabase
+    .from('delivery_addresses')
+    .update({ is_default: true })
+    .eq('id', addressId)
+    .eq('user_id', userId);
+
+  if (error) {
+    throw new Error(`Failed to set default address: ${error.message}`);
   }
 }
 
