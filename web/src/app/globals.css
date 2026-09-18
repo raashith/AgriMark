@@ -263,3 +263,153 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration:.001ms !important; animation-iteration-count:1 !important; scroll-behavior:auto !important; transition-duration:.001ms !important; }
 }
+
+
+/* Cinematic rainy night farm background */
+.rain-canvas{
+  position:absolute;
+  inset:0;
+  z-index:0;
+  overflow:hidden;
+  pointer-events:none;
+  isolation:isolate;
+  background:
+    radial-gradient(circle at 78% 18%, rgba(150,180,255,.15), transparent 12%),
+    linear-gradient(180deg,#030711 0%,#07101b 43%,#06120f 65%,#08150f 100%);
+}
+.rain-canvas::before{
+  content:"";
+  position:absolute;
+  inset:-5%;
+  background:
+    radial-gradient(ellipse at 52% 86%, rgba(25,74,49,.52), transparent 38%),
+    linear-gradient(180deg, rgba(8,17,31,.2), rgba(2,8,7,.35));
+  transform:translateZ(-200px);
+}
+.moon{
+  position:absolute;
+  width:8rem;height:8rem;
+  right:13%;top:10%;
+  border-radius:50%;
+  background:
+    radial-gradient(circle at 34% 30%, #fffdf1 0 16%, transparent 17%),
+    radial-gradient(circle at 62% 42%, rgba(174,183,208,.35) 0 12%, transparent 13%),
+    radial-gradient(circle at 42% 65%, rgba(174,183,208,.25) 0 10%, transparent 11%),
+    linear-gradient(145deg,#fffdf6,#c6d1e9 72%,#8e9ab4);
+  box-shadow:0 0 40px rgba(211,225,255,.32),0 0 120px rgba(157,182,255,.14);
+  filter:saturate(.88);
+  animation:moon-drift 10s ease-in-out infinite;
+}
+.moon-haze{
+  position:absolute;width:19rem;height:12rem;right:7%;top:4%;
+  background:radial-gradient(circle,rgba(159,179,255,.12),transparent 68%);
+  filter:blur(20px);transform:translateZ(-25px);
+}
+.mountain{
+  position:absolute;left:-7%;right:-7%;bottom:31%;height:31%;
+  clip-path:polygon(0 100%,0 67%,9% 56%,17% 63%,26% 40%,35% 56%,44% 31%,53% 57%,64% 38%,73% 57%,83% 34%,92% 58%,100% 44%,100% 100%);
+  transform-origin:center bottom;
+}
+.mountain-back{
+  background:linear-gradient(180deg,rgba(35,47,72,.7),rgba(11,18,28,.82));
+  transform:translate3d(calc(var(--mx)*-8px),calc(var(--my)*-5px),-180px) scale(1.08);
+  filter:blur(.4px);
+}
+.mountain-mid{
+  bottom:27%;height:28%;
+  background:linear-gradient(180deg,rgba(20,37,52,.92),rgba(6,18,14,.95));
+  clip-path:polygon(0 100%,0 70%,12% 52%,23% 65%,34% 38%,45% 63%,55% 34%,67% 65%,77% 43%,88% 61%,100% 48%,100% 100%);
+  transform:translate3d(calc(var(--mx)*-18px),calc(var(--my)*-8px),-80px) scale(1.03);
+}
+.mountain-front{
+  bottom:24%;height:25%;
+  background:linear-gradient(180deg,rgba(7,24,18,.98),#06130e);
+  clip-path:polygon(0 100%,0 70%,8% 60%,19% 73%,29% 48%,38% 66%,49% 42%,60% 69%,71% 46%,83% 64%,92% 52%,100% 65%,100% 100%);
+  transform:translate3d(calc(var(--mx)*-30px),calc(var(--my)*-10px),0) scale(1.02);
+}
+.tree-line{
+  position:absolute;left:-4%;right:-4%;bottom:24%;height:34%;
+  transform-style:preserve-3d;
+  transform:translate3d(calc(var(--mx)*-24px),calc(var(--my)*-10px),15px);
+}
+.tree{
+  position:absolute;bottom:0;
+  left:calc(var(--i) * 4.35%);
+  width:2.5rem;
+  height:calc(5rem + (var(--i) % 5) * 1rem);
+  transform:scale(calc(.62 + (var(--i) % 4) * .12)) translateZ(calc((var(--i) % 6) * 8px));
+  filter:drop-shadow(0 5px 12px rgba(0,0,0,.34));
+}
+.tree::before,.tree::after{
+  content:"";position:absolute;left:50%;transform:translateX(-50%);
+  border-left:.95rem solid transparent;border-right:.95rem solid transparent;
+  border-bottom:2rem solid #071b13;
+}
+.tree::before{bottom:1.35rem}
+.tree::after{bottom:0;border-left-width:1.2rem;border-right-width:1.2rem;border-bottom-width:2.35rem}
+.tree::marker{display:none}
+.field-plane{
+  position:absolute;left:-5%;right:-5%;bottom:-10%;height:43%;
+  transform-style:preserve-3d;
+  transform:perspective(850px) rotateX(63deg) translate3d(calc(var(--mx)*-12px),calc(var(--my)*-5px),20px) scale(1.25);
+  transform-origin:center bottom;
+  background:
+    radial-gradient(ellipse at center,rgba(48,120,72,.16),transparent 48%),
+    linear-gradient(180deg,#102b1b,#06150e 74%);
+  box-shadow:inset 0 28px 50px rgba(55,126,72,.05);
+}
+.crop-row{
+  position:absolute;left:0;width:100%;height:2px;
+  top:calc(var(--i) * 4%);
+  background:linear-gradient(90deg,transparent 0%,rgba(76,147,89,.18) 18%,rgba(100,164,95,.32) 50%,rgba(76,147,89,.15) 82%,transparent 100%);
+  box-shadow:0 0 10px rgba(80,150,92,.06);
+}
+.puddle-glow{
+  position:absolute;left:0;right:0;bottom:0;height:24%;
+  background:
+    radial-gradient(ellipse at 24% 32%,rgba(122,159,201,.18),transparent 18%),
+    radial-gradient(ellipse at 68% 48%,rgba(122,159,201,.12),transparent 17%),
+    linear-gradient(180deg,transparent,rgba(5,15,12,.36));
+  filter:blur(.4px);
+}
+.rain-streaks,.rain-streaks-far{
+  position:absolute;inset:-20%;
+  background-image:
+    repeating-linear-gradient(104deg, transparent 0 17px, rgba(194,220,255,.17) 18px, transparent 19px 32px),
+    repeating-linear-gradient(101deg, transparent 0 43px, rgba(194,220,255,.07) 44px, transparent 45px 74px);
+  background-size:90px 130px,160px 190px;
+  animation:rain-fall .8s linear infinite;
+  opacity:.6;
+  transform:translateZ(80px);
+}
+.rain-streaks-far{
+  opacity:.25;filter:blur(1px);transform:translateZ(-30px) scale(1.05);
+  animation-duration:1.35s;
+}
+.mist-band{
+  position:absolute;left:-8%;right:-8%;bottom:24%;height:17%;
+  background:linear-gradient(180deg,transparent,rgba(154,186,205,.055),transparent);
+  filter:blur(16px);
+  transform:translateX(calc(var(--mx)*18px));
+  animation:mist-drift 11s ease-in-out infinite;
+}
+.cinematic-landing > *:not(.rain-canvas){position:relative;z-index:2}
+.hero-stage,.section-shell,.final-cta,.cinematic-footer{isolation:isolate}
+
+@keyframes rain-fall{
+  from{background-position:0 -160px,0 -220px}
+  to{background-position:85px 170px,-65px 240px}
+}
+@keyframes mist-drift{
+  0%,100%{transform:translateX(-2%)}
+  50%{transform:translateX(3%)}
+}
+@keyframes moon-drift{
+  0%,100%{transform:translate3d(0,0,0) scale(1)}
+  50%{transform:translate3d(calc(var(--mx)*10px),calc(var(--my)*6px),12px) scale(1.025)}
+}
+@media (max-width:640px){
+  .moon{width:5.5rem;height:5.5rem;right:10%;top:8%}
+  .tree-line{bottom:26%;height:27%}
+  .field-plane{height:37%}
+}
