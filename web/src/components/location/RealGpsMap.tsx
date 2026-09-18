@@ -72,11 +72,17 @@ export const RealGpsMap: React.FC<RealGpsMapProps> = ({ center, onPinChange, acc
     };
 
     if (!(window as any).L) {
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-      script.async = true;
-      script.onload = () => initMap();
-      document.body.appendChild(script);
+      const existingScript = document.getElementById('leaflet-js') as HTMLScriptElement | null;
+      if (existingScript) {
+        existingScript.addEventListener('load', () => initMap());
+      } else {
+        const script = document.createElement('script');
+        script.id = 'leaflet-js';
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.async = true;
+        script.onload = () => initMap();
+        document.body.appendChild(script);
+      }
     } else {
       initMap();
     }

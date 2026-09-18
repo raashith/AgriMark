@@ -74,7 +74,12 @@ export async function verifyFirstPartyOtp(
         return res.user;
       }
     } catch (err: any) {
-      console.warn('[AgriMark OTP] Primary API verify failed, trying Supabase fallback:', err?.message);
+      // Re-throw authentication rejections (e.g. 400 bad request / incorrect OTP / expired)
+      const isNetworkError = err?.message === 'Failed to fetch' || err?.name === 'TypeError';
+      if (!isNetworkError) {
+        throw new Error(formatAuthError(err?.message || 'OTP verification failed.'));
+      }
+      console.warn('[AgriMark OTP] Primary API unreachable, trying Supabase fallback:', err?.message);
     }
   }
 

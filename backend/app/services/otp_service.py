@@ -92,7 +92,10 @@ class OtpChallenge:
 
 
 class OtpManager:
-    SERVER_SECRET = os.getenv("AGRI_OTP_SECRET", "agrimark_production_otp_secret_key_2026").encode()
+    @classmethod
+    def get_server_secret(cls) -> bytes:
+        secret = os.getenv("AGRI_OTP_SECRET", "agrimark_production_otp_secret_key_2026")
+        return secret.encode("utf-8")
 
     # In-memory challenge repository with rate limiting counters
     _challenges: Dict[str, OtpChallenge] = {}
@@ -110,8 +113,8 @@ class OtpManager:
 
     @classmethod
     def compute_otp_hash(cls, phone_e164: str, challenge_id: str, code: str) -> str:
-        msg = f"{phone_e164}:{challenge_id}:{code}".encode()
-        return hmac.new(cls.SERVER_SECRET, msg, hashlib.sha256).hexdigest()
+        msg = f"{phone_e164}:{challenge_id}:{code}".encode("utf-8")
+        return hmac.new(cls.get_server_secret(), msg, hashlib.sha256).hexdigest()
 
     @staticmethod
     def hash_ip(ip_address: Optional[str]) -> str:

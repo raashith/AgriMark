@@ -1,6 +1,18 @@
 -- Database Migration: 18_delivery_address_integrity.sql
 -- Purpose: Add unique partial index for single default address per user and automatic default fallback triggers.
 
+-- Normalize existing duplicate defaults so only the newest remains is_default = true
+WITH ranked_defaults AS (
+    SELECT id, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at DESC, id DESC) as rnk
+    FROM public.delivery_addresses
+    WHERE is_default = true
+)
+UPDATE public.delivery_addresses
+SET is_default = false
+WHERE id IN (
+    SELECT id FROM ranked_defaults WHERE rnk > 1
+);
+
 -- Enforce at most one default address per user
 CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_addresses_one_default_per_user
     ON public.delivery_addresses (user_id)
