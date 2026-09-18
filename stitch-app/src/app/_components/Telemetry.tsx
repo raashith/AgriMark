@@ -7,5 +7,6 @@ export default function Telemetry({ route }: { route: string }) {
   useEffect(() => {
     void trackScreen(route);
   }, [route]);
+
   return null;
 }

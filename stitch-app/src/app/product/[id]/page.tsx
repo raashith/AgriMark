@@ -1,0 +1,12 @@
+'use client';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { ArrowLeft, ArrowRight, CheckCircle2, MapPin, ShieldCheck } from 'lucide-react';
+import AppShell from '@/app/_components/AppShell';
+import { api, Listing, ProduceLot } from '@/lib/api';
+export default function ProductPage({params}:{params:{id:string}}){
+ const [listing,setListing]=useState<Listing|null>(null);const[lot,setLot]=useState<ProduceLot|null>(null);const[loading,setLoading]=useState(true);
+ useEffect(()=>{Promise.all([api.listings(),api.produceLots()]).then(([list,lots])=>{const found=list.find(x=>x.id===params.id)||null;setListing(found);setLot(lots.find(x=>x.id===found?.lot_id)||lots.find(x=>x.id===params.id)||null)}).finally(()=>setLoading(false))},[params.id]);
+ return <AppShell>{loading?<div className="loading">Loading produce passport…</div>:<><div className="page-title"><div><Link href="/marketplace" style={{display:'inline-flex',gap:7,alignItems:'center',fontSize:12,fontWeight:800,color:'#68716b'}}><ArrowLeft size={15}/> Marketplace</Link><div className="eyebrow" style={{marginTop:14}}>Produce trust details</div><h1>{listing?.title||'Produce lot'}</h1><p style={{color:'#707873',margin:'6px 0 0'}}><MapPin size={14} style={{verticalAlign:'-2px'}}/> Farm-linked and traceable</p></div><Link href={`/checkout/${params.id}`} className="btn btn-primary">Checkout <ArrowRight size={16}/></Link></div><div className="grid-3"><div className="card" style={{gridColumn:'span 2'}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10}}><h3>Lot passport</h3><span className="badge"><ShieldCheck size={12} style={{marginRight:4}}/> Traceable</span></div><div className="stats" style={{marginTop:16}}><div className="stat-card"><small>Price / unit</small><strong>₹{Number(listing?.price_per_unit||0).toLocaleString()}</strong></div><div className="stat-card"><small>Available</small><strong>{Number(lot?.available_quantity??lot?.quantity??0).toLocaleString()}</strong></div><div className="stat-card"><small>Grade</small><strong style={{fontSize:20,fontFamily:'inherit'}}>{lot?.quality_grade||'—'}</strong></div><div className="stat-card"><small>Unit</small><strong style={{fontSize:20,fontFamily:'inherit'}}>{lot?.unit||'kg'}</strong></div></div></div><div className="card"><CheckCircle2 color="#257042"/><h3 style={{marginTop:12}}>Trust signals</h3><p>Seller identity, farm linkage, lot status and order milestones remain part of the transaction context.</p></div></div></>}
+ </AppShell>;
+}
