@@ -19,9 +19,11 @@ import {
   MessageSquare,
 } from 'lucide-react';
 
+import { getActiveSelectedAddressSync } from '@/lib/delivery-addresses';
+
 export default function ProductDetailPage() {
   const { id } = useParams() as { id: string };
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, defaultAddress } = useAuth() as any;
   const { showSuccess, showError } = useToast();
   const router = useRouter();
 
@@ -49,6 +51,14 @@ export default function ProductDetailPage() {
     };
     if (id) fetchListing();
   }, [id]);
+
+  useEffect(() => {
+    const addr = defaultAddress || getActiveSelectedAddressSync();
+    if (addr && !deliveryAddress) {
+      const formatted = `${addr.full_name} (+91 ${addr.phone}), ${addr.house_number}, ${addr.street}, ${addr.area}, ${addr.city}, ${addr.state} - ${addr.postal_code}`;
+      setDeliveryAddress(formatted);
+    }
+  }, [defaultAddress, deliveryAddress]);
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
