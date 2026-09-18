@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { saveDeliveryAddress } from '@/lib/delivery-addresses';
 import { useI18n } from '@/lib/i18n';
 import { MapPin, Navigation, Map as MapIcon, Edit3, Check, AlertCircle, Home, Sprout, Building } from 'lucide-react';
+import { RealGpsMap } from '@/components/location/RealGpsMap';
 
 interface GeocodedAddress {
   house_number?: string;
@@ -29,6 +30,8 @@ export default function DeliveryLocationPage() {
   // Geolocation & reverse geocoding state
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState('');
+  const [geoWarning, setGeoWarning] = useState('');
+  const [accuracy, setAccuracy] = useState<number | null>(null);
   const [selectedPin, setSelectedPin] = useState<{ lat: number; lng: number } | null>(null);
 
   // Form Fields
@@ -53,8 +56,17 @@ export default function DeliveryLocationPage() {
     if ((user?.phone || user?.phone_number) && !phone) setPhone(user.phone || user.phone_number || '');
   }, [user, fullName, phone]);
 
+  // Coordinate validation
+  const isValidCoordinate = (lat: number, lng: number): boolean => {
+    if (typeof lat !== 'number' || typeof lng !== 'number') return false;
+    if (isNaN(lat) || isNaN(lng) || !isFinite(lat) || !isFinite(lng)) return false;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return false;
+    return true;
+  };
+
   // Reverse Geocoding helper using OpenStreetMap Nominatim with fallback
   const reverseGeocode = async (lat: number, lng: number): Promise<GeocodedAddress> => {
+    if (!isValidCoordinate(lat, lng)) return {};
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
@@ -92,12 +104,26 @@ export default function DeliveryLocationPage() {
 
     setGeoLoading(true);
     setGeoError('');
+    setGeoWarning('');
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
+        const acc = position.coords.accuracy;
+
+        if (!isValidCoordinate(lat, lng)) {
+          setGeoLoading(false);
+          setGeoError('Received invalid GPS coordinates. Please select location on map or enter manually.');
+          return;
+        }
+
+        setAccuracy(acc);
         setSelectedPin({ lat, lng });
+
+        if (acc && acc > 150) {
+          setGeoWarning(`Location accuracy is low (${Math.round(acc)} m). Move to an open area or adjust pin on map.`);
+        }
 
         const geocoded = await reverseGeocode(lat, lng);
         if (geocoded.house_number) setHouseNumber(geocoded.house_number);
@@ -114,6 +140,8 @@ export default function DeliveryLocationPage() {
         setGeoLoading(false);
         if (err.code === err.PERMISSION_DENIED) {
           setGeoError('Location permission was denied. Please select your location on map or enter details manually.');
+        } else if (err.code === err.TIMEOUT) {
+          setGeoError('Location request timed out. Please try again or select location on map.');
         } else {
           setGeoError('Unable to retrieve current location. Please enter address manually.');
         }
@@ -124,7 +152,7 @@ export default function DeliveryLocationPage() {
 
   // Secondary Action: "Select location on map"
   const handleSelectMapLocation = () => {
-    // Default fallback to center of India (e.g., Chennai / South Mandi Region 13.0827, 80.2707)
+    // Default fallback to Chennai / South Mandi Region (13.0827, 80.2707) if no GPS acquired
     if (!selectedPin) {
       setSelectedPin({ lat: 13.0827, lng: 80.2707 });
     }
@@ -133,7 +161,7 @@ export default function DeliveryLocationPage() {
 
   // Confirm pin on map
   const handleConfirmMapPin = async () => {
-    if (!selectedPin) return;
+    if (!selectedPin || !isValidCoordinate(selectedPin.lat, selectedPin.lng)) return;
     setGeoLoading(true);
     const geocoded = await reverseGeocode(selectedPin.lat, selectedPin.lng);
     if (geocoded.area) setArea(geocoded.area);
@@ -295,50 +323,22 @@ export default function DeliveryLocationPage() {
           <div className="space-y-6">
             <div className="space-y-1 text-center">
               <h2 className="text-xl font-bold text-white">Move &amp; Select Delivery Pin</h2>
-              <p className="text-xs text-gray-400">Position the pin over your delivery area</p>
+              <p className="text-xs text-gray-400">Position the pin over your exact delivery location</p>
             </div>
 
-            {/* Mobile Map Canvas Simulator */}
-            <div className="relative h-64 w-full bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl overflow-hidden flex items-center justify-center shadow-inner">
-              <div
-                className="absolute inset-0 opacity-40 bg-[radial-gradient(#3E7B54_1px,transparent_1px)]"
-                style={{ backgroundSize: '16px 16px' }}
-              />
-
-              <div className="z-10 flex flex-col items-center space-y-1">
-                <div className="p-2.5 bg-emerald-600 rounded-full text-white shadow-xl animate-bounce border-2 border-white">
-                  <MapPin className="w-6 h-6" />
-                </div>
-                <div className="px-3 py-1 bg-black/80 text-emerald-400 font-mono text-[11px] font-bold rounded-full border border-emerald-800/60 backdrop-blur-sm">
-                  {selectedPin ? `${selectedPin.lat.toFixed(4)}, ${selectedPin.lng.toFixed(4)}` : 'Chennai Region'}
-                </div>
+            {geoWarning && (
+              <div className="p-3 bg-amber-950/70 border border-amber-800/70 rounded-2xl text-amber-200 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+                <span>{geoWarning}</span>
               </div>
+            )}
 
-              {/* Quick Pin Adjust Buttons */}
-              <div className="absolute bottom-3 left-3 right-3 flex justify-between gap-2 z-20">
-                <button
-                  type="button"
-                  onClick={() => setSelectedPin({ lat: 13.0827, lng: 80.2707 })}
-                  className="px-3 py-1.5 bg-[#121a16]/90 border border-[#1e2d26] text-gray-300 text-[11px] font-semibold rounded-xl"
-                >
-                  Chennai
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedPin({ lat: 12.9716, lng: 77.5946 })}
-                  className="px-3 py-1.5 bg-[#121a16]/90 border border-[#1e2d26] text-gray-300 text-[11px] font-semibold rounded-xl"
-                >
-                  Bengaluru
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedPin({ lat: 11.0168, lng: 76.9558 })}
-                  className="px-3 py-1.5 bg-[#121a16]/90 border border-[#1e2d26] text-gray-300 text-[11px] font-semibold rounded-xl"
-                >
-                  Coimbatore
-                </button>
-              </div>
-            </div>
+            {/* Real Interactive Leaflet GPS Map */}
+            <RealGpsMap
+              center={selectedPin || { lat: 13.0827, lng: 80.2707 }}
+              accuracy={accuracy}
+              onPinChange={(lat, lng) => setSelectedPin({ lat, lng })}
+            />
 
             <div className="flex gap-3">
               <button
@@ -354,7 +354,7 @@ export default function DeliveryLocationPage() {
                 disabled={geoLoading}
                 className="flex-2 py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-2xl shadow-lg transition text-sm flex items-center justify-center gap-2"
               >
-                <span>{geoLoading ? 'Resolving...' : 'Confirm location'}</span>
+                <span>{geoLoading ? 'Resolving address...' : 'Confirm location'}</span>
                 <Check className="w-4 h-4" />
               </button>
             </div>
