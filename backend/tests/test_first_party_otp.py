@@ -101,8 +101,8 @@ def test_10_hourly_phone_rate_limit():
     now = datetime.now(timezone.utc)
     for i in range(5):
         c, _ = OtpManager.create_challenge(phone, ttl_minutes=5)
-        # Fast-forward created_at by 61 seconds each to bypass 60s resend cooldown
-        c.created_at = now - timedelta(seconds=3600 - (i * 61))
+        # Fast-forward created_at to bypass 60s resend cooldown while keeping within 1-hour window
+        c.created_at = now - timedelta(seconds=3500 - (i * 61))
     
     with pytest.raises(ValueError, match="Unable to send a verification code right now"):
         OtpManager.create_challenge(phone)
