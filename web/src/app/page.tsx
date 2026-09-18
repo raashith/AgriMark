@@ -1,102 +1,106 @@
 'use client';
 
-import React, { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, MapPinned, ShieldCheck, Sparkles, Sprout, Truck, Users } from 'lucide-react';
-import { useI18n } from '@/lib/i18n';
+import { ArrowRight, BarChart3, Bot, Leaf, MapPinned, ShieldCheck, Sprout, Truck, Users } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { useI18n } from '@/lib/i18n';
+
+function usePointerMotion() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches || !window.matchMedia('(pointer:fine)').matches) return;
+    let raf = 0, tx = 0, ty = 0, x = 0, y = 0;
+    const move = (e: PointerEvent) => { tx = e.clientX / window.innerWidth - .5; ty = e.clientY / window.innerHeight - .5; };
+    const tick = () => { x += (tx-x)*.05; y += (ty-y)*.05; el.style.setProperty('--mx', x.toFixed(4)); el.style.setProperty('--my', y.toFixed(4)); raf = requestAnimationFrame(tick); };
+    window.addEventListener('pointermove', move, { passive: true }); tick();
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('pointermove', move); };
+  }, []);
+  return ref;
+}
 
 export default function HomePage() {
   const { t } = useI18n();
   const { isAuthenticated, role, user } = useAuth();
+  const rootRef = usePointerMotion();
+  const [activeScene, setActiveScene] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const scenes = [
+    { title:'FIELD', label:'Live crop intelligence', tone:'green' },
+    { title:'MARKET', label:'Price & demand signals', tone:'gold' },
+    { title:'ROUTE', label:'Traceable movement', tone:'blue' },
+  ];
+  const primaryHref = useMemo(() => isAuthenticated ? (role === 'farmer' ? '/farmer/dashboard' : '/buyer/marketplace') : '/auth/register', [isAuthenticated, role]);
+  const primaryLabel = isAuthenticated ? `Open ${(user?.role || role || 'user').toUpperCase()} WORKSPACE` : 'START FOR FREE';
 
   useEffect(() => {
-    if (document.getElementById('agrimark-reference-css')) return;
-    const link = document.createElement('link');
-    link.id = 'agrimark-reference-css';
-    link.rel = 'stylesheet';
-    link.href = '/agrimark-landing-reference.css';
-    document.head.appendChild(link);
-    return () => link.remove();
+    const id = window.setInterval(() => setActiveScene(s => (s + 1) % scenes.length), 5200);
+    return () => window.clearInterval(id);
   }, []);
-
-  const primaryHref = useMemo(() => {
-    if (isAuthenticated) return role === 'farmer' ? '/farmer/dashboard' : '/buyer/marketplace';
-    return '/auth/register';
-  }, [isAuthenticated, role]);
-
-  const primaryLabel = useMemo(() => {
-    if (isAuthenticated) return `Open ${(user?.role || role || 'user').toUpperCase()} Workspace`;
-    return t('register');
-  }, [isAuthenticated, role, t, user?.role]);
-
-  const roleLinks = [
-    { title: 'FARMERS', href: '/farmer/dashboard', icon: Sprout, text: 'Grow with field intelligence' },
-    { title: 'BUYERS', href: '/buyer/marketplace', icon: Users, text: 'Source trusted produce' },
-    { title: 'LOGISTICS', href: '/logistics/deliveries', icon: Truck, text: 'Move every order clearly' },
-  ];
+  useEffect(() => { document.body.style.overflow = menuOpen ? 'hidden' : ''; return () => { document.body.style.overflow = ''; }; }, [menuOpen]);
 
   return (
-    <main className="agri-reference-stage">
-      <div className="agri-reference-halo" aria-hidden="true" />
-      <div className="agri-reference-nav">
-        <Link href="/" className="agri-reference-brand" aria-label="AgriMark home">agri<span>mark</span></Link>
-        <nav className="agri-reference-links" aria-label="Primary">
-          <a className="active" href="#platform">Platform</a>
-          <a href="#market">Market</a>
-          <a href="#roles">Roles</a>
-          <Link href="/ai-assistant">AgriAI</Link>
-          <Link className="agri-reference-enroll" href={primaryHref}>{isAuthenticated ? 'WORKSPACE' : 'JOIN AGRIMARK'}</Link>
-        </nav>
-        <div className="md:hidden flex items-center gap-2">
-          <Link href="/auth/login" className="text-white text-xs px-3 py-2 rounded-full border border-white/15">{t('login')}</Link>
+    <main ref={rootRef} className="agri3d-page">
+      <div className="agri3d-bg" aria-hidden="true">
+        <div className={`agri3d-scene agri3d-scene-${scenes[activeScene].tone}`}>
+          <div className="agri3d-horizon" />
+          <div className="agri3d-sun" />
+          <div className="agri3d-mist agri3d-mist-a" />
+          <div className="agri3d-mist agri3d-mist-b" />
+          <div className="agri3d-field agri3d-field-back" />
+          <div className="agri3d-field agri3d-field-mid" />
+          <div className="agri3d-field agri3d-field-front" />
+          <div className="agri3d-orbit agri3d-orbit-a" />
+          <div className="agri3d-orbit agri3d-orbit-b" />
         </div>
+        <div className="agri3d-noise" />
       </div>
 
-      <section className="agri-reference-main" id="platform">
-        <div className="agri-reference-orb agri-reference-orb-left" aria-hidden="true">
-          <div className="h-full w-full rounded-full border border-emerald-200/20 bg-[radial-gradient(circle_at_35%_30%,#b8e69a,#3e7b54_48%,#0a2618_82%)] shadow-[0_30px_80px_rgba(0,0,0,.45)]" />
+      <header className={`agri3d-nav ${menuOpen ? 'is-open' : ''}`}>
+        <Link href="/" className="agri3d-logo"><span className="agri3d-logo-mark"><Leaf size={20}/></span><span>AgriMark<span>.ai</span></span></Link>
+        <nav className="agri3d-links">
+          <a href="#platform" onClick={() => setMenuOpen(false)}>Platform</a>
+          <a href="#intelligence" onClick={() => setMenuOpen(false)}>Intelligence</a>
+          <a href="#ecosystem" onClick={() => setMenuOpen(false)}>Ecosystem</a>
+          <Link href="/marketplace" onClick={() => setMenuOpen(false)}>Marketplace</Link>
+        </nav>
+        <div className="agri3d-nav-actions"><Link href={primaryHref} className="agri3d-top-cta">{isAuthenticated ? 'WORKSPACE' : 'JOIN AGRIMARK'}</Link><button className="agri3d-menu-btn" onClick={()=>setMenuOpen(v=>!v)} aria-label="Toggle navigation" aria-expanded={menuOpen}>☰</button></div>
+        <div className="agri3d-mobile-panel">
+          <a href="#platform" onClick={()=>setMenuOpen(false)}>Platform</a><a href="#intelligence" onClick={()=>setMenuOpen(false)}>Intelligence</a><a href="#ecosystem" onClick={()=>setMenuOpen(false)}>Ecosystem</a><Link href="/marketplace" onClick={()=>setMenuOpen(false)}>Marketplace</Link>
+          <Link href={primaryHref} className="agri3d-top-cta">{isAuthenticated ? 'WORKSPACE' : 'JOIN AGRIMARK'}</Link>
         </div>
-        <div className="agri-reference-orb agri-reference-orb-right" aria-hidden="true">
-          <div className="h-full w-full rounded-full border border-amber-200/15 bg-[radial-gradient(circle_at_35%_30%,#efd58b,#a36c20_48%,#261506_84%)] shadow-[0_30px_80px_rgba(0,0,0,.45)]" />
-        </div>
-        <span className="agri-reference-label agri-reference-label-left">FARMER</span>
-        <span className="agri-reference-label agri-reference-label-right">BUYER</span>
+      </header>
 
-        <div className="agri-reference-copy">
-          <div className="agri-reference-eyebrow">AGRICULTURAL INTELLIGENCE</div>
-          <h1 className="agri-reference-title">AGRIMARK</h1>
-          <div className="agri-reference-rule" />
-          <p className="agri-reference-lede">
-            Connect farms, markets, AI and logistics in one calm digital agriculture experience.
-            Discover produce, understand market signals, trace every lot and move from harvest to trade with confidence.
-          </p>
-          <Link href={primaryHref} className="agri-reference-cta">
-            {primaryLabel.toUpperCase()} <ArrowRight className="ml-2 h-5 w-5" />
-          </Link>
+      <section className="agri3d-hero" id="platform">
+        <div className="agri3d-copy">
+          <div className="agri3d-kicker"><span className="live-dot"/> LIVE AGRICULTURAL INTELLIGENCE</div>
+          <div className="scene-caption">{scenes[activeScene].title} · {scenes[activeScene].label}</div>
+          <h1>FROM <em>SOIL</em><br/>TO SMART TRADE.</h1>
+          <p>One connected operating layer for farms, markets, AI decisions, traceability and logistics.</p>
+          <div className="agri3d-actions"><Link href={primaryHref} className="agri3d-primary">{primaryLabel}<ArrowRight size={17}/></Link><a href="#intelligence" className="agri3d-secondary">EXPLORE AGRIMARK</a></div>
+          <div className="agri3d-trust"><span><ShieldCheck size={16}/> VERIFIED</span><span><MapPinned size={16}/> LOCATION-AWARE</span><span><Bot size={16}/> AI-ASSISTED</span></div>
         </div>
 
-        <div className="agri-reference-stats" id="market">
-          <span className="agri-reference-stat"><ShieldCheck className="inline h-3 w-3 mr-1" /> VERIFIED WORKFLOWS</span>
-          <span className="agri-reference-stat"><MapPinned className="inline h-3 w-3 mr-1" /> LOCATION-AWARE</span>
-          <span className="agri-reference-stat"><Sparkles className="inline h-3 w-3 mr-1" /> AI-ASSISTED</span>
+        <div className="agri3d-dashboard" aria-hidden="true">
+          <div className="dashboard-top"><div><span>AGRIMARK COMMAND</span><strong>Live field signal</strong></div><b>ONLINE</b></div>
+          <div className="dashboard-main"><div className="dashboard-value">+18.6% <small>market pulse</small></div><div className="dashboard-chart"><i/><i/><i/><i/><i/><i/><i/><i/><i/></div></div>
+          <div className="dashboard-grid"><div><span>FIELD HEALTH</span><b>92%</b></div><div><span>DEMAND</span><b>HIGH</b></div><div><span>TRACE</span><b>100%</b></div></div>
         </div>
+
+        <div className="agri3d-float agri3d-float-a"><Sprout size={15}/><span>Crop health</span><b>92%</b></div>
+        <div className="agri3d-float agri3d-float-b"><BarChart3 size={15}/><span>Market pulse</span><b>+12.4%</b></div>
+        <div className="agri3d-float agri3d-float-c"><Truck size={15}/><span>Dispatch</span><b>ON ROUTE</b></div>
       </section>
 
-      <section id="roles" className="relative z-[3] px-6 pb-16 md:px-12">
-        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-3 md:grid-cols-3">
-          {roleLinks.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link key={item.title} href={item.href} className="group rounded-2xl border border-white/10 bg-black/15 p-5 backdrop-blur-xl transition hover:-translate-y-1 hover:border-amber-300/25">
-                <div className="flex items-center justify-between"><span className="text-[11px] tracking-[.25em] text-amber-200/70">{item.title}</span><Icon className="h-5 w-5 text-amber-200/80" /></div>
-                <p className="mt-3 text-sm text-white/60">{item.text}</p>
-                <span className="mt-4 inline-flex items-center gap-2 text-xs font-semibold text-amber-200">EXPLORE <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></span>
-              </Link>
-            );
-          })}
-        </div>
+      <section className="agri3d-bottom" id="intelligence">
+        <div><span>FARMERS</span><b>Plan smarter</b><small>Crop and harvest intelligence</small></div>
+        <div><span>BUYERS</span><b>Source directly</b><small>Traceable produce workflows</small></div>
+        <div><span>FPO / CO-OP</span><b>Aggregate supply</b><small>Coordinate trade at scale</small></div>
+        <div><span>LOGISTICS</span><b>Move clearly</b><small>Track every delivery</small></div>
       </section>
+
+      <div className="agri3d-dots" aria-label="Hero scenes">{scenes.map((s,i)=><button key={s.title} className={i===activeScene?'active':''} onClick={()=>setActiveScene(i)} aria-label={`Show ${s.title} scene`}/>)}</div>
     </main>
   );
 }
