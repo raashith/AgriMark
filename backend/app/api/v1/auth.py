@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from ...core.auth import AuthenticatedUser, _get_auth_client, get_current_user
 from ...core.config import get_settings
 from ...core.database import get_supabase
 from ...schemas.domain import ProfileResponse
+from ...services.otp_service import OtpManager
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -22,6 +24,70 @@ class RegisterRequest(BaseModel):
     phone: str | None = None
     password: str = Field(min_length=6)
     role: str = "farmer"
+
+
+class SendOtpRequest(BaseModel):
+    phone: str
+
+
+class VerifyOtpRequest(BaseModel):
+    challenge_id: str
+    phone: str
+    otp: str
+
+
+@router.post("/otp/send")
+def send_otp(request: SendOtpRequest, req: Request):
+    try:
+        phone_e164 = OtpManager.normalize_phone(request.phone)
+        client_ip = req.client.host if req and req.client else "127.0.0.1"
+        challenge, _code = OtpManager.create_challenge(phone_e164, ip_address=client_ip)
+        return {
+            "challenge_id": challenge.id,
+            "phone_e164": challenge.phone_e164,
+            "expires_at": challenge.expires_at.isoformat(),
+            "resend_cooldown_seconds": 60,
+            "message": "OTP verification code sent successfully.",
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Unable to send a verification code right now. Please try again later.")
+
+
+@router.post("/otp/verify")
+def verify_otp(request: VerifyOtpRequest):
+    try:
+        phone_e164 = OtpManager.normalize_phone(request.phone)
+        code = (request.otp or "").strip()
+        if not code or len(code) != 6 or not code.isdigit():
+            raise HTTPException(status_code=400, detail="Enter the 6-digit OTP.")
+
+        OtpManager.verify_challenge(request.challenge_id, phone_e164, code)
+
+        prof_res = get_supabase().table("profiles").select("id,full_name,phone,role").eq("phone", phone_e164).limit(1).execute()
+        if prof_res.data:
+            profile_data = prof_res.data[0]
+        else:
+            new_id = str(uuid.uuid4())
+            profile_data = {
+                "id": new_id,
+                "full_name": None,
+                "phone": phone_e164,
+                "role": "buyer",
+            }
+            try:
+                get_supabase().table("profiles").upsert(profile_data).execute()
+            except Exception:
+                pass
+
+        return {
+            "access_token": f"agrimark_token_{profile_data['id']}",
+            "token_type": "bearer",
+            "user": profile_data,
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/me", response_model=ProfileResponse)
