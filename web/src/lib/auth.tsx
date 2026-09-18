@@ -229,9 +229,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [defaultAddress, setDefaultAddressState] = useState<DeliveryAddress | null>(null);
 
   const refreshAddress = async (): Promise<DeliveryAddress | null> => {
+    const currentUserId = user?.id;
+    if (!currentUserId) {
+      setDefaultAddressState(null);
+      return null;
+    }
     try {
       const addr = await getDefaultAddress();
-      setDefaultAddressState(addr);
+      if (user?.id === currentUserId) {
+        setDefaultAddressState(addr);
+      }
       return addr;
     } catch {
       return null;
@@ -239,12 +246,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       void refreshAddress();
     } else {
       setDefaultAddressState(null);
     }
-  }, [user]);
+  }, [user?.id]);
 
   const logout = async () => {
     await supabase.auth.signOut().catch(() => {});

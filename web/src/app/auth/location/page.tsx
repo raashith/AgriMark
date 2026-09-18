@@ -200,6 +200,21 @@ export default function DeliveryLocationPage() {
 
       await refreshAddress();
 
+      // Check for redirect param
+      let relativeRedirect = '';
+      if (typeof window !== 'undefined') {
+        const searchParams = new URLSearchParams(window.location.search);
+        const redirectParam = searchParams.get('redirect');
+        if (redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')) {
+          relativeRedirect = redirectParam;
+        }
+      }
+
+      if (relativeRedirect) {
+        router.push(relativeRedirect);
+        return;
+      }
+
       // Route user to appropriate experience
       const userRole = user?.role || 'buyer';
       if (userRole === 'farmer') router.push('/farmer/dashboard');

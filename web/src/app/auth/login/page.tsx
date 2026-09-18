@@ -51,14 +51,30 @@ export default function LoginPage() {
     }
   }, []);
 
-  // Post-auth routing check: Check if user has a default delivery address
+  // Post-auth routing check: Check if user has a default delivery address and respect relative redirect parameter
   const handlePostAuthRouting = React.useCallback(async (userProfile: any) => {
     try {
+      let relativeRedirect = '';
+      if (typeof window !== 'undefined') {
+        const searchParams = new URLSearchParams(window.location.search);
+        const redirectParam = searchParams.get('redirect');
+        if (redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')) {
+          relativeRedirect = redirectParam;
+        }
+      }
+
       const defaultAddr = await getDefaultAddress();
       if (!defaultAddr) {
-        router.push('/auth/location');
+        const target = relativeRedirect ? `/auth/location?redirect=${encodeURIComponent(relativeRedirect)}` : '/auth/location';
+        router.push(target);
         return;
       }
+
+      if (relativeRedirect) {
+        router.push(relativeRedirect);
+        return;
+      }
+
       const role = userProfile.role;
       if (role === 'farmer') router.push('/farmer/dashboard');
       else if (role === 'buyer') router.push('/buyer/marketplace');
