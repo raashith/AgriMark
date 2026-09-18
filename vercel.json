@@ -1,3 +1,3 @@
 {
-  "ignoreCommand": "node -e \"if (process.env.VERCEL_PROJECT_NAME === 'stitch-app' || (process.env.VERCEL_PROJECT_NAME && process.env.VERCEL_PROJECT_NAME !== 'agrimark')) process.exit(0); else process.exit(1);\""
+  "ignoreCommand": "node -e \"const name = process.env.VERCEL_PROJECT_NAME; if (name === 'stitch-app' || (name && name !== 'agrimark')) process.exit(0); process.exit(1);\""
 }
