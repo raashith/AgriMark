@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, BarChart3, Bot, Leaf, MapPinned, ShieldCheck, Sprout, Truck, Users } from 'lucide-react';
+import { ArrowRight, BarChart3, Bot, BrainCircuit, Leaf, MapPinned, ShieldCheck, Sprout, Store, Truck, Users } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { useI18n } from '@/lib/i18n';
 
 function usePointerMotion() {
   const ref = useRef<HTMLDivElement>(null);
@@ -21,7 +20,6 @@ function usePointerMotion() {
 }
 
 export default function HomePage() {
-  const { t } = useI18n();
   const { isAuthenticated, role, user } = useAuth();
   const rootRef = usePointerMotion();
   const [activeScene, setActiveScene] = useState(0);
@@ -31,8 +29,19 @@ export default function HomePage() {
     { title:'MARKET', label:'Price & demand signals', tone:'gold' },
     { title:'ROUTE', label:'Traceable movement', tone:'blue' },
   ];
-  const primaryHref = useMemo(() => isAuthenticated ? (role === 'farmer' ? '/farmer/dashboard' : '/buyer/marketplace') : '/auth/register', [isAuthenticated, role]);
-  const primaryLabel = isAuthenticated ? `Open ${(user?.role || role || 'user').toUpperCase()} WORKSPACE` : 'START FOR FREE';
+  const workspaceHref = useMemo(() => {
+    if (!isAuthenticated) return '/auth/register';
+    switch (role || user?.role) {
+      case 'farmer': return '/farmer/dashboard';
+      case 'buyer': return '/buyer/marketplace';
+      case 'fpo': return '/dashboard';
+      case 'logistics': return '/logistics/deliveries';
+      case 'admin': return '/admin/dashboard';
+      default: return '/dashboard';
+    }
+  }, [isAuthenticated, role, user?.role]);
+  const workspaceLabel = isAuthenticated ? `OPEN ${(user?.role || role || 'USER').toUpperCase()} WORKSPACE` : 'START FOR FREE';
+  const closeMenu = () => setMenuOpen(false);
 
   useEffect(() => {
     const id = window.setInterval(() => setActiveScene(s => (s + 1) % scenes.length), 5200);
@@ -58,17 +67,17 @@ export default function HomePage() {
       </div>
 
       <header className={`agri3d-nav ${menuOpen ? 'is-open' : ''}`}>
-        <Link href="/" className="agri3d-logo"><span className="agri3d-logo-mark"><Leaf size={20}/></span><span>AgriMark<span>.ai</span></span></Link>
+        <Link href="/" className="agri3d-logo" onClick={closeMenu}><span className="agri3d-logo-mark"><Leaf size={20}/></span><span>AgriMark<span>.ai</span></span></Link>
         <nav className="agri3d-links">
-          <a href="#platform" onClick={() => setMenuOpen(false)}>Platform</a>
-          <a href="#intelligence" onClick={() => setMenuOpen(false)}>Intelligence</a>
-          <a href="#ecosystem" onClick={() => setMenuOpen(false)}>Ecosystem</a>
-          <Link href="/marketplace" onClick={() => setMenuOpen(false)}>Marketplace</Link>
+          <a href="#platform" onClick={closeMenu}>Platform</a>
+          <a href="#intelligence" onClick={closeMenu}>Intelligence</a>
+          <a href="#ecosystem" onClick={closeMenu}>Ecosystem</a>
+          <Link href="/marketplace" onClick={closeMenu}>Marketplace</Link>
         </nav>
-        <div className="agri3d-nav-actions"><Link href={primaryHref} className="agri3d-top-cta">{isAuthenticated ? 'WORKSPACE' : 'JOIN AGRIMARK'}</Link><button className="agri3d-menu-btn" onClick={()=>setMenuOpen(v=>!v)} aria-label="Toggle navigation" aria-expanded={menuOpen}>☰</button></div>
+        <div className="agri3d-nav-actions"><Link href={workspaceHref} className="agri3d-top-cta">{isAuthenticated ? 'WORKSPACE' : 'JOIN AGRIMARK'}</Link><button className="agri3d-menu-btn" onClick={()=>setMenuOpen(v=>!v)} aria-label="Toggle navigation" aria-expanded={menuOpen}>☰</button></div>
         <div className="agri3d-mobile-panel">
           <a href="#platform" onClick={()=>setMenuOpen(false)}>Platform</a><a href="#intelligence" onClick={()=>setMenuOpen(false)}>Intelligence</a><a href="#ecosystem" onClick={()=>setMenuOpen(false)}>Ecosystem</a><Link href="/marketplace" onClick={()=>setMenuOpen(false)}>Marketplace</Link>
-          <Link href={primaryHref} className="agri3d-top-cta">{isAuthenticated ? 'WORKSPACE' : 'JOIN AGRIMARK'}</Link>
+          <Link href={workspaceHref} className="agri3d-top-cta">{isAuthenticated ? 'WORKSPACE' : 'JOIN AGRIMARK'}</Link>
         </div>
       </header>
 
@@ -78,7 +87,7 @@ export default function HomePage() {
           <div className="scene-caption">{scenes[activeScene].title} · {scenes[activeScene].label}</div>
           <h1>FROM <em>SOIL</em><br/>TO SMART TRADE.</h1>
           <p>One connected operating layer for farms, markets, AI decisions, traceability and logistics.</p>
-          <div className="agri3d-actions"><Link href={primaryHref} className="agri3d-primary">{primaryLabel}<ArrowRight size={17}/></Link><a href="#intelligence" className="agri3d-secondary">EXPLORE AGRIMARK</a></div>
+          <div className="agri3d-actions"><Link href={workspaceHref} className="agri3d-primary">{workspaceLabel}<ArrowRight size={17}/></Link><a href="#intelligence" className="agri3d-secondary">EXPLORE AGRIMARK</a></div>
           <div className="agri3d-trust"><span><ShieldCheck size={16}/> VERIFIED</span><span><MapPinned size={16}/> LOCATION-AWARE</span><span><Bot size={16}/> AI-ASSISTED</span></div>
         </div>
 
@@ -88,16 +97,28 @@ export default function HomePage() {
           <div className="dashboard-grid"><div><span>FIELD HEALTH</span><b>92%</b></div><div><span>DEMAND</span><b>HIGH</b></div><div><span>TRACE</span><b>100%</b></div></div>
         </div>
 
-        <div className="agri3d-float agri3d-float-a"><Sprout size={15}/><span>Crop health</span><b>92%</b></div>
-        <div className="agri3d-float agri3d-float-b"><BarChart3 size={15}/><span>Market pulse</span><b>+12.4%</b></div>
-        <div className="agri3d-float agri3d-float-c"><Truck size={15}/><span>Dispatch</span><b>ON ROUTE</b></div>
+        <Link href={isAuthenticated ? "/farmer/dashboard" : "/auth/register"} className="agri3d-float agri3d-float-a"><Sprout size={15}/><span>Crop health</span><b>92%</b></Link>
+        <Link href="/marketplace" className="agri3d-float agri3d-float-b"><BarChart3 size={15}/><span>Market pulse</span><b>+12.4%</b></Link>
+        <Link href="/logistics/deliveries" className="agri3d-float agri3d-float-c"><Truck size={15}/><span>Dispatch</span><b>ON ROUTE</b></Link>
       </section>
 
       <section className="agri3d-bottom" id="intelligence">
-        <div><span>FARMERS</span><b>Plan smarter</b><small>Crop and harvest intelligence</small></div>
-        <div><span>BUYERS</span><b>Source directly</b><small>Traceable produce workflows</small></div>
-        <div><span>FPO / CO-OP</span><b>Aggregate supply</b><small>Coordinate trade at scale</small></div>
-        <div><span>LOGISTICS</span><b>Move clearly</b><small>Track every delivery</small></div>
+        <Link href={isAuthenticated ? "/farmer/dashboard" : "/auth/register"}><span>FARMERS</span><b>Plan smarter</b><small>Crop and harvest intelligence</small></Link>
+        <Link href="/buyer/marketplace"><span>BUYERS</span><b>Source directly</b><small>Traceable produce workflows</small></Link>
+        <Link href="/dashboard#ecosystem"><span>FPO / CO-OP</span><b>Aggregate supply</b><small>Coordinate trade at scale</small></Link>
+        <Link href="/logistics/deliveries"><span>LOGISTICS</span><b>Move clearly</b><small>Track every delivery</small></Link>
+      </section>
+
+      <section className="agri3d-ecosystem" id="ecosystem">
+        <div className="agri3d-eco-card">
+          <span>ECOSYSTEM</span><h2>ONE OPERATING LAYER FOR AGRICULTURE.</h2>
+          <p>Connect field operations, marketplace discovery, AI assistance and logistics into the existing AgriMark workspace.</p>
+          <div className="agri3d-eco-actions">
+            <Link href="/dashboard" className="agri3d-secondary"><Users size={16}/> OPEN DASHBOARD</Link>
+            <Link href="/ai-assistant" className="agri3d-secondary"><BrainCircuit size={16}/> ASK AGRIAI</Link>
+            <Link href="/marketplace" className="agri3d-secondary"><Store size={16}/> EXPLORE MARKET</Link>
+          </div>
+        </div>
       </section>
 
       <div className="agri3d-dots" aria-label="Hero scenes">{scenes.map((s,i)=><button key={s.title} className={i===activeScene?'active':''} onClick={()=>setActiveScene(i)} aria-label={`Show ${s.title} scene`}/>)}</div>
