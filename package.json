@@ -1,0 +1,8 @@
+{
+  "name": "agrimark-render-root",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix stitch-app install && npm --prefix stitch-app run build",
+    "start": "npm --prefix stitch-app start"
+  }
+}
