@@ -77,7 +77,7 @@ export default function HomePage() {
         <div className="agri3d-nav-actions"><Link href={workspaceHref} className="agri3d-top-cta">{isAuthenticated ? 'WORKSPACE' : 'JOIN AGRIMARK'}</Link><button className="agri3d-menu-btn" onClick={()=>setMenuOpen(v=>!v)} aria-label="Toggle navigation" aria-expanded={menuOpen}>☰</button></div>
         <div className="agri3d-mobile-panel">
           <a href="#platform" onClick={()=>setMenuOpen(false)}>Platform</a><a href="#intelligence" onClick={()=>setMenuOpen(false)}>Intelligence</a><a href="#ecosystem" onClick={()=>setMenuOpen(false)}>Ecosystem</a><Link href="/marketplace" onClick={()=>setMenuOpen(false)}>Marketplace</Link>
-          <Link href={primaryHref} className="agri3d-top-cta">{isAuthenticated ? 'WORKSPACE' : 'JOIN AGRIMARK'}</Link>
+          <Link href={workspaceHref} className="agri3d-top-cta">{isAuthenticated ? 'WORKSPACE' : 'JOIN AGRIMARK'}</Link>
         </div>
       </header>
 
@@ -87,7 +87,7 @@ export default function HomePage() {
           <div className="scene-caption">{scenes[activeScene].title} · {scenes[activeScene].label}</div>
           <h1>FROM <em>SOIL</em><br/>TO SMART TRADE.</h1>
           <p>One connected operating layer for farms, markets, AI decisions, traceability and logistics.</p>
-          <div className="agri3d-actions"><Link href={primaryHref} className="agri3d-primary">{workspaceLabel}<ArrowRight size={17}/></Link><a href="#intelligence" className="agri3d-secondary">EXPLORE AGRIMARK</a></div>
+          <div className="agri3d-actions"><Link href={workspaceHref} className="agri3d-primary">{workspaceLabel}<ArrowRight size={17}/></Link><a href="#intelligence" className="agri3d-secondary">EXPLORE AGRIMARK</a></div>
           <div className="agri3d-trust"><span><ShieldCheck size={16}/> VERIFIED</span><span><MapPinned size={16}/> LOCATION-AWARE</span><span><Bot size={16}/> AI-ASSISTED</span></div>
         </div>
 
