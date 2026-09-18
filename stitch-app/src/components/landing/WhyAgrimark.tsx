@@ -36,10 +36,10 @@ export const WhyAgrimark: React.FC = () => {
             return (
               <div
                 key={index}
-                className="group relative rounded-3xl border border-[#E7E5DC] bg-white p-8 shadow-sm transition-all duration-500 will-change-transform [transform-style:preserve-3d] hover:-translate-y-3 hover:[transform:rotateX(5deg)_rotateY(-4deg)_translateZ(18px)] hover:shadow-2xl hover:border-[#1B4D3E]"
+                className="group relative rounded-3xl border border-[#E7E5DC] bg-white p-8 shadow-sm transition-all duration-500 will-change-transform [transform-style:preserve-3d] hover:-translate-y-3 hover:[transform:perspective(900px)_rotateX(8deg)_rotateY(-7deg)_translateZ(24px)_scale(1.02)] hover:shadow-2xl hover:border-[#1B4D3E]"
               >
                 <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-emerald-500/5 via-transparent to-amber-400/10 opacity-0 transition-opacity duration-500 group-hover:opacity-100 pointer-events-none" />
-                <div className="relative space-y-6 [transform:translateZ(24px)]">
+                <div className="relative space-y-6 [transform:translateZ(35px)]">
                   <div className="flex items-center justify-between">
                     <div className="p-3.5 bg-[#F6F4ED] group-hover:bg-[#1B4D3E] rounded-2xl transition duration-300">
                       <IconComponent className="w-6 h-6 text-[#1B4D3E] group-hover:text-[#E5A93C] transition" />
