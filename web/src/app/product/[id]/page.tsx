@@ -19,9 +19,11 @@ import {
   MessageSquare,
 } from 'lucide-react';
 
+import { getActiveSelectedAddressSync } from '@/lib/delivery-addresses';
+
 export default function ProductDetailPage() {
   const { id } = useParams() as { id: string };
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, defaultAddress } = useAuth() as any;
   const { showSuccess, showError } = useToast();
   const router = useRouter();
 
@@ -32,6 +34,8 @@ export default function ProductDetailPage() {
   const [isOrderOpen, setIsOrderOpen] = useState(false);
   const [orderQty, setOrderQty] = useState<number>(500);
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [isAddressUserEdited, setIsAddressUserEdited] = useState(false);
+  const [lastAutoFilledAddressId, setLastAutoFilledAddressId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -49,6 +53,16 @@ export default function ProductDetailPage() {
     };
     if (id) fetchListing();
   }, [id]);
+
+  useEffect(() => {
+    const addr = defaultAddress || getActiveSelectedAddressSync();
+    if (addr && (!isAddressUserEdited || addr.id !== lastAutoFilledAddressId)) {
+      const formatted = `${addr.full_name} (+91 ${addr.phone}), ${addr.house_number}, ${addr.street}, ${addr.area}, ${addr.city}, ${addr.state} - ${addr.postal_code}`;
+      setDeliveryAddress(formatted);
+      setLastAutoFilledAddressId(addr.id);
+      setIsAddressUserEdited(false);
+    }
+  }, [defaultAddress, isAddressUserEdited, lastAutoFilledAddressId]);
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -264,7 +278,10 @@ export default function ProductDetailPage() {
               required
               rows={3}
               value={deliveryAddress}
-              onChange={(e) => setDeliveryAddress(e.target.value)}
+              onChange={(e) => {
+                setDeliveryAddress(e.target.value);
+                setIsAddressUserEdited(true);
+              }}
               className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-xs focus:border-emerald-500 focus:outline-none"
               placeholder="Enter full delivery warehouse / mill address..."
             />

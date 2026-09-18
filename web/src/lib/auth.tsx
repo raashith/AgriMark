@@ -1,14 +1,17 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { UserProfile, UserRole } from '@/types';
+import { UserProfile, UserRole, DeliveryAddress } from '@/types';
 import { supabase, logSupabaseDiagnostic } from './supabase';
 import { api } from './api';
 import { PRODUCTION_AUTH_CALLBACK, getAuthCallbackUrl } from './auth-config';
+import { getDefaultAddress } from './delivery-addresses';
 
 interface AuthContextType {
   user: UserProfile | null;
   isLoading: boolean;
+  defaultAddress: DeliveryAddress | null;
+  refreshAddress: () => Promise<DeliveryAddress | null>;
   login: (credentials: any) => Promise<UserProfile>;
   sendPhoneOtp: (phone: string) => Promise<void>;
   loginWithPhoneOtp: (phone: string) => Promise<void>;
@@ -23,6 +26,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
+  defaultAddress: null,
+  refreshAddress: async () => null,
   login: async () => { throw new Error('Not initialized'); },
   sendPhoneOtp: async () => { throw new Error('Not initialized'); },
   loginWithPhoneOtp: async () => { throw new Error('Not initialized'); },
@@ -221,14 +226,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const [defaultAddress, setDefaultAddressState] = useState<DeliveryAddress | null>(null);
+
+  const refreshAddress = async (): Promise<DeliveryAddress | null> => {
+    const currentUserId = user?.id;
+    if (!currentUserId) {
+      setDefaultAddressState(null);
+      return null;
+    }
+    try {
+      const addr = await getDefaultAddress();
+      if (user?.id === currentUserId) {
+        setDefaultAddressState(addr);
+      }
+      return addr;
+    } catch {
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    if (user?.id) {
+      void refreshAddress();
+    } else {
+      setDefaultAddressState(null);
+    }
+  }, [user?.id]);
+
   const logout = async () => {
     await supabase.auth.signOut().catch(() => {});
     await api.logout().catch(() => {});
     clearLocalAuth();
     setUser(null);
+    setDefaultAddressState(null);
   };
 
-  return <AuthContext.Provider value={{ user, isLoading, login, sendPhoneOtp, loginWithPhoneOtp, verifyPhoneOtp, loginWithGoogle, register, logout, isAuthenticated: !!user, role: user?.role || null }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        defaultAddress,
+        refreshAddress,
+        login,
+        sendPhoneOtp,
+        loginWithPhoneOtp,
+        verifyPhoneOtp,
+        loginWithGoogle,
+        register,
+        logout,
+        isAuthenticated: !!user,
+        role: user?.role || null,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export function normalizePhone(phone: string): string {

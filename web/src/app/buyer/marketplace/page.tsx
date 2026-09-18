@@ -133,12 +133,47 @@ export default function MarketplacePage() {
         const minOrder = getMinOrder(activeListing);
         const availableQty = getAvailableQty(activeListing);
         const pricePerKg = getPricePerKg(activeListing);
+        const activeAddr = typeof window !== 'undefined' ? (require('@/lib/delivery-addresses').getActiveSelectedAddressSync()) : null;
+        const addressText = activeAddr
+          ? `${activeAddr.house_number}, ${activeAddr.street}, ${activeAddr.area}, ${activeAddr.city} (${activeAddr.postal_code})`
+          : 'Default Delivery Address';
+
         return (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"><div className="bg-[#121a16] border border-[#1e2d26] p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4"><div className="flex justify-between items-center border-b border-[#1e2d26] pb-3"><h3 className="font-bold text-lg text-emerald-300">Place Wholesale Order</h3><button onClick={() => setActiveListing(null)} className="text-gray-400 hover:text-white">✕</button></div>
-            {orderMessage && <div className={`p-3 rounded-xl text-xs flex items-center gap-2 ${orderMessage.startsWith('Error') ? 'bg-red-950/60 border border-red-800 text-red-300' : 'bg-emerald-950/60 border border-emerald-800 text-emerald-300'}`}>{orderMessage.startsWith('Error') ? <AlertCircle className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}<span>{orderMessage}</span></div>}
-            <div className="space-y-2 text-xs text-gray-300 font-mono bg-[#0a0f0d] p-3 rounded-xl border border-[#1e2d26]"><p><strong>Produce:</strong> {getCropName(activeListing)}</p><p><strong>Asking Price:</strong> ₹{pricePerKg} / KG</p><p><strong>Available Qty:</strong> {availableQty} KG</p><p><strong>Min Order Qty:</strong> {minOrder} KG</p></div>
-            <form onSubmit={handlePlaceOrder} className="space-y-4"><div><label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Order Quantity (KG)</label><input type="number" required min={minOrder} max={availableQty} value={orderQty} onChange={(e) => setOrderQty(e.target.value)} className="w-full px-4 py-2.5 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" /></div><div className="p-3 bg-emerald-950/40 border border-emerald-800/40 rounded-xl flex justify-between items-center text-sm font-bold text-emerald-300"><span>Total Amount:</span><span>₹{((parseFloat(orderQty) || 0) * pricePerKg).toFixed(2)}</span></div><div className="flex gap-3"><button type="button" onClick={() => setActiveListing(null)} className="flex-1 py-2.5 bg-[#0a0f0d] border border-[#1e2d26] text-gray-300 font-semibold rounded-xl">Cancel</button><button type="submit" disabled={orderSubmitting} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow transition">{orderSubmitting ? t('loading') : 'Confirm Order'}</button></div></form>
-          </div></div>
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-[#121a16] border border-[#1e2d26] p-6 rounded-2xl max-w-md w-full shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-[#1e2d26] pb-3">
+                <h3 className="font-bold text-lg text-emerald-300">Place Wholesale Order</h3>
+                <button onClick={() => setActiveListing(null)} className="text-gray-400 hover:text-white">✕</button>
+              </div>
+              {orderMessage && (
+                <div className={`p-3 rounded-xl text-xs flex items-center gap-2 ${orderMessage.startsWith('Error') ? 'bg-red-950/60 border border-red-800 text-red-300' : 'bg-emerald-950/60 border border-emerald-800 text-emerald-300'}`}>
+                  {orderMessage.startsWith('Error') ? <AlertCircle className="w-4 h-4 shrink-0" /> : <CheckCircle2 className="w-4 h-4 shrink-0" />}
+                  <span>{orderMessage}</span>
+                </div>
+              )}
+              <div className="space-y-2 text-xs text-gray-300 font-mono bg-[#0a0f0d] p-3 rounded-xl border border-[#1e2d26]">
+                <p><strong>Produce:</strong> {getCropName(activeListing)}</p>
+                <p><strong>Asking Price:</strong> ₹{pricePerKg} / KG</p>
+                <p><strong>Available Qty:</strong> {availableQty} KG</p>
+                <p><strong>Min Order Qty:</strong> {minOrder} KG</p>
+                <p className="text-emerald-400 truncate"><strong>Deliver To:</strong> {addressText}</p>
+              </div>
+              <form onSubmit={handlePlaceOrder} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Order Quantity (KG)</label>
+                  <input type="number" required min={minOrder} max={availableQty} value={orderQty} onChange={(e) => setOrderQty(e.target.value)} className="w-full px-4 py-2.5 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white focus:border-emerald-500 focus:outline-none" />
+                </div>
+                <div className="p-3 bg-emerald-950/40 border border-emerald-800/40 rounded-xl flex justify-between items-center text-sm font-bold text-emerald-300">
+                  <span>Total Amount:</span>
+                  <span>₹{((parseFloat(orderQty) || 0) * pricePerKg).toFixed(2)}</span>
+                </div>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setActiveListing(null)} className="flex-1 py-2.5 bg-[#0a0f0d] border border-[#1e2d26] text-gray-300 font-semibold rounded-xl">Cancel</button>
+                  <button type="submit" disabled={orderSubmitting} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow transition">{orderSubmitting ? t('loading') : 'Confirm Order'}</button>
+                </div>
+              </form>
+            </div>
+          </div>
         );
       })()}
     </div>
