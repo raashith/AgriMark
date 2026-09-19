@@ -10,14 +10,12 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles?: UserRole[];
   requireAuth?: boolean;
-  allowGuest?: boolean;
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   allowedRoles,
   requireAuth = false,
-  allowGuest = true,
 }) => {
   const { user, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
@@ -28,12 +26,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     // Guest access is the default. Auth is only required when a route
     // explicitly opts in with requireAuth or role restrictions.
-    if (requireAuth && !isAuthenticated) {
+    if (!isAuthenticated && requireAuth) {
       router.replace('/auth/login');
       return;
     }
 
-    if (user?.needs_onboarding && pathname !== '/auth/onboarding') {
+    if (isAuthenticated && user?.needs_onboarding && pathname !== '/auth/onboarding') {
       router.replace('/auth/onboarding');
       return;
     }
