@@ -30,7 +30,7 @@ export default function HomePage() {
     { title:'ROUTE', label:'Traceable movement', tone:'blue' },
   ];
   const workspaceHref = useMemo(() => {
-    if (!isAuthenticated) return '/auth/register';
+    if (!isAuthenticated) return '/dashboard';
     switch (role || user?.role) {
       case 'farmer': return '/farmer/dashboard';
       case 'buyer': return '/buyer/marketplace';
@@ -40,7 +40,7 @@ export default function HomePage() {
       default: return '/dashboard';
     }
   }, [isAuthenticated, role, user?.role]);
-  const workspaceLabel = isAuthenticated ? `OPEN ${(user?.role || role || 'USER').toUpperCase()} WORKSPACE` : 'START FOR FREE';
+  const workspaceLabel = isAuthenticated ? \`OPEN \${(user?.role || role || 'USER').toUpperCase()} WORKSPACE\` : 'OPEN DASHBOARD';
   const closeMenu = () => setMenuOpen(false);
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export default function HomePage() {
   return (
     <main ref={rootRef} className="agri3d-page">
       <div className="agri3d-bg" aria-hidden="true">
-        <div className={`agri3d-scene agri3d-scene-${scenes[activeScene].tone}`}>
+        <div className={\`agri3d-scene agri3d-scene-\${scenes[activeScene].tone}\`}>
           <div className="agri3d-horizon" />
           <div className="agri3d-sun" />
           <div className="agri3d-mist agri3d-mist-a" />
@@ -66,7 +66,7 @@ export default function HomePage() {
         <div className="agri3d-noise" />
       </div>
 
-      <header className={`agri3d-nav ${menuOpen ? 'is-open' : ''}`}>
+      <header className={\`agri3d-nav \${menuOpen ? 'is-open' : ''}\`}>
         <Link href="/" className="agri3d-logo" onClick={closeMenu}><span className="agri3d-logo-mark"><Leaf size={20}/></span><span>AgriMark<span>.ai</span></span></Link>
         <nav className="agri3d-links">
           <a href="#platform" onClick={closeMenu}>Platform</a>
@@ -74,10 +74,10 @@ export default function HomePage() {
           <a href="#ecosystem" onClick={closeMenu}>Ecosystem</a>
           <Link href="/marketplace" onClick={closeMenu}>Marketplace</Link>
         </nav>
-        <div className="agri3d-nav-actions"><Link href={workspaceHref} className="agri3d-top-cta">{isAuthenticated ? 'WORKSPACE' : 'JOIN AGRIMARK'}</Link><button className="agri3d-menu-btn" onClick={()=>setMenuOpen(v=>!v)} aria-label="Toggle navigation" aria-expanded={menuOpen}>☰</button></div>
+        <div className="agri3d-nav-actions"><Link href={workspaceHref} className="agri3d-top-cta">{isAuthenticated ? 'WORKSPACE' : 'OPEN DASHBOARD'}</Link><button className="agri3d-menu-btn" onClick={()=>setMenuOpen(v=>!v)} aria-label="Toggle navigation" aria-expanded={menuOpen}>☰</button></div>
         <div className="agri3d-mobile-panel">
           <a href="#platform" onClick={()=>setMenuOpen(false)}>Platform</a><a href="#intelligence" onClick={()=>setMenuOpen(false)}>Intelligence</a><a href="#ecosystem" onClick={()=>setMenuOpen(false)}>Ecosystem</a><Link href="/marketplace" onClick={()=>setMenuOpen(false)}>Marketplace</Link>
-          <Link href={workspaceHref} className="agri3d-top-cta">{isAuthenticated ? 'WORKSPACE' : 'JOIN AGRIMARK'}</Link>
+          <Link href={workspaceHref} className="agri3d-top-cta">{isAuthenticated ? 'WORKSPACE' : 'OPEN DASHBOARD'}</Link>
         </div>
       </header>
 
@@ -92,27 +92,27 @@ export default function HomePage() {
         </div>
 
         <div className="agri3d-dashboard" aria-hidden="true">
-          <div className="dashboard-top"><div><span>AGRIMARK COMMAND</span><strong>Live field signal</strong></div><b>ONLINE</b></div>
-          <div className="dashboard-main"><div className="dashboard-value">+18.6% <small>market pulse</small></div><div className="dashboard-chart"><i/><i/><i/><i/><i/><i/><i/><i/><i/></div></div>
-          <div className="dashboard-grid"><div><span>FIELD HEALTH</span><b>92%</b></div><div><span>DEMAND</span><b>HIGH</b></div><div><span>TRACE</span><b>100%</b></div></div>
+          <div className="dashboard-top"><div><span>AGRIMARK COMMAND</span><strong>Public overview</strong></div><b>OPEN</b></div>
+          <div className="dashboard-main"><div className="dashboard-value">LIVE <small>agriculture intelligence</small></div><div className="dashboard-chart"><i/><i/><i/><i/><i/><i/><i/><i/><i/></div></div>
+          <div className="dashboard-grid"><div><span>FIELD HEALTH</span><b>VIEW</b></div><div><span>MARKET</span><b>VIEW</b></div><div><span>TRACE</span><b>VIEW</b></div></div>
         </div>
 
-        <Link href={isAuthenticated ? "/farmer/dashboard" : "/auth/register"} className="agri3d-float agri3d-float-a"><Sprout size={15}/><span>Crop health</span><b>92%</b></Link>
-        <Link href="/marketplace" className="agri3d-float agri3d-float-b"><BarChart3 size={15}/><span>Market pulse</span><b>+12.4%</b></Link>
-        <Link href="/logistics/deliveries" className="agri3d-float agri3d-float-c"><Truck size={15}/><span>Dispatch</span><b>ON ROUTE</b></Link>
+        <Link href="/farmer/dashboard" className="agri3d-float agri3d-float-a"><Sprout size={15}/><span>Crop intelligence</span><b>OPEN</b></Link>
+        <Link href="/marketplace" className="agri3d-float agri3d-float-b"><BarChart3 size={15}/><span>Market intelligence</span><b>OPEN</b></Link>
+        <Link href="/logistics/deliveries" className="agri3d-float agri3d-float-c"><Truck size={15}/><span>Logistics view</span><b>OPEN</b></Link>
       </section>
 
       <section className="agri3d-bottom" id="intelligence">
-        <Link href={isAuthenticated ? "/farmer/dashboard" : "/auth/register"}><span>FARMERS</span><b>Plan smarter</b><small>Crop and harvest intelligence</small></Link>
-        <Link href="/buyer/marketplace"><span>BUYERS</span><b>Source directly</b><small>Traceable produce workflows</small></Link>
-        <Link href="/dashboard#ecosystem"><span>FPO / CO-OP</span><b>Aggregate supply</b><small>Coordinate trade at scale</small></Link>
-        <Link href="/logistics/deliveries"><span>LOGISTICS</span><b>Move clearly</b><small>Track every delivery</small></Link>
+        <Link href="/farmer/dashboard"><span>FARMERS</span><b>Explore dashboard</b><small>Sign in only when saving farm data</small></Link>
+        <Link href="/buyer/marketplace"><span>BUYERS</span><b>Browse marketplace</b><small>Public discovery before account actions</small></Link>
+        <Link href="/dashboard#ecosystem"><span>FPO / CO-OP</span><b>Explore workspace</b><small>Account required for protected actions</small></Link>
+        <Link href="/logistics/deliveries"><span>LOGISTICS</span><b>View logistics</b><small>Account required for protected updates</small></Link>
       </section>
 
       <section className="agri3d-ecosystem" id="ecosystem">
         <div className="agri3d-eco-card">
           <span>ECOSYSTEM</span><h2>ONE OPERATING LAYER FOR AGRICULTURE.</h2>
-          <p>Connect field operations, marketplace discovery, AI assistance and logistics into the existing AgriMark workspace.</p>
+          <p>Browse AgriMark without an account. Authentication is reserved for private data, edits, transactions and role-specific actions.</p>
           <div className="agri3d-eco-actions">
             <Link href="/dashboard" className="agri3d-secondary"><Users size={16}/> OPEN DASHBOARD</Link>
             <Link href="/ai-assistant" className="agri3d-secondary"><BrainCircuit size={16}/> ASK AGRIAI</Link>
@@ -121,7 +121,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div className="agri3d-dots" aria-label="Hero scenes">{scenes.map((s,i)=><button key={s.title} className={i===activeScene?'active':''} onClick={()=>setActiveScene(i)} aria-label={`Show ${s.title} scene`}/>)}</div>
+      <div className="agri3d-dots" aria-label="Hero scenes">{scenes.map((s,i)=><button key={s.title} className={i===activeScene?'active':''} onClick={()=>setActiveScene(i)} aria-label={\`Show \${s.title} scene\`}/>)}</div>
     </main>
   );
 }
