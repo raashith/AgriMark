@@ -82,7 +82,7 @@ export async function GET() {
     const mandiCode = code(state + '_' + district + '_' + mandi).slice(0, 100);
     const commodityCode = code(commodity).slice(0, 50);
     const variantCode = variety ? code(commodity + '_' + variety).slice(0, 100) : null;
-    const observedAt = observedDate.includes('T') ? observedDate : observedDate + 'T00:00:00+05:30';
+    const observedAt = observedDate + 'T00:00:00+05:30';
 
     const { error: stateError } = await supabase.from('national_states').upsert({
       state_code: stateCode,
@@ -136,8 +136,8 @@ export async function GET() {
       min_price: minPrice,
       max_price: maxPrice,
       modal_price: modalPrice,
-      arrival_quantity_mt: num(r.arrival_qty) || 0,
-      arrival_unit: String(r.unit_name_arrival ?? 'Metric Tonnes'),
+      arrival_quantity_mt: 0,
+      arrival_unit: null,
       observed_at: observedAt,
       source: 'AGMARKNET',
       source_url: SOURCE_URL,
