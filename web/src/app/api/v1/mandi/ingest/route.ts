@@ -2,12 +2,11 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
 
 const OGD_URL = 'https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070';
 const SOURCE_URL = 'https://agmarknet.gov.in/';
-const DEFAULT_PAGE_SIZE = 1000;
-const MAX_PAGES_PER_REQUEST = 20;
+const DEFAULT_PAGE_SIZE = 500;
+const MAX_PAGES_PER_REQUEST = 10;
 
 function num(v: unknown): number | null {
   const n = Number(String(v ?? '').replace(/,/g, '').trim());
