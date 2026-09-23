@@ -6,6 +6,9 @@ export const dynamic = 'force-dynamic';
 const OGD_URL = 'https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070';
 const SOURCE_URL = 'https://agmarknet.gov.in/';
 
+// Official Government of India OGD resource used by AGMARKNET.
+// The API key must be configured as a server-side environment variable.
+
 function num(v: unknown): number | null {
   const n = Number(String(v ?? '').replace(/,/g, '').trim());
   return Number.isFinite(n) ? n : null;
