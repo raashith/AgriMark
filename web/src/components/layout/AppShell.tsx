@@ -44,24 +44,18 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
   return (
     <ToastProvider>
-      {!isCinematicHome && <AgriMarkIntro />}
-      {isCinematicHome ? (
-        <div className="min-h-screen bg-[#07110d] text-gray-100">
-          {children}
+      <AgriMarkIntro />
+      <div className="min-h-screen bg-[#0a0f0d] text-gray-100 flex flex-col font-sans selection:bg-emerald-600 selection:text-white">
+        <Navbar />
+        <div className="flex-1 flex w-full max-w-[1600px] mx-auto">
+          {!isPublicPage && <Sidebar />}
+          <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl w-full mx-auto pb-24 lg:pb-12 space-y-6">
+            {children}
+          </main>
         </div>
-      ) : (
-        <div className="min-h-screen bg-[#0a0f0d] text-gray-100 flex flex-col font-sans selection:bg-emerald-600 selection:text-white">
-          <Navbar />
-          <div className="flex-1 flex w-full max-w-[1600px] mx-auto">
-            {!isPublicPage && <Sidebar />}
-            <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl w-full mx-auto pb-24 lg:pb-12 space-y-6">
-              {children}
-            </main>
-          </div>
-          <Footer />
-          {!isPublicPage && <MobileNav />}
-        </div>
-      )}
+        <Footer />
+        {!isPublicPage && <MobileNav />}
+      </div>
     </ToastProvider>
   );
 };
