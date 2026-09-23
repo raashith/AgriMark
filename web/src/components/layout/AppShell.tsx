@@ -31,6 +31,17 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     '/auth/onboarding',
   ].includes(pathname);
 
+  if (pathname === '/') {
+    return (
+      <ToastProvider>
+        <AgriMarkIntro />
+        <div className="min-h-screen bg-[#000000] text-white font-sans selection:bg-[#1B4D3E] selection:text-white">
+          {children}
+        </div>
+      </ToastProvider>
+    );
+  }
+
   return (
     <ToastProvider>
       <AgriMarkIntro />
@@ -48,3 +59,4 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     </ToastProvider>
   );
 };
+
