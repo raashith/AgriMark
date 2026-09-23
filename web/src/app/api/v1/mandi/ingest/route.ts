@@ -60,64 +60,6 @@ async function fetchPage(apiKey: string, offset: number, limit: number, state?: 
   return response.json();
 }
 
-
-async function resolveCanonicalIds(
-  state: string,
-  district: string,
-  mandi: string,
-  commodity: string,
-  variety: string,
-  grade: string,
-) {
-  const stateCode = code(state, 10);
-  const districtCode = code(state + '_' + district, 20);
-  const mandiCode = code(state + '_' + district + '_' + mandi, 100);
-  const commodityCode = code(commodity, 50);
-  const variantCode = variety ? code(commodity + '_' + variety, 100) : null;
-
-  const { error: stateError } = await supabase.from('national_states').upsert({
-    state_code: stateCode,
-    name: state,
-    region: 'INDIA',
-  }, { onConflict: 'state_code' });
-  if (stateError) throw new Error('state upsert failed: ' + stateError.message);
-
-  const { error: districtError } = await supabase.from('national_districts').upsert({
-    district_code: districtCode,
-    state_code: stateCode,
-    name: district,
-  }, { onConflict: 'district_code' });
-  if (districtError) throw new Error('district upsert failed: ' + districtError.message);
-
-  const { error: mandiError } = await supabase.from('national_mandis').upsert({
-    mandi_code: mandiCode,
-    district_code: districtCode,
-    name: mandi,
-  }, { onConflict: 'mandi_code' });
-  if (mandiError) throw new Error('mandi upsert failed: ' + mandiError.message);
-
-  const { data: commodityRow, error: commodityError } = await supabase.from('national_commodities').upsert({
-    code: commodityCode,
-    name: commodity,
-    category: category('', commodity),
-  }, { onConflict: 'code' }).select('id').single();
-  if (commodityError || !commodityRow) {
-    throw new Error('commodity upsert failed: ' + (commodityError?.message || 'missing commodity id'));
-  }
-
-  if (variantCode) {
-    const { error: variantError } = await supabase.from('national_commodity_variants').upsert({
-      variant_code: variantCode,
-      commodity_id: commodityRow.id,
-      variant_name: variety,
-      grade: grade || 'STANDARD',
-    }, { onConflict: 'variant_code' });
-    if (variantError) throw new Error('variant upsert failed: ' + variantError.message);
-  }
-
-  return { stateCode, districtCode, mandiCode, commodityCode, variantCode };
-}
-
 async function upsertRecord(r: Record<string, unknown>) {
   const state = String(r.state ?? '').trim();
   const district = String(r.district ?? '').trim();
