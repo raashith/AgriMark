@@ -50,9 +50,14 @@ export async function GET(request: Request) {
     const payload = await upstream.json();
     const records = Array.isArray(payload?.records) ? payload.records : [];
     const cookieStore = cookies();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xrcqzpnstdbbtafhcwbb.supabase.co';
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    if (!supabaseKey) {
+      return NextResponse.json({ ok: false, error: 'Supabase publishable key is not configured in Vercel Production.' }, { status: 503 });
+    }
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xrcqzpnstdbbtafhcwbb.supabase.co',
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+      supabaseUrl,
+      supabaseKey,
       { cookies: { get(name: string){ return cookieStore.get(name)?.value; } } }
     );
 
