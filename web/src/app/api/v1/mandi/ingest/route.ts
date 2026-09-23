@@ -4,10 +4,10 @@ import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
-const OGD_RESOURCE_ID = '9ef4b77d-9a0c-4988-8573-054bb0058170';
+const OGD_RESOURCE_ID = '35985678-0d79-46b4-9ed6-6f13308a1d24';
 const OGD_BASE_URL = 'https://api.data.gov.in/resource/';
 const DEFAULT_PAGE_SIZE = 200;
-const MAX_PAGE_SIZE = 200;
+const MAX_PAGE_SIZE = 100;
 
 const STATE_CODES: Record<string,string> = {
   'TAMIL NADU':'TN','MAHARASHTRA':'MH','KARNATAKA':'KA','UTTAR PRADESH':'UP','PUNJAB':'PB','HARYANA':'HR','MADHYA PRADESH':'MP','GUJARAT':'GJ','WEST BENGAL':'WB','ANDHRA PRADESH':'AP','TELANGANA':'TS','RAJASTHAN':'RJ','BIHAR':'BR','KERALA':'KL','ODISHA':'OD','ASSAM':'AS','CHHATTISGARH':'CG','JHARKHAND':'JH','HIMACHAL PRADESH':'HP','UTTARAKHAND':'UK','GOA':'GA','DELHI':'DL'
@@ -63,12 +63,12 @@ export async function GET(request: Request) {
 
     let ingested=0, skipped=0, errors=0;
     for (const rec of records) {
-      const state=String(rec?.state || '').trim();
-      const district=String(rec?.district || '').trim();
-      const market=String(rec?.market || '').trim();
-      const commodity=String(rec?.commodity || '').trim();
-      const variety=String(rec?.variety || 'Standard').trim() || 'Standard';
-      const modal=Number(rec?.modal_price);
+      const state=String(rec?.State ?? rec?.state ?? '').trim();
+      const district=String(rec?.District ?? rec?.district ?? '').trim();
+      const market=String(rec?.Market ?? rec?.market ?? '').trim();
+      const commodity=String(rec?.Commodity ?? rec?.commodity ?? '').trim();
+      const variety=String(rec?.Variety ?? rec?.variety ?? 'Standard').trim() || 'Standard';
+      const modal=Number(rec?.['Modal Price'] ?? rec?.modal_price);
       if (!state || !district || !market || !commodity || !Number.isFinite(modal)) { skipped++; continue; }
 
       const stateCode=stateCodeFor(state);
@@ -76,9 +76,9 @@ export async function GET(request: Request) {
       const mandiCode=`${districtCode}_${slugify(market)}`;
       const commodityCode=slugify(commodity);
       const variantCode=`${commodityCode}_${slugify(variety)}`;
-      const obsDate=parseDate(String(rec?.arrival_date || '')) || new Date().toISOString().slice(0,10);
-      const minPrice=Number(rec?.min_price);
-      const maxPrice=Number(rec?.max_price);
+      const obsDate=parseDate(String(rec?.Arrival_Date ?? rec?.arrival_date ?? '')) || new Date().toISOString().slice(0,10);
+      const minPrice=Number(rec?.['Min Price'] ?? rec?.min_price);
+      const maxPrice=Number(rec?.['Max Price'] ?? rec?.max_price);
       const min=minPrice>0?minPrice:modal;
       const max=maxPrice>0?maxPrice:modal;
 
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
           supabase.from('national_districts').upsert({state_code:stateCode,district_code:districtCode,name:district},{onConflict:'district_code'}),
           supabase.from('national_mandis').upsert({district_code:districtCode,mandi_code:mandiCode,name:market},{onConflict:'mandi_code'}),
           supabase.from('national_commodities').upsert({code:commodityCode,name:commodity,category:'AGRICULTURE',standard_unit:'QUINTAL'},{onConflict:'code'}),
-          supabase.from('national_commodity_variants').upsert({variant_code:variantCode,variant_name:variety,grade:String(rec?.grade || 'STANDARD')},{onConflict:'variant_code'})
+          supabase.from('national_commodity_variants').upsert({variant_code:variantCode,variant_name:variety,grade:String(rec?.Grade ?? rec?.grade ?? 'STANDARD')},{onConflict:'variant_code'})
         ]);
         const dimensionError=results.find(r=>r.error)?.error;
         if (dimensionError) { errors++; continue; }
@@ -97,7 +97,7 @@ export async function GET(request: Request) {
           commodity_code:commodityCode,variant_code:variantCode,mandi_code:mandiCode,district_code:districtCode,state_code:stateCode,
           price_signal_type:'OBSERVED_MANDI',min_price:min,max_price:max,modal_price:modal,observed_at:`${obsDate}T00:00:00.000Z`,
           source:'AGMARKNET_OFFICIAL',source_url:OGD_BASE_URL+OGD_RESOURCE_ID,geography:`${district}, ${state}`,unit:'INR_PER_QUINTAL',
-          validation_status:'VALIDATED',data_layer:'CANONICAL',is_synthetic:false,commodity_name:commodity,variety_name:variety,grade_name:String(rec?.grade || 'STANDARD'),
+          validation_status:'VALIDATED',data_layer:'CANONICAL',is_synthetic:false,commodity_name:commodity,variety_name:variety,grade_name:String(rec?.Grade ?? rec?.grade ?? 'STANDARD'),
           mandi_name:market,arrival_unit:null,raw_payload:rec
         },{onConflict:'commodity_code,variant_code,mandi_code,observed_at,source'});
         if (obsError) { errors++; continue; }
