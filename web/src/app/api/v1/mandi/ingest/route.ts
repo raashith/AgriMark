@@ -43,7 +43,8 @@ export async function GET(request: Request) {
     const apiKey = process.env.DATA_GOV_IN_API_KEY;
     if (!apiKey) return NextResponse.json({ok:false,error:'DATA_GOV_IN_API_KEY is not configured server-side.'},{status:503});
 
-    const arrivalDate = searchParams.get('date') || new Date().toISOString().slice(0,10);\n    const apiUrl = `${OGD_BASE_URL}${OGD_RESOURCE_ID}?api-key=${encodeURIComponent(apiKey)}&format=json&offset=${offset}&limit=${limit}&filters[Arrival_Date]=${encodeURIComponent(arrivalDate)}`;
+    const arrivalDate = searchParams.get('date') || new Date().toISOString().slice(0, 10);
+    const apiUrl = `${OGD_BASE_URL}${OGD_RESOURCE_ID}?api-key=${encodeURIComponent(apiKey)}&format=json&offset=${offset}&limit=${limit}&filters[Arrival_Date]=${encodeURIComponent(arrivalDate)}`;
     const upstream = await fetch(apiUrl,{cache:'no-store'});
     if (!upstream.ok) return NextResponse.json({ok:false,error:`AGMARKNET request failed: HTTP ${upstream.status}`},{status:upstream.status});
 
