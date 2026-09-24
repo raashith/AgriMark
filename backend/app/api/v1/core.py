@@ -11,6 +11,8 @@ from ...schemas.domain import (
     CultivationResponse,
     FarmCreate,
     FarmResponse,
+    HarvestBatchCreate,
+    HarvestBatchResponse,
     ListingCreate,
     ListingResponse,
     ProduceLotCreate,
@@ -122,6 +124,68 @@ def list_cultivations(
     result = query.execute()
     rows = [dict(row) for row in (result.data or [])]
     return [CultivationResponse(**{key: value for key, value in row.items() if key != "farms"}) for row in rows]
+
+
+@router.get("/harvest-batches", response_model=list[HarvestBatchResponse])
+def list_harvest_batches(
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> list[HarvestBatchResponse]:
+    result = (
+        get_supabase()
+        .table("harvest_batches")
+        .select("id,cultivation_id,harvested_at,quantity,grade,trace_code,cultivations!inner(farm_id,farms!inner(owner_id))")
+        .eq("cultivations.farms.owner_id", str(user.id))
+        .order("harvested_at", desc=True)
+        .execute()
+    )
+    return [
+        HarvestBatchResponse(
+            id=row["id"],
+            cultivation_id=row["cultivation_id"],
+            harvest_date=str(row["harvested_at"])[:10],
+            total_quantity_kg=row["quantity"],
+            quality_grade=row["grade"],
+            trace_code=row["trace_code"],
+        )
+        for row in (result.data or [])
+    ]
+
+
+@router.post("/harvest-batches", response_model=HarvestBatchResponse, status_code=201)
+def create_harvest_batch(
+    request: HarvestBatchCreate,
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> HarvestBatchResponse:
+    cultivation = (
+        get_supabase()
+        .table("cultivations")
+        .select("id,farm_id,farms!inner(owner_id)")
+        .eq("id", str(request.cultivation_id))
+        .eq("farms.owner_id", str(user.id))
+        .limit(1)
+        .execute()
+    )
+    _single(cultivation)
+    payload = {
+        "cultivation_id": str(request.cultivation_id),
+        "farm_id": str(cultivation.data[0]["farm_id"]),
+        "harvested_at": request.harvest_date.isoformat(),
+        "quantity": request.total_quantity_kg,
+        "unit": "kg",
+        "grade": request.quality_grade,
+    }
+    try:
+        created = _single(get_supabase().table("harvest_batches").insert(payload).execute())
+        return HarvestBatchResponse(
+            id=created["id"],
+            cultivation_id=created["cultivation_id"],
+            harvest_date=str(created["harvested_at"])[:10],
+            total_quantity_kg=created["quantity"],
+            quality_grade=created["grade"],
+            trace_code=created["trace_code"],
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Unable to create harvest batch") from exc
 
 
 @router.get("/produce-lots", response_model=list[ProduceLotResponse])
