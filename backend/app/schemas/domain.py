@@ -67,6 +67,18 @@ class ProduceLotResponse(ProduceLotCreate):
     status: str
 
 
+class HarvestBatchCreate(BaseModel):
+    cultivation_id: UUID
+    harvest_date: date
+    total_quantity_kg: Decimal = Field(gt=0)
+    quality_grade: str
+
+
+class HarvestBatchResponse(HarvestBatchCreate):
+    id: UUID
+    trace_code: str
+
+
 class ListingCreate(BaseModel):
     lot_id: UUID
     title: str
