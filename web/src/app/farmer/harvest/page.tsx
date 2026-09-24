@@ -215,7 +215,7 @@ export default function HarvestPage() {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2"><h3 className="font-bold text-amber-300">Harvest {harvest.id.slice(0, 8)}</h3><span className="text-[11px] px-2.5 py-1 rounded-full border border-emerald-900 bg-emerald-950/50 text-emerald-300">{status}</span></div>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-3 mt-4 text-sm">
-                            <div><p className="text-gray-500 text-xs">Crop</p><p className="text-white">{linkedLot?.crop_name || linkedLot?.crop_id || 'Linked crop'}</p></div>
+                            <div><p className="text-gray-500 text-xs">Crop</p><p className="text-white">{linkedLot?.crop_name || cropOptions.find((crop) => crop.id === linkedLot?.crop_id)?.name || linkedLot?.crop_id || 'Linked crop'}</p></div>
                             <div><p className="text-gray-500 text-xs">Quantity</p><p className="text-white">{qty.toLocaleString()} {linkedLot?.unit || 'kg'}</p></div>
                             <div><p className="text-gray-500 text-xs">Available</p><p className="text-emerald-300">{stock.toLocaleString()} {linkedLot?.unit || 'kg'}</p></div>
                             <div><p className="text-gray-500 text-xs">Quality</p><p className="text-white">{harvest.quality_grade || linkedLot?.quality_grade || 'Not specified'}</p></div>
