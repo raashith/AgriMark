@@ -86,6 +86,8 @@ export const api = {
     return request<Cultivation[]>(`/core/cultivations${query.toString() ? `?${query}` : ''}`);
   },
   createCultivation: (data: Partial<Cultivation>) => request<Cultivation>('/core/cultivations', { method: 'POST', body: JSON.stringify(data) }),
+  getHarvestBatches: () => request<Array<{ id: string; cultivation_id: string; harvest_date: string; total_quantity_kg: number; quality_grade: string; trace_code: string }>>('/core/harvest-batches'),
+  createHarvestBatch: (data: { cultivation_id: string; harvest_date: string; total_quantity_kg: number; quality_grade: string }) => request<{ id: string; cultivation_id: string; harvest_date: string; total_quantity_kg: number; quality_grade: string; trace_code: string }>('/core/harvest-batches', { method: 'POST', body: JSON.stringify(data) }),
   getProduceLots: () => request<ProduceLot[]>('/core/produce-lots'),
   createProduceLot: (data: Partial<ProduceLot>) => request<ProduceLot>('/core/produce-lots', { method: 'POST', body: JSON.stringify(data) }),
   createListing: (data: Partial<Listing>) => request<Listing>('/core/listings', { method: 'POST', body: JSON.stringify(data) }),

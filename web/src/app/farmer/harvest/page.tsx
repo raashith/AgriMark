@@ -25,18 +25,21 @@ export default function HarvestPage() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [errorDetails, setErrorDetails] = useState('');
+  const [harvestHistory, setHarvestHistory] = useState<Array<{ id: string; cultivation_id: string; harvest_date: string; total_quantity_kg: number; quality_grade: string; trace_code: string }>>([]);
 
   const loadData = async (id: string) => {
     setLoading(true);
     setErrorDetails('');
     try {
-      const [farmRes, lotRes, cropRes] = await Promise.all([
+      const [farmRes, lotRes, harvestRes, cropRes] = await Promise.all([
         api.getFarms(id),
         api.getProduceLots(),
+        api.getHarvestBatches(),
         api.getCrops(),
       ]);
       setFarms(farmRes);
       setLots(lotRes);
+      setHarvestHistory(harvestRes);
       setCropOptions(cropRes.items || []);
 
       if (!farmId && farmRes[0]?.id) setFarmId(farmRes[0].id);
@@ -83,6 +86,14 @@ export default function HarvestPage() {
       });
 
       if (!cultivation?.id) throw new Error('Cultivation was not created, so the harvest could not be linked.');
+
+      const harvest = await api.createHarvestBatch({
+        cultivation_id: cultivation.id,
+        harvest_date: harvestDate,
+        total_quantity_kg: quantity,
+        quality_grade: qualityGrade,
+      });
+      if (!harvest?.id) throw new Error('Harvest batch was not created.');
 
       const lot = await api.createProduceLot({
         cultivation_id: cultivation.id,
@@ -189,31 +200,32 @@ export default function HarvestPage() {
           <div className="bg-[#121a16] border border-[#1e2d26] p-5 rounded-2xl shadow-md">
             <div className="flex items-center gap-2 mb-4"><PackageCheck className="w-5 h-5 text-amber-400" /><h2 className="text-lg font-bold text-gray-100">Harvest & Lot Details</h2></div>
 
-            {loading ? <div className="py-12 text-center text-gray-400">Loading your harvest records...</div> : lots.length === 0 ? (
+            {loading ? <div className="py-12 text-center text-gray-400">Loading your harvest records...</div> : harvestHistory.length === 0 ? (
               <div className="py-12 text-center border border-dashed border-[#294136] rounded-xl text-gray-400"><ClipboardList className="w-8 h-8 mx-auto mb-3 text-gray-600" />No harvest lots found for this account yet.</div>
             ) : (
               <div className="space-y-3">
-                {lots.map((lot) => {
-                  const stock = Number(lot.available_quantity ?? lot.quantity ?? 0);
-                  const qty = Number(lot.quantity ?? lot.quantity_kg ?? 0);
-                  const status = lot.status ?? 'available';
+                {harvestHistory.map((harvest) => {
+                  const linkedLot = lots.find((lot) => lot.cultivation_id === harvest.cultivation_id && lot.harvested_at === harvest.harvest_date);
+                  const stock = Number(linkedLot?.available_quantity ?? linkedLot?.quantity ?? harvest.total_quantity_kg ?? 0);
+                  const qty = Number(linkedLot?.quantity ?? harvest.total_quantity_kg ?? 0);
+                  const status = linkedLot?.status ?? 'available';
                   return (
-                    <div key={lot.id} className="rounded-2xl border border-[#294136] bg-[#0a0f0d] p-5">
+                    <div key={harvest.id} className="rounded-2xl border border-[#294136] bg-[#0a0f0d] p-5">
                       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                         <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2"><h3 className="font-bold text-amber-300">Lot {lot.id.slice(0, 8)}</h3><span className="text-[11px] px-2.5 py-1 rounded-full border border-emerald-900 bg-emerald-950/50 text-emerald-300">{status}</span></div>
+                          <div className="flex flex-wrap items-center gap-2"><h3 className="font-bold text-amber-300">Harvest {harvest.id.slice(0, 8)}</h3><span className="text-[11px] px-2.5 py-1 rounded-full border border-emerald-900 bg-emerald-950/50 text-emerald-300">{status}</span></div>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-3 mt-4 text-sm">
-                            <div><p className="text-gray-500 text-xs">Crop</p><p className="text-white">{lot.crop_name || lot.crop_id}</p></div>
-                            <div><p className="text-gray-500 text-xs">Quantity</p><p className="text-white">{qty.toLocaleString()} {lot.unit || 'kg'}</p></div>
-                            <div><p className="text-gray-500 text-xs">Available</p><p className="text-emerald-300">{stock.toLocaleString()} {lot.unit || 'kg'}</p></div>
-                            <div><p className="text-gray-500 text-xs">Quality</p><p className="text-white">{lot.quality_grade || 'Not specified'}</p></div>
-                            <div><p className="text-gray-500 text-xs">Harvested</p><p className="text-white">{lot.harvested_at || lot.harvest_date || '—'}</p></div>
-                            <div><p className="text-gray-500 text-xs">Trace code</p><p className="text-white font-mono break-all">{lot.trace_code || 'Linked through cultivation'}</p></div>
-                            <div><p className="text-gray-500 text-xs">Listed</p><p className="text-white">{lot.is_listed ? 'Yes' : 'No'}</p></div>
-                            <div><p className="text-gray-500 text-xs">Lot ID</p><p className="text-gray-300 font-mono text-xs break-all">{lot.id}</p></div>
+                            <div><p className="text-gray-500 text-xs">Crop</p><p className="text-white">{linkedLot?.crop_name || linkedLot?.crop_id || 'Linked crop'}</p></div>
+                            <div><p className="text-gray-500 text-xs">Quantity</p><p className="text-white">{qty.toLocaleString()} {linkedLot?.unit || 'kg'}</p></div>
+                            <div><p className="text-gray-500 text-xs">Available</p><p className="text-emerald-300">{stock.toLocaleString()} {linkedLot?.unit || 'kg'}</p></div>
+                            <div><p className="text-gray-500 text-xs">Quality</p><p className="text-white">{harvest.quality_grade || linkedLot?.quality_grade || 'Not specified'}</p></div>
+                            <div><p className="text-gray-500 text-xs">Harvested</p><p className="text-white">{harvest.harvest_date}</p></div>
+                            <div><p className="text-gray-500 text-xs">Trace code</p><p className="text-white font-mono break-all">{harvest.trace_code || 'Generated trace code'}</p></div>
+                            <div><p className="text-gray-500 text-xs">Listed</p><p className="text-white">{linkedLot?.is_listed ? 'Yes' : 'No'}</p></div>
+                            <div><p className="text-gray-500 text-xs">Lot ID</p><p className="text-gray-300 font-mono text-xs break-all">{linkedLot?.id || 'Generated from harvest'}</p></div>
                           </div>
                         </div>
-                        <div className="shrink-0 text-xs text-gray-500 flex items-center gap-1"><ClipboardList className="w-4 h-4" />{lot.created_at ? new Date(lot.created_at).toLocaleString() : 'Created record'}</div>
+                        <div className="shrink-0 text-xs text-gray-500 flex items-center gap-1"><ClipboardList className="w-4 h-4" />Harvest batch recorded</div>
                       </div>
                     </div>
                   );
