@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/lib/auth';
 import { dataService } from '@/lib/data-service';
-import { EmptyState } from '@/components/ui/EmptyState';
 import {
   Sprout,
   Layers,
