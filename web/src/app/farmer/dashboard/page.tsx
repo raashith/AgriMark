@@ -5,16 +5,11 @@ import Link from 'next/link';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/lib/auth';
 import { dataService } from '@/lib/data-service';
-import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import {
   Sprout,
-  MapPin,
-  Eye,
   Layers,
-  ShoppingCart,
   TrendingUp,
-  FileText,
   CheckSquare,
   Bot,
   AlertTriangle,
