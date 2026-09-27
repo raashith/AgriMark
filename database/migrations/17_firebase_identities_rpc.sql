@@ -92,3 +92,9 @@ BEGIN
   WHERE p.id = v_profile_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- SECURITY DEFINER functions must not expose execution to PUBLIC.
+REVOKE ALL ON FUNCTION public.ensure_firebase_identity(text, text, text, text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ensure_firebase_identity(text, text, text, text, text) TO service_role;
+ALTER FUNCTION public.ensure_firebase_identity(text, text, text, text, text)
+  SET search_path = public, extensions;
