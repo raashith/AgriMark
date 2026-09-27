@@ -1,1 +1,1 @@
-// Firebase auth sync fixes will be applied next.
+// RESTORE FIREBASE AUTH
