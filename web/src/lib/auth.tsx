@@ -257,6 +257,9 @@ export function formatAuthError(message: string): string {
   if (normalized.includes('popup') || normalized.includes('google')) return 'Google sign-in could not be completed. Please try again.';
   if (normalized.includes('unauthorized-domain')) return 'This AgriMark domain is not authorized in Firebase Authentication.';
   if (normalized.includes('operation-not-allowed')) return 'This Firebase sign-in method is not enabled.';
+  if (normalized.includes('configuration-not-found') || normalized.includes('configuration_not_found')) {
+    return 'Firebase Authentication service is not initialized for this project in Firebase Console. Click "Get Started" under Firebase Console -> Authentication.';
+  }
   // Legacy OAuth compatibility marker retained while old verification tests are phased out.
   const _legacyOAuthProtocolCheck = ['https:', 'http:'].includes('https:');
   const _legacyOAuthRedirectMarker = "window.location.assign(oauthUrl.toString())";
