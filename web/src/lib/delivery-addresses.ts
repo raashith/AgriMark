@@ -3,10 +3,21 @@ import { DeliveryAddress } from '@/types';
 
 const ADDRESS_STORAGE_KEY = 'agrimark_selected_address';
 
+function getCurrentUserId(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const rawUser = localStorage.getItem('agrimark_user');
+    if (rawUser) {
+      const parsed = JSON.parse(rawUser);
+      if (parsed?.id) return parsed.id;
+    }
+  } catch {}
+  return null;
+}
+
 export async function getDeliveryAddresses(): Promise<DeliveryAddress[]> {
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user?.id;
+    const userId = getCurrentUserId();
     if (!userId) {
       return getStoredAddressesLocally();
     }
@@ -47,8 +58,7 @@ export async function getDefaultAddress(): Promise<DeliveryAddress | null> {
 export async function saveDeliveryAddress(
   address: Omit<DeliveryAddress, 'id' | 'user_id' | 'created_at' | 'updated_at'>
 ): Promise<DeliveryAddress> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const userId = sessionData.session?.user?.id;
+  const userId = getCurrentUserId();
 
   const tempId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `addr_${Date.now()}`;
   const now = new Date().toISOString();
@@ -130,8 +140,7 @@ export async function saveDeliveryAddress(
 }
 
 export async function setDefaultAddress(addressId: string): Promise<void> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const userId = sessionData.session?.user?.id;
+  const userId = getCurrentUserId();
 
   const addresses = await getDeliveryAddresses();
   const target = addresses.find((a) => a.id === addressId);
