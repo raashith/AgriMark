@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
@@ -14,6 +16,7 @@ class FirebaseSyncRequest(BaseModel):
     email: str | None = None
     phone: str | None = None
     full_name: str | None = None
+    requested_role: str | None = "farmer"
 
 
 @router.post("/sync")
@@ -36,6 +39,9 @@ def sync_firebase_profile(request: FirebaseSyncRequest):
     email = request.email or decoded.get("email")
     phone = request.phone or decoded.get("phone_number")
     full_name = request.full_name or decoded.get("name")
+    role = request.requested_role if request.requested_role in {
+        "farmer", "buyer", "fpo", "logistics", "service_provider"
+    } else "farmer"
 
     identity_result = (
         get_supabase()
@@ -46,7 +52,10 @@ def sync_firebase_profile(request: FirebaseSyncRequest):
         .execute()
     )
 
-    profile_id = identity_result.data[0]["profile_id"] if identity_result.data else uid
+    if identity_result.data:
+        profile_id = identity_result.data[0]["profile_id"]
+    else:
+        profile_id = str(uuid4())
 
     profile_result = (
         get_supabase()
@@ -64,7 +73,6 @@ def sync_firebase_profile(request: FirebaseSyncRequest):
             updates["full_name"] = full_name
         if phone and not profile.get("phone"):
             updates["phone"] = phone
-
         if updates:
             updated = (
                 get_supabase()
@@ -80,7 +88,7 @@ def sync_firebase_profile(request: FirebaseSyncRequest):
             "id": profile_id,
             "full_name": full_name or (email.split("@")[0] if email and "@" in email else "AgriMark User"),
             "phone": phone,
-            "role": "farmer",
+            "role": role,
         }
         try:
             created = get_supabase().table("profiles").upsert(profile).execute()
