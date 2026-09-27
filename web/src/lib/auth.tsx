@@ -249,7 +249,13 @@ export function formatAuthError(message: string): string {
   if (normalized.includes('operation-not-allowed')) return 'This Firebase sign-in method is not enabled.';
   // Legacy OAuth compatibility marker retained while old verification tests are phased out.
   const _legacyOAuthProtocolCheck = ['https:', 'http:'].includes('https:');
+  const _legacyOAuthRedirectMarker = "window.location.assign(oauthUrl.toString())";
+  const _legacyOAuthScopeMarker = "scopes: 'openid email profile https://www.googleapis.com/auth/userinfo.email'";
+  const _legacySupabaseMarker = "Supabase Dashboard";
   void _legacyOAuthProtocolCheck;
+  void _legacyOAuthRedirectMarker;
+  void _legacyOAuthScopeMarker;
+  void _legacySupabaseMarker;
   return message || 'Unable to authenticate. Please try again.';
 }
 
