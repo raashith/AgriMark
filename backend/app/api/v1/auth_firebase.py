@@ -49,11 +49,13 @@ def sync_firebase_profile(request: FirebaseSyncRequest):
     phone = request.phone or decoded.get("phone_number")
     full_name = request.full_name or decoded.get("name")
 
-    # Primary: Use Supabase RPC ensure_firebase_identity
+    client = get_supabase()
+
+    # The sync endpoint is server-side only, so it must use the service-role client.
+    # The RPC is preferred because it creates the profile + Firebase identity atomically.
     try:
         rpc_res = (
-            get_supabase()
-            .rpc(
+            client.rpc(
                 "ensure_firebase_identity",
                 {
                     "p_firebase_uid": uid,
@@ -65,93 +67,48 @@ def sync_firebase_profile(request: FirebaseSyncRequest):
             )
             .execute()
         )
-        if rpc_res.data:
-            profile = rpc_res.data[0] if isinstance(rpc_res.data, list) else rpc_res.data
-            has_name = bool(profile.get("full_name") and str(profile.get("full_name")).strip())
-            return {
-                "user": ProfileResponse(**profile, needs_onboarding=not has_name).model_dump(),
-            }
-    except Exception:
-        # Fallback to direct table queries if RPC is not installed in database
-        pass
+    except Exception as exc:
+        # Surface the real infrastructure failure instead of hiding it behind
+        # the misleading "unable to create profile" fallback.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AgriMark profile service is temporarily unavailable. Please try again.",
+        ) from exc
 
-    identity_result = (
-        get_supabase()
-        .table("firebase_identities")
-        .select("profile_id,email")
-        .eq("firebase_uid", uid)
-        .limit(1)
-        .execute()
-    )
+    if not rpc_res.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="AgriMark profile service returned no profile.",
+        )
 
-    if identity_result.data:
-        profile_id = identity_result.data[0]["profile_id"]
-    else:
-        profile_id = str(uuid4())
+    profile = rpc_res.data[0] if isinstance(rpc_res.data, list) else rpc_res.data
 
-    profile_result = (
-        get_supabase()
-        .table("profiles")
-        .select("id,full_name,phone,role")
-        .eq("id", profile_id)
-        .limit(1)
-        .execute()
-    )
-
-    if profile_result.data:
-        profile = profile_result.data[0]
-        updates = {}
-        if full_name and not profile.get("full_name"):
-            updates["full_name"] = full_name
-        if phone and not profile.get("phone"):
-            updates["phone"] = phone
-        if updates:
-            updated = (
-                get_supabase()
-                .table("profiles")
-                .update(updates)
-                .eq("id", profile_id)
-                .execute()
-            )
-            if updated.data:
-                profile = updated.data[0]
-    else:
-        profile = {
-            "id": profile_id,
-            "full_name": full_name or (email.split("@")[0] if email and "@" in email else "AgriMark User"),
-            "phone": phone,
-            "role": role,
-        }
-        try:
-            created = get_supabase().table("profiles").upsert(profile).execute()
-            if created.data:
-                profile = created.data[0]
-        except Exception as exc:
+    # Depending on the deployed RPC revision, it may return either a profile
+    # record or only the profile UUID. Normalize the UUID shape when necessary.
+    if isinstance(profile, str):
+        profile_id = profile
+        profile_result = (
+            client.table("profiles")
+            .select("id,full_name,phone,role")
+            .eq("id", profile_id)
+            .limit(1)
+            .execute()
+        )
+        if not profile_result.data:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Unable to create AgriMark profile",
-            ) from exc
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="AgriMark profile could not be loaded after synchronization.",
+            )
+        profile = profile_result.data[0]
+
+    has_name = bool(profile.get("full_name") and str(profile.get("full_name")).strip())
 
     try:
-        if identity_result.data:
-            get_supabase().table("firebase_identities").update(
-                {"email": email}
-            ).eq("firebase_uid", uid).execute()
-        else:
-            get_supabase().table("firebase_identities").insert(
-                {
-                    "firebase_uid": uid,
-                    "profile_id": profile_id,
-                    "email": email,
-                }
-            ).execute()
+        return {
+            "user": ProfileResponse(**profile, needs_onboarding=not has_name).model_dump(),
+        }
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to link Firebase identity",
+            detail="AgriMark profile data is invalid.",
         ) from exc
-
-    has_name = bool(profile.get("full_name") and str(profile.get("full_name")).strip())
-    return {
-        "user": ProfileResponse(**profile, needs_onboarding=not has_name).model_dump(),
-    }
