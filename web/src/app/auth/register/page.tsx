@@ -6,10 +6,10 @@ import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { UserRole } from '@/types';
 import Link from 'next/link';
-import { UserPlus, AlertCircle, CheckCircle2, Mail } from 'lucide-react';
+import { UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function RegisterPage() {
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const { t } = useI18n();
   const router = useRouter();
 
@@ -21,6 +21,14 @@ export default function RegisterPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const routeForRole = (userRole?: string | null) => {
+    if (userRole === 'buyer') return '/buyer/marketplace';
+    if (userRole === 'fpo') return '/fpo/dashboard';
+    if (userRole === 'logistics') return '/logistics/deliveries';
+    if (userRole === 'admin') return '/admin/dashboard';
+    return '/farmer/dashboard';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,16 +52,7 @@ export default function RegisterPage() {
         phone_number: phoneNumber,
       });
 
-      if (user.needs_onboarding) {
-        router.push('/auth/onboarding');
-        return;
-      }
-
-      if (user.role === 'farmer') router.push('/farmer/dashboard');
-      else if (user.role === 'buyer') router.push('/buyer/marketplace');
-      else if (user.role === 'fpo') router.push('/fpo/dashboard');
-      else if (user.role === 'logistics') router.push('/logistics/deliveries');
-      else router.push('/farmer/dashboard');
+      router.push(user.needs_onboarding ? '/auth/onboarding' : routeForRole(user.role));
     } catch (err: any) {
       setError(String(err?.message || 'Registration failed. Please try again.'));
     } finally {
@@ -67,12 +66,8 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const user = await (useAuth() as any).loginWithGoogle();
-      if (user?.role === 'farmer') router.push('/farmer/dashboard');
-      else if (user?.role === 'buyer') router.push('/buyer/marketplace');
-      else if (user?.role === 'fpo') router.push('/fpo/dashboard');
-      else if (user?.role === 'logistics') router.push('/logistics/deliveries');
-      else router.push('/farmer/dashboard');
+      const user = await loginWithGoogle();
+      router.push(routeForRole(user.role));
     } catch (err: any) {
       setError(String(err?.message || 'Google sign-in failed.'));
     } finally {
