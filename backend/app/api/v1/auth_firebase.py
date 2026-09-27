@@ -45,6 +45,36 @@ def sync_firebase_profile(request: FirebaseSyncRequest):
     allowed_roles = {"farmer", "buyer", "fpo", "logistics", "service_provider"}
     role = request.requested_role if request.requested_role in allowed_roles else "farmer"
 
+    email = request.email or decoded.get("email")
+    phone = request.phone or decoded.get("phone_number")
+    full_name = request.full_name or decoded.get("name")
+
+    # Primary: Use Supabase RPC ensure_firebase_identity
+    try:
+        rpc_res = (
+            get_supabase()
+            .rpc(
+                "ensure_firebase_identity",
+                {
+                    "p_firebase_uid": uid,
+                    "p_email": email,
+                    "p_full_name": full_name,
+                    "p_phone": phone,
+                    "p_requested_role": role,
+                },
+            )
+            .execute()
+        )
+        if rpc_res.data:
+            profile = rpc_res.data[0] if isinstance(rpc_res.data, list) else rpc_res.data
+            has_name = bool(profile.get("full_name") and str(profile.get("full_name")).strip())
+            return {
+                "user": ProfileResponse(**profile, needs_onboarding=not has_name).model_dump(),
+            }
+    except Exception:
+        # Fallback to direct table queries if RPC is not installed in database
+        pass
+
     identity_result = (
         get_supabase()
         .table("firebase_identities")
