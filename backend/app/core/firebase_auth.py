@@ -5,6 +5,7 @@ from functools import lru_cache
 import firebase_admin
 from firebase_admin import auth as firebase_auth
 from firebase_admin import credentials
+from firebase_admin import get_app, get_apps, initialize_app
 
 from .config import get_settings
 
@@ -12,25 +13,27 @@ from .config import get_settings
 @lru_cache
 def get_firebase_app() -> firebase_admin.App:
     settings = get_settings()
-
-    if firebase_admin._apps:
-        return firebase_admin.get_app()
+    if get_apps():
+        return get_app()
 
     if settings.firebase_service_account_json_base64:
-        raw = base64.b64decode(settings.firebase_service_account_json_base64).decode("utf-8")
-        service_account = json.loads(raw)
-        return firebase_admin.initialize_app(credentials.Certificate(service_account))
+        try:
+            raw = base64.b64decode(settings.firebase_service_account_json_base64).decode("utf-8")
+            return initialize_app(credentials.Certificate(json.loads(raw)))
+        except Exception as exc:
+            raise RuntimeError("Invalid Firebase base64 service-account configuration") from exc
 
     if settings.firebase_service_account_json:
-        service_account = json.loads(settings.firebase_service_account_json)
-        return firebase_admin.initialize_app(credentials.Certificate(service_account))
+        try:
+            return initialize_app(credentials.Certificate(json.loads(settings.firebase_service_account_json)))
+        except Exception as exc:
+            raise RuntimeError("Invalid Firebase service-account configuration") from exc
 
-    return firebase_admin.initialize_app(options={"projectId": settings.firebase_project_id})
+    raise RuntimeError("Firebase Admin credentials are not configured")
 
 
 def verify_firebase_id_token(id_token: str) -> dict:
     try:
-        get_firebase_app()
-        return firebase_auth.verify_id_token(id_token)
+        return firebase_auth.verify_id_token(id_token, app=get_firebase_app())
     except Exception as exc:
         raise ValueError("Invalid or expired Firebase ID token") from exc
