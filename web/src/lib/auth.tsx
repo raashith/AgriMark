@@ -49,12 +49,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('agrimark_user');
   };
 
-  const clearLocalAuth = () => {
-    if (typeof window === 'undefined') return;
-    localStorage.removeItem('agrimark_token');
-    localStorage.removeItem('agrimark_user');
-  };
-
   const syncFirebaseUser = async (firebaseUser: User, requestedRole?: UserRole | null, phone?: string | null) => {
     const idToken = await firebaseUser.getIdToken(false);
     if (typeof window !== 'undefined') localStorage.setItem('agrimark_token', idToken);
