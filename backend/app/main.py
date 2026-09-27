@@ -6,6 +6,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .api.v1.ai import router as ai_router
 from .api.v1.ai_chat import router as ai_chat_router
+from .api.v1.ai_voice import router as ai_voice_router
 from .api.v1.auth import router as auth_router
 from .api.v1.core import router as core_router
 from .api.v1.health import router as health_router
@@ -25,7 +26,6 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
-
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -48,7 +48,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
-
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
@@ -61,6 +60,7 @@ app.include_router(health_router, prefix="/api/v1")
 app.include_router(readiness_router, prefix="/api/v1")
 app.include_router(ai_router, prefix="/api/v1")
 app.include_router(ai_chat_router, prefix="/api/v1")
+app.include_router(ai_voice_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(core_router, prefix="/api/v1")
 app.include_router(marketplace_router, prefix="/api/v1")
