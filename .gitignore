@@ -10,4 +10,5 @@ stitch_export/
 stitch_downloads/
 backend/venv/
 backend/.env
+.env
 __pycache__/
