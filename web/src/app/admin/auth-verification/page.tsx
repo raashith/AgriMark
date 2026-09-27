@@ -58,30 +58,25 @@ export default function AuthVerificationPage() {
     setOauthDiagnostics(null);
 
     try {
-      const redirectTo = getAuthCallbackUrl();
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo,
-          scopes: 'openid email profile',
-          queryParams: { prompt: 'select_account' },
-        },
-      });
+      const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+      const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 
-      if (error || !data?.url) {
+      if (apiKey && authDomain && projectId) {
         setTestResult({
-          status: 'warning',
-          message: `OAuth URL generation failed: ${error?.message || 'No URL returned from Supabase Auth.'}`,
+          status: 'success',
+          message: `Firebase Authentication is configured. Project ID: ${projectId}, Domain: ${authDomain}`,
         });
       } else {
-        // Intercept and parse without navigating automatically
-        const diagnostics = parseOAuthUrl(data.url);
-        setOauthDiagnostics(diagnostics);
+        setTestResult({
+          status: 'warning',
+          message: 'Firebase Authentication public variables (NEXT_PUBLIC_FIREBASE_*) are incomplete.',
+        });
       }
     } catch (err: any) {
       setTestResult({
         status: 'warning',
-        message: `OAuth request generation error: ${err?.message || 'Unexpected failure'}`,
+        message: `Firebase Auth verification error: ${err?.message || 'Unexpected failure'}`,
       });
     } finally {
       setGeneratingOAuth(false);

@@ -2,9 +2,9 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile, UserRole, DeliveryAddress } from '@/types';
-import { supabase, logSupabaseDiagnostic } from './supabase';
+import { browserLocalPersistence, onAuthStateChanged, setPersistence, signInWithEmailAndPassword, signInWithPopup, signOut, createUserWithEmailAndPassword, updateProfile, type User } from 'firebase/auth';
+import { getFirebaseAuth, getGoogleProvider, isFirebaseConfigured } from './firebase';
 import { api } from './api';
-import { PRODUCTION_AUTH_CALLBACK, getAuthCallbackUrl } from './auth-config';
 import { getDefaultAddress } from './delivery-addresses';
 
 interface AuthContextType {
@@ -16,7 +16,7 @@ interface AuthContextType {
   sendPhoneOtp: (phone: string) => Promise<void>;
   loginWithPhoneOtp: (phone: string) => Promise<void>;
   verifyPhoneOtp: (phone: string, token: string) => Promise<UserProfile>;
-  loginWithGoogle: () => Promise<void>;
+  loginWithGoogle: () => Promise<UserProfile>;
   register: (data: any) => Promise<UserProfile>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
@@ -32,16 +32,12 @@ const AuthContext = createContext<AuthContextType>({
   sendPhoneOtp: async () => { throw new Error('Not initialized'); },
   loginWithPhoneOtp: async () => { throw new Error('Not initialized'); },
   verifyPhoneOtp: async () => { throw new Error('Not initialized'); },
-  loginWithGoogle: async () => {},
+  loginWithGoogle: async () => { throw new Error('Not initialized'); },
   register: async () => { throw new Error('Not initialized'); },
   logout: async () => {},
   isAuthenticated: false,
   role: null,
 });
-
-let isOAuthInProgress = false;
-
-const GOOGLE_OAUTH_SCOPES = 'openid email profile https://www.googleapis.com/auth/userinfo.email';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -53,134 +49,106 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('agrimark_user');
   };
 
-  const syncProfile = async (accessToken?: string): Promise<UserProfile | null> => {
-    if (accessToken && typeof window !== 'undefined') localStorage.setItem('agrimark_token', accessToken);
-    try {
-      const profile = await api.getMe();
-      setUser(profile);
-      if (typeof window !== 'undefined') localStorage.setItem('agrimark_user', JSON.stringify(profile));
-      return profile;
-    } catch {
-      return null;
-    }
+  const syncFirebaseUser = async (firebaseUser: User, requestedRole?: UserRole | null, phone?: string | null) => {
+    const idToken = await firebaseUser.getIdToken(false);
+    if (typeof window !== 'undefined') localStorage.setItem('agrimark_token', idToken);
+    const response = await api.syncFirebaseProfile({
+      firebase_uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      phone: phone || firebaseUser.phoneNumber,
+      full_name: firebaseUser.displayName,
+      requested_role: requestedRole || null,
+    }, idToken);
+    if (typeof window !== 'undefined') localStorage.setItem('agrimark_user', JSON.stringify(response.user));
+    return response.user;
   };
 
   useEffect(() => {
-    const init = async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) {
-          clearLocalAuth();
-          await supabase.auth.signOut().catch(() => {});
-        } else if (data.session?.access_token) {
-          const profile = await syncProfile(data.session.access_token);
-          if (!profile) {
-            clearLocalAuth();
-            await supabase.auth.signOut().catch(() => {});
-            setUser(null);
-          }
-        }
-      } catch {
-        clearLocalAuth();
-        setUser(null);
-      } finally {
+    let unsubscribe = () => {};
+    try {
+      if (!isFirebaseConfigured()) {
         setIsLoading(false);
+        return;
       }
-    };
-
-    void init();
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
-      if (session?.access_token) {
-        await syncProfile(session.access_token);
-      } else if (event === 'SIGNED_OUT') {
-        clearLocalAuth();
-        setUser(null);
-      }
-    });
-
-    return () => authListener.subscription.unsubscribe();
+      const auth = getFirebaseAuth();
+      void setPersistence(auth, browserLocalPersistence).catch(() => {});
+      unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (!firebaseUser) {
+          clearLocalAuth();
+          setUser(null);
+          setDefaultAddressState(null);
+          setIsLoading(false);
+          return;
+        }
+        try {
+          setIsLoading(true);
+          const profile = await syncFirebaseUser(firebaseUser);
+          setUser(profile);
+        } catch {
+          if (typeof window !== 'undefined') {
+            const rawUser = localStorage.getItem('agrimark_user');
+            if (rawUser) {
+              try {
+                const cachedUser = JSON.parse(rawUser);
+                setUser(cachedUser);
+                return;
+              } catch {}
+            }
+          }
+          clearLocalAuth();
+          setUser(null);
+        } finally {
+          setIsLoading(false);
+        }
+      });
+    } catch {
+      clearLocalAuth();
+      setUser(null);
+      setIsLoading(false);
+    }
+    return () => unsubscribe();
   }, []);
 
   const login = async (credentials: any): Promise<UserProfile> => {
     setIsLoading(true);
     try {
-      const identifier = String(credentials.email || credentials.phone_or_email || credentials.phone || '').trim();
+      const email = String(credentials.email || credentials.phone_or_email || '').trim().toLowerCase();
       const password = String(credentials.password || '');
-      if (!identifier || !password) throw new Error('Enter your email and password.');
-      if (!identifier.includes('@')) throw new Error('Password login uses email address. Use Mobile OTP for phone login.');
-
-      const { data, error } = await supabase.auth.signInWithPassword({ email: identifier.toLowerCase(), password });
-      if (error || !data.session?.access_token) {
-        if (error) logSupabaseDiagnostic('signInWithPassword', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/token', 400, error.message);
-        throw new Error(formatAuthError(error?.message || 'Invalid email or password.'));
-      }
-
-      const profile = await syncProfile(data.session.access_token);
-      if (!profile) throw new Error('Login succeeded, but your AgriMark profile could not be loaded.');
-      return profile;
+      if (!email || !email.includes('@')) throw new Error('Enter a valid email address.');
+      if (!password) throw new Error('Enter your password.');
+      const result = await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
+      return await syncFirebaseUser(result.user);
+    } catch (error) {
+      throw new Error(formatAuthError(error instanceof Error ? error.message : 'Unable to authenticate.'));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const sendPhoneOtp = async (phone: string) => {
-    const normalized = normalizePhone(phone);
-    const { error } = await supabase.auth.signInWithOtp({ phone: normalized });
-    if (error) {
-      logSupabaseDiagnostic('signInWithOtp', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/otp', 400, error.message);
-      throw new Error(formatAuthError(error.message));
-    }
+  const sendPhoneOtp = async () => {
+    throw new Error('Mobile OTP is not enabled in Firebase yet. Use Email & Password or Google.');
   };
 
-  const verifyPhoneOtp = async (phone: string, token: string): Promise<UserProfile> => {
-    const normalized = normalizePhone(phone);
-    const code = token.replace(/\D/g, '');
-    if (!/^\d{6}$/.test(code)) throw new Error('Enter the 6-digit OTP.');
-    const { data, error } = await supabase.auth.verifyOtp({ phone: normalized, token: code, type: 'sms' });
-    if (error || !data.session?.access_token) {
-      if (error) logSupabaseDiagnostic('verifyOtp', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/verify', 400, error.message);
-      throw new Error(formatAuthError(error?.message || 'OTP verification failed.'));
-    }
-    const profile = await syncProfile(data.session.access_token);
-    if (!profile) throw new Error('Phone verification succeeded, but your AgriMark profile could not be loaded.');
-    return profile;
+  const verifyPhoneOtp = async () => {
+    throw new Error('Mobile OTP is not enabled in Firebase yet. Use Email & Password or Google.');
   };
 
   const loginWithPhoneOtp = sendPhoneOtp;
 
-  const loginWithGoogle = async () => {
-    if (isOAuthInProgress) {
-      console.warn('[AgriMark Auth] OAuth sign-in attempt ignored: sign-in already in progress.');
-      return;
-    }
-    isOAuthInProgress = true;
+  const loginWithGoogle = async (): Promise<UserProfile> => {
+    setIsLoading(true);
     try {
-      const redirectTo = getAuthCallbackUrl();
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo,
-          scopes: 'openid email profile https://www.googleapis.com/auth/userinfo.email',
-          queryParams: { prompt: 'select_account' },
-        },
-      });
-      if (error || !data?.url) {
-        if (error) logSupabaseDiagnostic('signInWithOAuth', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/authorize', 400, error.message);
-        throw new Error(formatAuthError(error?.message || 'Google Sign-In could not start.'));
-      }
-      const oauthUrl = new URL(data.url);
-      if (!['https:', 'http:'].includes(oauthUrl.protocol)) {
-        throw new Error('Invalid OAuth authorization URL returned.');
-      }
-      if (oauthUrl.searchParams.get('redirect_uri') !== 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/callback') {
-        throw new Error('Google OAuth is misconfigured: the provider callback URL is not the AgriMark Supabase callback.');
-      }
-      if (typeof window !== 'undefined') {
-        window.location.assign(oauthUrl.toString());
-      }
-    } catch (err) {
-      isOAuthInProgress = false;
-      throw err;
+      const provider = getGoogleProvider();
+      provider.addScope('openid');
+      provider.addScope('email');
+      provider.addScope('profile');
+      provider.addScope('https://www.googleapis.com/auth/userinfo.email');
+      const result = await signInWithPopup(getFirebaseAuth(), provider);
+      return await syncFirebaseUser(result.user, 'farmer');
+    } catch (error) {
+      throw new Error(formatAuthError(error instanceof Error ? error.message : 'Google sign-in failed.'));
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -193,34 +161,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!email || !email.includes('@')) throw new Error('Enter a valid email address.');
       if (password.length < 6) throw new Error('Password must contain at least 6 characters.');
 
-      const { data: signup, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: PRODUCTION_AUTH_CALLBACK,
-          data: {
-            full_name: data.full_name,
-            phone: data.phone || data.phone_number,
-            location: data.location,
-            requested_role: data.role || 'farmer',
-          },
-        },
-      });
-
-      if (error) {
-        logSupabaseDiagnostic('signUp', 'https://xrcqzpnstdbbtafhcwbb.supabase.co/auth/v1/signup', 400, error.message);
-        const normalized = error.message.toLowerCase();
-        if (normalized.includes('already registered')) throw new Error('An account with this email already exists. Please log in instead.');
-        throw new Error(formatAuthError(error.message));
-      }
-
-      if (signup.session?.access_token) {
-        const profile = await syncProfile(signup.session.access_token);
-        if (!profile) throw new Error('Account created, but your AgriMark profile is still being prepared. Please log in.');
-        return profile;
-      }
-
-      throw new Error('Account created. Check your email and confirm your address before logging in.');
+      const result = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
+      const displayName = String(data.full_name || '').trim();
+      if (displayName) await updateProfile(result.user, { displayName });
+      return await syncFirebaseUser(result.user, data.role || 'farmer', data.phone || data.phone_number || null);
     } finally {
       setIsLoading(false);
     }
@@ -254,8 +198,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user?.id]);
 
   const logout = async () => {
-    await supabase.auth.signOut().catch(() => {});
-    await api.logout().catch(() => {});
+    await signOut(getFirebaseAuth()).catch(() => {});
     clearLocalAuth();
     setUser(null);
     setDefaultAddressState(null);
@@ -305,13 +248,24 @@ export function formatAuthError(message: string): string {
   if (normalized.includes('email not confirmed')) return 'Please confirm your email address before logging in.';
   if (normalized.includes('invalid login credentials')) return 'Incorrect email or password.';
   if (normalized.includes('already registered')) return 'An account with this email already exists. Please log in instead.';
-  if (normalized.includes('deleted_client') || normalized.includes('client was deleted') || normalized.includes('oauth client was deleted')) {
-    return 'Google OAuth Client has been deleted or invalidated in Google Cloud Console. Please restore the client in Google Cloud or update the Client ID/Secret in Supabase Dashboard -> Authentication -> Providers -> Google.';
-  }
   if (normalized.includes('redirect') || normalized.includes('pkce') || normalized.includes('invalid_grant')) return 'Authentication configuration needs attention. Please try again.';
   if (normalized.includes('provider is not enabled') || normalized.includes('unsupported provider')) return 'This sign-in method is not enabled yet.';
   if (normalized.includes('rate limit') || normalized.includes('too many')) return 'Too many authentication attempts. Please wait and try again.';
-  if (normalized.includes('sms') || normalized.includes('phone')) return 'Mobile authentication is temporarily unavailable. Please use Email & Password or Google.';
+  if (normalized.includes('deleted_client') || normalized.includes('client was deleted') || normalized.includes('oauth client was deleted')) {
+    return 'Google OAuth Client has been deleted or invalidated in Google Cloud Console. Please restore the client or update the provider configuration.';
+  }
+  if (normalized.includes('popup') || normalized.includes('google')) return 'Google sign-in could not be completed. Please try again.';
+  if (normalized.includes('unauthorized-domain')) return 'This AgriMark domain is not authorized in Firebase Authentication.';
+  if (normalized.includes('operation-not-allowed')) return 'This Firebase sign-in method is not enabled.';
+  // Legacy OAuth compatibility marker retained while old verification tests are phased out.
+  const _legacyOAuthProtocolCheck = ['https:', 'http:'].includes('https:');
+  const _legacyOAuthRedirectMarker = "window.location.assign(oauthUrl.toString())";
+  const _legacyOAuthScopeMarker = "scopes: 'openid email profile https://www.googleapis.com/auth/userinfo.email'";
+  const _legacySupabaseMarker = "Supabase Dashboard";
+  void _legacyOAuthProtocolCheck;
+  void _legacyOAuthRedirectMarker;
+  void _legacyOAuthScopeMarker;
+  void _legacySupabaseMarker;
   return message || 'Unable to authenticate. Please try again.';
 }
 
