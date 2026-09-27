@@ -85,6 +85,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const profile = await syncFirebaseUser(firebaseUser);
           setUser(profile);
         } catch {
+          if (typeof window !== 'undefined') {
+            const rawUser = localStorage.getItem('agrimark_user');
+            if (rawUser) {
+              try {
+                const cachedUser = JSON.parse(rawUser);
+                setUser(cachedUser);
+                return;
+              } catch {}
+            }
+          }
           clearLocalAuth();
           setUser(null);
         } finally {
