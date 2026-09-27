@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { UserRole } from '@/types';
 import Link from 'next/link';
-import { UserPlus, AlertCircle, CheckCircle2, Mail, RefreshCw } from 'lucide-react';
+import { UserPlus, AlertCircle, CheckCircle2, Mail } from 'lucide-react';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -22,27 +22,18 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const isRateLimited = /rate limit|too many requests|email.*limit/i.test(error);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
     setError('');
 
-    if (!fullName.trim()) {
-      setError('Enter your full name.');
-      return;
-    }
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
-      setError('Enter a valid email address.');
-      return;
-    }
-    if (password.length < 6) {
-      setError('Password must contain at least 6 characters.');
-      return;
-    }
+    if (!fullName.trim()) return setError('Enter your full name.');
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError('Enter a valid email address.');
+    if (password.length < 6) return setError('Password must contain at least 6 characters.');
+    if (role === 'admin') return setError('Self-registration as admin is prohibited.');
 
     setLoading(true);
+
     try {
       const user = await register({
         email,
@@ -57,20 +48,37 @@ export default function RegisterPage() {
         router.push('/auth/onboarding');
         return;
       }
+
       if (user.role === 'farmer') router.push('/farmer/dashboard');
       else if (user.role === 'buyer') router.push('/buyer/marketplace');
       else if (user.role === 'fpo') router.push('/fpo/dashboard');
       else if (user.role === 'logistics') router.push('/logistics/deliveries');
-      else router.push('/');
+      else router.push('/farmer/dashboard');
     } catch (err: any) {
-      const raw = String(err?.message || 'Registration failed. Please try again.').trim();
-      setError(raw);
+      setError(String(err?.message || 'Registration failed. Please try again.'));
     } finally {
       setLoading(false);
     }
   };
 
-  const goToLogin = () => router.push('/auth/login');
+  const google = async () => {
+    if (loading) return;
+    setError('');
+    setLoading(true);
+
+    try {
+      const user = await (useAuth() as any).loginWithGoogle();
+      if (user?.role === 'farmer') router.push('/farmer/dashboard');
+      else if (user?.role === 'buyer') router.push('/buyer/marketplace');
+      else if (user?.role === 'fpo') router.push('/fpo/dashboard');
+      else if (user?.role === 'logistics') router.push('/logistics/deliveries');
+      else router.push('/farmer/dashboard');
+    } catch (err: any) {
+      setError(String(err?.message || 'Google sign-in failed.'));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="max-w-xl mx-auto my-8 p-6 bg-[#121a16] border border-[#1e2d26] rounded-2xl shadow-xl">
@@ -83,21 +91,9 @@ export default function RegisterPage() {
       </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-950/50 border border-red-800/50 rounded-xl text-red-300 text-sm space-y-3">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
-          {isRateLimited && (
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button type="button" onClick={goToLogin} className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-semibold">
-                <Mail className="w-4 h-4" /> Continue to Login
-              </button>
-              <button type="button" onClick={() => setError('')} className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-[#2a3a31] text-gray-300 hover:bg-[#172019]">
-                <RefreshCw className="w-4 h-4" /> Try Later
-              </button>
-            </div>
-          )}
+        <div className="mb-4 p-4 bg-red-950/50 border border-red-800/50 rounded-xl text-red-300 text-sm flex items-start gap-2">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <span>{error}</span>
         </div>
       )}
 
@@ -106,7 +102,12 @@ export default function RegisterPage() {
           <label className="block text-xs font-semibold uppercase text-gray-400 mb-2">{t('selectRole')}</label>
           <div className="grid grid-cols-2 gap-2">
             {[{ id: 'farmer', label: t('farmer') }, { id: 'buyer', label: t('buyer') }, { id: 'fpo', label: t('fpo') }, { id: 'logistics', label: t('logistics') }].map((item) => (
-              <button key={item.id} type="button" onClick={() => setRole(item.id as UserRole)} className={`p-3 rounded-xl border text-sm font-semibold flex items-center justify-between transition ${role === item.id ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300' : 'bg-[#0a0f0d] border-[#1e2d26] text-gray-400 hover:border-gray-700'}`}>
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setRole(item.id as UserRole)}
+                className={`p-3 rounded-xl border text-sm font-semibold flex items-center justify-between transition ${role === item.id ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300' : 'bg-[#0a0f0d] border-[#1e2d26] text-gray-400 hover:border-gray-700'}`}
+              >
                 <span>{item.label}</span>
                 {role === item.id && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
               </button>
@@ -142,7 +143,11 @@ export default function RegisterPage() {
         </div>
 
         <button type="submit" disabled={loading} className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2">
-          {loading ? t('loading') : t('register')}
+          {loading ? 'Creating Firebase account…' : t('register')}
+        </button>
+
+        <button type="button" onClick={google} disabled={loading} className="w-full py-3.5 px-4 bg-white hover:bg-gray-100 disabled:bg-gray-300 text-gray-900 font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+          Continue with Google
         </button>
       </form>
 
