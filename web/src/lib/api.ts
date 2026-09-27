@@ -102,7 +102,10 @@ export const api = {
     '/auth/firebase/sync',
     {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        ...data,
+        id_token: idToken,
+      }),
     },
     idToken,
   ),
