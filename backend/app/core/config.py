@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     firebase_service_account_json: str | None = None
     firebase_service_account_json_base64: str | None = None
 
+    openai_api_key: str | None = None
+
     cors_origins: str = (
         "https://agrimark.com,https://www.agrimark.com,https://agrimark-six.vercel.app,"
         "https://agrimark-git-main-sheik-raashith.vercel.app,"

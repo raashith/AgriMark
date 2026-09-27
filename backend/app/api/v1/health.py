@@ -15,9 +15,17 @@ def health() -> HealthResponse:
         get_supabase().table("profiles").select("id", count="exact").limit(1).execute()
     except Exception:
         database = "degraded"
+
+    firebase_configured = bool(
+        settings.firebase_service_account_json
+        or settings.firebase_service_account_json_base64
+        or settings.firebase_project_id
+    )
+
     return HealthResponse(
         status="ok" if database == "ok" else "degraded",
         service=settings.app_name,
         database=database,
-        ai="configured" if settings.openai_api_key else "not_configured",
+        firebase="configured" if firebase_configured else "not_configured",
+        ai="configured" if getattr(settings, "openai_api_key", None) else "not_configured",
     )
