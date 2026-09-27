@@ -25,6 +25,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["X-AgriMark-Transcript", "X-AgriMark-Answer", "X-AgriMark-Language"],
 )
 
 

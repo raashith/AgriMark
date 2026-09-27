@@ -1,49 +1,106 @@
 import base64
 import os
+import logging
+from typing import Optional, Tuple
 
 from sarvamai import SarvamAI
+from ..core.config import get_settings
 
+logger = logging.getLogger("sarvam_voice")
+
+SUPPORTED_TTS_LANGUAGES = {
+    "hi-IN", "bn-IN", "kn-IN", "ml-IN", "mr-IN",
+    "od-IN", "pa-IN", "ta-IN", "te-IN", "en-IN", "gu-IN",
+}
 
 class SarvamVoiceService:
-    def __init__(self) -> None:
-        api_key = os.environ.get("SARVAM_API_KEY")
-        if not api_key:
-            raise RuntimeError("SARVAM_API_KEY is not configured")
-        self._client = SarvamAI(api_subscription_key=api_key)
+    def __init__(self, api_key: Optional[str] = None) -> None:
+        settings = get_settings()
+        self._api_key = api_key or os.getenv("SARVAM_API_KEY") or getattr(settings, "sarvam_api_key", None)
+        if not self._api_key or not self._api_key.strip():
+            self._client = None
+        else:
+            self._client = SarvamAI(api_subscription_key=self._api_key.strip())
 
-    def transcribe(self, audio_bytes: bytes, filename: str, language_code: str) -> str:
+    @property
+    def configured(self) -> bool:
+        return self._client is not None
+
+    def transcribe(
+        self,
+        audio_bytes: bytes,
+        filename: str = "recording.webm",
+        language_code: str = "unknown",
+    ) -> Tuple[str, str]:
+        """
+        Speech-to-Text using Sarvam Saaras v3 model.
+        Returns (transcript_text, detected_language_code).
+        """
+        if not self._client:
+            raise RuntimeError("SARVAM_API_KEY is not configured on the backend server.")
+
+        lang = language_code if language_code and language_code != "auto" else "unknown"
+
         try:
-            from io import BytesIO
-
-            audio_file = BytesIO(audio_bytes)
-            audio_file.name = filename
             response = self._client.speech_to_text.transcribe(
-                file=audio_file,
+                file=(filename, audio_bytes),
                 model="saaras:v3",
-                language_code=language_code,
                 mode="transcribe",
+                language_code=lang,
             )
         except Exception as exc:
-            raise RuntimeError("Sarvam speech-to-text request failed") from exc
+            logger.error(f"Sarvam STT failed: {exc}")
+            raise RuntimeError(f"Sarvam Speech-to-Text service error: {exc}") from exc
 
-        text = (response.transcript or "").strip()
-        if not text:
-            raise RuntimeError("Sarvam returned an empty transcription")
-        return text
+        transcript = getattr(response, "transcript", "") or ""
+        detected_lang = getattr(response, "language_code", None) or lang
+        
+        if not transcript.strip():
+            raise ValueError("No speech could be recognized in the provided audio recording.")
 
-    def synthesize(self, text: str, language_code: str) -> bytes:
+        return transcript.strip(), detected_lang
+
+    def synthesize(self, text: str, language_code: Optional[str] = None) -> bytes:
+        """
+        Text-to-Speech using Sarvam Bulbul v3 model.
+        Returns WAV audio bytes.
+        """
+        if not self._client:
+            raise RuntimeError("SARVAM_API_KEY is not configured on the backend server.")
+
+        if not text or not text.strip():
+            raise ValueError("Cannot synthesize empty text response.")
+
+        # Fallback safely to en-IN if language is missing, unknown, or unsupported by Bulbul TTS
+        target_lang = language_code if language_code in SUPPORTED_TTS_LANGUAGES else "en-IN"
+
         try:
             response = self._client.text_to_speech.convert(
-                text=text[:2500],
-                target_language_code=language_code,
-                speaker="shubh",
+                text=text.strip(),
                 model="bulbul:v3",
+                language_code=target_lang,
             )
         except Exception as exc:
-            raise RuntimeError("Sarvam text-to-speech request failed") from exc
+            logger.error(f"Sarvam TTS failed for language {target_lang}: {exc}")
+            # Try fallback to en-IN if primary language conversion failed
+            if target_lang != "en-IN":
+                try:
+                    response = self._client.text_to_speech.convert(
+                        text=text.strip(),
+                        model="bulbul:v3",
+                        language_code="en-IN",
+                    )
+                except Exception as fallback_exc:
+                    raise RuntimeError(f"Sarvam Text-to-Speech service error: {fallback_exc}") from fallback_exc
+            else:
+                raise RuntimeError(f"Sarvam Text-to-Speech service error: {exc}") from exc
 
-        if hasattr(response, "audios"):
-            return base64.b64decode("".join(response.audios))
-        if isinstance(response, bytes):
-            return response
-        raise RuntimeError("Sarvam returned no audio data")
+        audios = getattr(response, "audios", [])
+        if not audios or not audios[0]:
+            raise RuntimeError("Sarvam TTS returned an empty audio payload.")
+
+        try:
+            audio_bytes = base64.b64decode(audios[0])
+            return audio_bytes
+        except Exception as exc:
+            raise RuntimeError("Failed to decode Sarvam TTS audio payload.") from exc
