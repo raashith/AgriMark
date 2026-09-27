@@ -25,7 +25,7 @@ router = APIRouter(prefix="/core", tags=["core"])
 
 
 def _single(result):
-    data = result.data
+    data = result.data or []
     if not data:
         raise HTTPException(status_code=404, detail="Resource not found")
     return data[0] if isinstance(data, list) else data
@@ -116,7 +116,7 @@ def list_cultivations(
     crop_id: UUID | None = None,
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> list[CultivationResponse]:
-    query = get_supabase().table("cultivations").select("*, farms!inner(owner_id)").eq("farms.owner_id", str(user.id)).order("created_at", desc=True)
+    query = get_supabase().table("cultivations").select("*,farms!inner(owner_id)").eq("farms.owner_id", str(user.id)).order("created_at", desc=True)
     if farm_id:
         query = query.eq("farm_id", str(farm_id))
     if crop_id:
@@ -133,8 +133,23 @@ def list_harvest_batches(
     result = (
         get_supabase()
         .table("harvest_batches")
-        .select("id,cultivation_id,harvested_at,quantity,grade,trace_code,cultivations!inner(farm_id,farms!inner(owner_id))")
-        .eq("cultivations.farms.owner_id", str(user.id))
+        .select("id,cultivation_id,harvested_at,quantity,grade,trace_code")
+        .eq("farm_id", "")  # replaced below after owner farm IDs are collected
+        .limit(0)
+        .execute()
+    )
+    del result
+
+    farms = get_supabase().table("farms").select("id").eq("owner_id", str(user.id)).execute()
+    farm_ids = [row["id"] for row in (farms.data or [])]
+    if not farm_ids:
+        return []
+
+    result = (
+        get_supabase()
+        .table("harvest_batches")
+        .select("id,cultivation_id,harvested_at,quantity,grade,trace_code")
+        .in_("farm_id", farm_ids)
         .order("harvested_at", desc=True)
         .execute()
     )
@@ -159,16 +174,27 @@ def create_harvest_batch(
     cultivation = (
         get_supabase()
         .table("cultivations")
-        .select("id,farm_id,farms!inner(owner_id)")
+        .select("id,farm_id")
         .eq("id", str(request.cultivation_id))
-        .eq("farms.owner_id", str(user.id))
         .limit(1)
         .execute()
     )
-    _single(cultivation)
+    cultivation_row = _single(cultivation)
+
+    farm = (
+        get_supabase()
+        .table("farms")
+        .select("id")
+        .eq("id", cultivation_row["farm_id"])
+        .eq("owner_id", str(user.id))
+        .limit(1)
+        .execute()
+    )
+    _single(farm)
+
     payload = {
         "cultivation_id": str(request.cultivation_id),
-        "farm_id": str(cultivation.data[0]["farm_id"]),
+        "farm_id": cultivation_row["farm_id"],
         "harvested_at": request.harvest_date.isoformat(),
         "quantity": request.total_quantity_kg,
         "unit": "kg",
@@ -209,12 +235,18 @@ def create_produce_lot(
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> ProduceLotResponse:
     if request.cultivation_id:
-        cultivation = get_supabase().table("cultivations").select("id, farms!inner(owner_id)").eq("id", str(request.cultivation_id)).eq("farms.owner_id", str(user.id)).limit(1).execute()
-        _single(cultivation)
+        cultivation = get_supabase().table("cultivations").select("id,farm_id").eq("id", str(request.cultivation_id)).limit(1).execute()
+        cultivation_row = _single(cultivation)
+        farm = get_supabase().table("farms").select("id").eq("id", cultivation_row["farm_id"]).eq("owner_id", str(user.id)).limit(1).execute()
+        _single(farm)
+
     payload = request.model_dump(exclude_none=True, mode="json")
     payload["owner_id"] = str(user.id)
-    if "available_quantity" not in payload:
+    if "available_quantity" not in payload or payload["available_quantity"] is None:
         payload["available_quantity"] = payload["quantity"]
+    if request.cultivation_id:
+        cultivation_row = get_supabase().table("cultivations").select("farm_id").eq("id", str(request.cultivation_id)).limit(1).execute().data[0]
+        payload["cultivation_id"] = str(request.cultivation_id)
     try:
         result = get_supabase().table("produce_lots").insert(payload).execute()
         return ProduceLotResponse(**_single(result))
@@ -227,7 +259,7 @@ def create_listing(
     request: ListingCreate,
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> ListingResponse:
-    lot = get_supabase().table("produce_lots").select("id, status").eq("id", str(request.lot_id)).eq("owner_id", str(user.id)).limit(1).execute()
+    lot = get_supabase().table("produce_lots").select("id,status").eq("id", str(request.lot_id)).eq("owner_id", str(user.id)).limit(1).execute()
     lot_data = _single(lot)
 
     if lot_data.get("status") == "listed":
@@ -250,17 +282,15 @@ def create_listing(
         raise HTTPException(status_code=400, detail="Unable to create listing") from exc
 
 
-
 @router.get("/listings", response_model=list[ListingResponse])
 def list_listings(status: str = Query(default="active", max_length=30)) -> list[ListingResponse]:
     result = get_supabase().table("listings").select("*").eq("status", status).order("created_at", desc=True).execute()
-    rows = result.data or []
     items = []
-    for row in rows:
+    for row in (result.data or []):
         item = dict(row)
         if item.get("lot_id"):
             try:
-                lot_res = get_supabase().table("produce_lots").select("*, crops(name)").eq("id", item["lot_id"]).limit(1).execute()
+                lot_res = get_supabase().table("produce_lots").select("*,crops(name)").eq("id", item["lot_id"]).limit(1).execute()
                 if lot_res.data:
                     lot_row = lot_res.data[0]
                     crop = lot_row.get("crops")
@@ -273,4 +303,3 @@ def list_listings(status: str = Query(default="active", max_length=30)) -> list[
         item["location"] = "Tamil Nadu, India"
         items.append(ListingResponse(**item))
     return items
-
