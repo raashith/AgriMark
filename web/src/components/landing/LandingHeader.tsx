@@ -20,10 +20,13 @@ export const LandingHeader: React.FC = () => {
         {/* Brand Lockup */}
         <a href="#scene-farm" className="flex items-center gap-3.5 group" aria-label="AgriMark.ai Home">
           <div className="w-9 h-9 rounded-full overflow-hidden border border-[#E5A93C]/60 p-0.5 bg-[#07110D] shadow-sm shadow-[#E5A93C]/25 group-hover:scale-105 transition-transform duration-300">
-            <img
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuC16aDzshHjYoQqeR8RZaXbUKw1tTHm7MkKU0dJiy8LuMhcWiX8hAgTSl9HgudkdGO41rVqF8PBc_YIpYajfDDBJYnVbPGUtWo4AE2rrZ7a3Zm2EQ0hTaXY0Pk0MWc-y8os0mpzMybb5Vdb4NroG0QIj9quIA1E5AAtx8t-OaiWbYY7jcFNt80GoONKqjhiaO4hz_Z0MB7ijNvdfWQSH7onU33-PQX0hhxUu5yv-HpedNP-R7XH0f0daRPSQT-rNP2ddg"
-              alt="AgriMark Official Heritage Emblem"
-              className="w-full h-full object-cover rounded-full"
+            <Image
+              src="/images/agrimark-logo.png"
+              alt="AgriMark"
+              width={36}
+              height={36}
+              priority
+              className="w-full h-full object-contain rounded-full"
             />
           </div>
           <div className="flex items-baseline">

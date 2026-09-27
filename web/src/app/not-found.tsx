@@ -1,15 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import { Home, LogIn, Sprout } from 'lucide-react';
+import Image from 'next/image';
+import { Home, LogIn } from 'lucide-react';
 
 export default function NotFound() {
   return (
     <main className="min-h-[70vh] flex items-center justify-center px-4 py-12">
-      <section className="w-full max-w-xl rounded-3xl border border-[#1e2d26] bg-[#121a16] p-8 text-center shadow-2xl">
-        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-800/50 bg-emerald-950/60 text-emerald-400">
-          <Sprout className="h-8 w-8" />
-        </div>
+      <section className="w-full max-w-xl rounded-3xl border border-[#1e2d26] bg-[#121a16] p-8 text-center shadow-2xl flex flex-col items-center">
+        <Image
+          src="/images/agrimark-logo.png"
+          alt="AgriMark"
+          width={64}
+          height={64}
+          priority
+          className="mx-auto mb-4 w-16 h-16 object-contain"
+        />
         <p className="text-xs font-mono uppercase tracking-[0.2em] text-emerald-400">AgriMark</p>
         <h1 className="mt-2 text-3xl font-extrabold text-white">Page not found</h1>
         <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-gray-400">

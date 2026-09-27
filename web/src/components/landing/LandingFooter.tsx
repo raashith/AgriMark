@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export const LandingFooter: React.FC = () => {
   return (
@@ -9,10 +10,12 @@ export const LandingFooter: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
         <div className="flex items-center gap-3">
           <div className="w-6 h-6 rounded-full overflow-hidden border border-[#E5A93C]/40">
-            <img
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuASEMZC5bvtH8BurA9dR6FJxEnhTFQ03wQfEKM56bWKs118TiFwI9uaNutADm_O7zN2EgdUy2Jq0Owh2lBwSooLIyxhe7GK9SRzqPfWOFMp4dtgEGn13atAN5YmLD1Zc4hsqLD-6hPpeihXxFfTap669q493a4f5g-DbWXGfpmL7CGW_TUoWMMTpuWBKtXjapypqtWWxx-WPQ01XCZOUrtoe3YWwzOnN966dRcZXILbkJK_b5TgkUnKF8FoBgf6KjJoFA"
+            <Image
+              src="/images/agrimark-logo.png"
               alt="AgriMark"
-              className="w-full h-full object-cover"
+              width={24}
+              height={24}
+              className="w-full h-full object-contain rounded-full"
             />
           </div>
           <span className="font-display font-bold text-white text-sm tracking-tight">

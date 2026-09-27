@@ -6,7 +6,8 @@ import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { UserRole } from '@/types';
 import Link from 'next/link';
-import { UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react';
+import Image from 'next/image';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function RegisterPage() {
   const { register, loginWithGoogle } = useAuth();
@@ -77,10 +78,15 @@ export default function RegisterPage() {
 
   return (
     <div className="max-w-xl mx-auto my-8 p-6 bg-[#121a16] border border-[#1e2d26] rounded-2xl shadow-xl">
-      <div className="text-center mb-6">
-        <div className="inline-flex p-3 bg-emerald-950/60 border border-emerald-800/40 rounded-full mb-3 text-emerald-400">
-          <UserPlus className="w-6 h-6" />
-        </div>
+      <div className="text-center mb-6 flex flex-col items-center">
+        <Image
+          src="/images/agrimark-logo.png"
+          alt="AgriMark"
+          width={64}
+          height={64}
+          priority
+          className="w-16 h-16 object-contain mb-3"
+        />
         <h1 className="text-2xl font-bold text-gray-100">{t('register')}</h1>
         <p className="text-sm text-gray-400 mt-1">{t('tagline')}</p>
       </div>

@@ -7,8 +7,8 @@ import { useAuth } from '@/lib/auth';
 import { useI18n, SUPPORTED_LANGUAGES } from '@/lib/i18n';
 import { CommandPalette } from './CommandPalette';
 import { LocationSelectorModal } from './LocationSelectorModal';
+import Image from 'next/image';
 import {
-  Sprout,
   Search,
   Bell,
   Globe,
@@ -41,10 +41,15 @@ export const Navbar: React.FC = () => {
       <nav className="bg-[#121a16] border-b border-[#1e2d26] sticky top-0 z-40 px-4 py-2.5">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           {/* Brand Logo */}
-          <Link href="/" className="flex items-center gap-2 font-black text-xl text-emerald-400 shrink-0 tracking-tight">
-            <div className="p-1.5 bg-emerald-950 border border-emerald-800/60 rounded-xl">
-              <Sprout className="w-6 h-6 text-emerald-400" />
-            </div>
+          <Link href="/" className="flex items-center gap-2.5 font-black text-xl text-emerald-400 shrink-0 tracking-tight">
+            <Image
+              src="/images/agrimark-logo.png"
+              alt="AgriMark"
+              width={38}
+              height={38}
+              priority
+              className="w-9 h-9 object-contain rounded-lg"
+            />
             <span>AgriMark</span>
           </Link>
 

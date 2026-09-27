@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, formatAuthError } from '@/lib/auth';
 import Link from 'next/link';
-import { Sprout, ArrowRight, AlertCircle, ShieldCheck, Mail, Lock } from 'lucide-react';
+import Image from 'next/image';
+import { ArrowRight, AlertCircle, ShieldCheck, Mail, Lock } from 'lucide-react';
 
 function getRoleRoute(role?: string | null): string {
   switch (role) {
@@ -73,10 +74,15 @@ export default function LoginPage() {
   return (
     <div className="min-h-[85vh] flex flex-col justify-center items-center px-4 py-8 bg-[#0a0f0d]">
       <div className="w-full max-w-md bg-[#121a16] border border-[#1e2d26] rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
-        <div className="text-center space-y-2">
-          <div className="inline-flex p-3.5 bg-emerald-950/80 border border-emerald-800/60 rounded-2xl shadow-inner text-emerald-400">
-            <Sprout className="w-8 h-8 text-emerald-400" />
-          </div>
+        <div className="text-center space-y-2 flex flex-col items-center">
+          <Image
+            src="/images/agrimark-logo.png"
+            alt="AgriMark"
+            width={64}
+            height={64}
+            priority
+            className="w-16 h-16 object-contain mb-1"
+          />
           <h1 className="text-2xl font-black text-white tracking-tight">AgriMark</h1>
           <p className="text-xs text-emerald-400 font-semibold uppercase tracking-wider">
             Agricultural Intelligence Platform
