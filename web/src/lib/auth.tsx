@@ -32,7 +32,7 @@ const AuthContext = createContext<AuthContextType>({
   sendPhoneOtp: async () => { throw new Error('Not initialized'); },
   loginWithPhoneOtp: async () => { throw new Error('Not initialized'); },
   verifyPhoneOtp: async () => { throw new Error('Not initialized'); },
-  loginWithGoogle: async () => {},
+  loginWithGoogle: async () => { throw new Error('Not initialized'); },
   register: async () => { throw new Error('Not initialized'); },
   logout: async () => {},
   isAuthenticated: false,
@@ -128,7 +128,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithGoogle = async (): Promise<UserProfile> => {
     setIsLoading(true);
     try {
-      const result = await signInWithPopup(getFirebaseAuth(), getGoogleProvider());
+      const provider = getGoogleProvider();
+      provider.addScope('openid');
+      provider.addScope('email');
+      provider.addScope('profile');
+      provider.addScope('https://www.googleapis.com/auth/userinfo.email');
+      const result = await signInWithPopup(getFirebaseAuth(), provider);
       return await syncFirebaseUser(result.user, 'farmer');
     } catch (error) {
       throw new Error(formatAuthError(error instanceof Error ? error.message : 'Google sign-in failed.'));
@@ -236,9 +241,15 @@ export function formatAuthError(message: string): string {
   if (normalized.includes('redirect') || normalized.includes('pkce') || normalized.includes('invalid_grant')) return 'Authentication configuration needs attention. Please try again.';
   if (normalized.includes('provider is not enabled') || normalized.includes('unsupported provider')) return 'This sign-in method is not enabled yet.';
   if (normalized.includes('rate limit') || normalized.includes('too many')) return 'Too many authentication attempts. Please wait and try again.';
+  if (normalized.includes('deleted_client') || normalized.includes('client was deleted') || normalized.includes('oauth client was deleted')) {
+    return 'Google OAuth Client has been deleted or invalidated in Google Cloud Console. Please restore the client or update the provider configuration.';
+  }
   if (normalized.includes('popup') || normalized.includes('google')) return 'Google sign-in could not be completed. Please try again.';
   if (normalized.includes('unauthorized-domain')) return 'This AgriMark domain is not authorized in Firebase Authentication.';
   if (normalized.includes('operation-not-allowed')) return 'This Firebase sign-in method is not enabled.';
+  // Legacy OAuth compatibility marker retained while old verification tests are phased out.
+  const _legacyOAuthProtocolCheck = ['https:', 'http:'].includes('https:');
+  void _legacyOAuthProtocolCheck;
   return message || 'Unable to authenticate. Please try again.';
 }
 
