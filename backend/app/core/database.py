@@ -1,8 +1,7 @@
 from functools import lru_cache
 
-import httpx
 from supabase import Client, create_client
-from supabase.lib.client_options import ClientOptions
+from supabase.client import ClientOptions
 
 from .config import get_settings
 
@@ -14,11 +13,10 @@ def get_supabase() -> Client:
     if not key:
         raise RuntimeError("Supabase service role key is required for server-side operations")
 
-    timeout = httpx.Timeout(30.0, connect=10.0)
     options = ClientOptions(
         auto_refresh_token=False,
         persist_session=False,
-        postgrest_client_timeout=timeout,
-        storage_client_timeout=timeout,
+        postgrest_client_timeout=30,
+        storage_client_timeout=30,
     )
     return create_client(settings.supabase_url, key, options=options)
