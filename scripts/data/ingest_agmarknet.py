@@ -313,15 +313,21 @@ def run_ingestion(
     logger.info("==================================================================")
 
     # Initialize Supabase Client
-    from supabase import create_client
-    url = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "https://xrcqzpnstdbbtafhcwbb.supabase.co"
-    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY") or ""
+    try:
+        from supabase import create_client
+        url = os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "https://xrcqzpnstdbbtafhcwbb.supabase.co"
+        key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY") or ""
 
-    if not key and not dry_run:
-        logger.error("No Supabase API key found in environment variables.")
-        sys.exit(1)
+        if not key and not dry_run:
+            logger.error("No Supabase API key found in environment variables.")
+            sys.exit(1)
 
-    supabase = create_client(url, key) if key else None
+        supabase = create_client(url, key) if key else None
+    except ImportError:
+        if not dry_run:
+            logger.error("Supabase package not installed.")
+            sys.exit(1)
+        supabase = None
 
     # Step 1: Data Source Registration
     source_code = "AGMARKNET"
