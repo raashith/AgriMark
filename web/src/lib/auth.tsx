@@ -64,32 +64,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    if (!isFirebaseConfigured()) {
-      setIsLoading(false);
-      return;
-    }
-    const auth = getFirebaseAuth();
-    void setPersistence(auth, browserLocalPersistence).catch(() => {});
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (!firebaseUser) {
-        clearLocalAuth();
-        setUser(null);
-        setDefaultAddressState(null);
+    let unsubscribe = () => {};
+    try {
+      if (!isFirebaseConfigured()) {
         setIsLoading(false);
         return;
       }
-      try {
-        setIsLoading(true);
-        const profile = await syncFirebaseUser(firebaseUser);
-        setUser(profile);
-      } catch {
-        clearLocalAuth();
-        setUser(null);
-      } finally {
-        setIsLoading(false);
-      }
-    });
-    return unsubscribe;
+      const auth = getFirebaseAuth();
+      void setPersistence(auth, browserLocalPersistence).catch(() => {});
+      unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (!firebaseUser) {
+          clearLocalAuth();
+          setUser(null);
+          setDefaultAddressState(null);
+          setIsLoading(false);
+          return;
+        }
+        try {
+          setIsLoading(true);
+          const profile = await syncFirebaseUser(firebaseUser);
+          setUser(profile);
+        } catch {
+          clearLocalAuth();
+          setUser(null);
+        } finally {
+          setIsLoading(false);
+        }
+      });
+    } catch {
+      clearLocalAuth();
+      setUser(null);
+      setIsLoading(false);
+    }
+    return () => unsubscribe();
   }, []);
 
   const login = async (credentials: any): Promise<UserProfile> => {
