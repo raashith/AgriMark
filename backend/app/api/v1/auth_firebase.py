@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
 from ...core.database import get_supabase
@@ -9,6 +9,7 @@ router = APIRouter(prefix="/auth/firebase", tags=["auth-firebase"])
 
 
 class FirebaseSyncRequest(BaseModel):
+    id_token: str
     firebase_uid: str
     email: str | None = None
     phone: str | None = None
@@ -18,30 +19,34 @@ class FirebaseSyncRequest(BaseModel):
 @router.post("/sync")
 def sync_firebase_profile(request: FirebaseSyncRequest):
     try:
-        decoded = verify_firebase_id_token(request.firebase_uid)
-    except ValueError:
-        raise HTTPException(status_code=401, detail="Invalid or expired Firebase ID token")
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired Firebase ID token")
+        decoded = verify_firebase_id_token(request.id_token)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired Firebase ID token",
+        ) from exc
 
     uid = str(decoded.get("uid") or "")
     if not uid or uid != request.firebase_uid:
-        raise HTTPException(status_code=401, detail="Firebase identity mismatch")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Firebase identity mismatch",
+        )
 
     email = request.email or decoded.get("email")
     phone = request.phone or decoded.get("phone_number")
     full_name = request.full_name or decoded.get("name")
 
-    existing = (
+    identity_result = (
         get_supabase()
         .table("firebase_identities")
-        .select("profile_id")
+        .select("profile_id,email")
         .eq("firebase_uid", uid)
         .limit(1)
         .execute()
     )
 
-    profile_id = existing.data[0]["profile_id"] if existing.data else uid
+    profile_id = identity_result.data[0]["profile_id"] if identity_result.data else uid
 
     profile_result = (
         get_supabase()
@@ -59,6 +64,7 @@ def sync_firebase_profile(request: FirebaseSyncRequest):
             updates["full_name"] = full_name
         if phone and not profile.get("phone"):
             updates["phone"] = phone
+
         if updates:
             updated = (
                 get_supabase()
@@ -67,26 +73,43 @@ def sync_firebase_profile(request: FirebaseSyncRequest):
                 .eq("id", profile_id)
                 .execute()
             )
-            profile = updated.data[0] if updated.data else profile
+            if updated.data:
+                profile = updated.data[0]
     else:
-        payload = {
+        profile = {
             "id": profile_id,
             "full_name": full_name or (email.split("@")[0] if email and "@" in email else "AgriMark User"),
             "phone": phone,
             "role": "farmer",
         }
-        created = get_supabase().table("profiles").upsert(payload).execute()
-        profile = created.data[0] if created.data else payload
+        try:
+            created = get_supabase().table("profiles").upsert(profile).execute()
+            if created.data:
+                profile = created.data[0]
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unable to create AgriMark profile",
+            ) from exc
 
-    if not existing.data:
-        get_supabase().table("firebase_identities").upsert(
-            {
-                "firebase_uid": uid,
-                "profile_id": profile_id,
-                "email": email,
-            },
-            on_conflict="firebase_uid",
-        ).execute()
+    try:
+        if identity_result.data:
+            get_supabase().table("firebase_identities").update(
+                {"email": email}
+            ).eq("firebase_uid", uid).execute()
+        else:
+            get_supabase().table("firebase_identities").insert(
+                {
+                    "firebase_uid": uid,
+                    "profile_id": profile_id,
+                    "email": email,
+                }
+            ).execute()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to link Firebase identity",
+        ) from exc
 
     has_name = bool(profile.get("full_name") and str(profile.get("full_name")).strip())
     return {
