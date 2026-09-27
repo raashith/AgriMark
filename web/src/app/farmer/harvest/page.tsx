@@ -149,15 +149,18 @@ export default function HarvestPage() {
             <div>
               <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Select Farm</label>
               <select required value={farmId} onChange={(event) => setFarmId(event.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#294136] rounded-xl text-white">
-                <option value="">Choose a farm</option>
+                <option value="">{farms.length ? 'Choose a farm' : 'No farm registered yet'}</option>
                 {farms.map((farm) => <option key={farm.id} value={farm.id}>{farm.name || 'Farm'}</option>)}
               </select>
+              {profileId && !loading && farms.length === 0 && (
+                <p className="text-xs text-amber-300 mt-2">Create a farm first in <a href="/farmer/farms" className="underline hover:text-amber-200">My Farms</a>.</p>
+              )}
             </div>
 
             <div>
               <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Crop</label>
               <select required value={cropId} onChange={(event) => setCropId(event.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#294136] rounded-xl text-white">
-                <option value="">Choose a crop</option>
+                <option value="">{cropOptions.length ? 'Choose a crop' : 'Loading crop catalog…'}</option>
                 {cropOptions.map((crop) => <option key={crop.id} value={crop.id}>{crop.name}</option>)}
               </select>
               {selectedCrop?.category && <p className="text-xs text-gray-500 mt-1">{selectedCrop.category}</p>}
@@ -182,11 +185,10 @@ export default function HarvestPage() {
             </div>
 
             <button type="submit" disabled={submitting || loading || farms.length === 0 || cropOptions.length === 0 || !profileId} className="w-full py-3 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-950 disabled:text-amber-700 text-white font-bold rounded-xl">
-              {submitting ? 'Saving harvest...' : 'Record Harvest & Generate Lot'}
+              {submitting ? 'Saving harvest...' : farms.length === 0 ? 'Add a Farm to Continue' : 'Record Harvest & Generate Lot'}
             </button>
 
             {!profileId && <p className="text-xs text-amber-300">Sign in to create a farm harvest record.</p>}
-            {profileId && farms.length === 0 && !loading && <p className="text-xs text-amber-300">Create a farm first; harvested produce must be linked to a farm.</p>}
           </form>
         </div>
 
@@ -201,7 +203,11 @@ export default function HarvestPage() {
             <div className="flex items-center gap-2 mb-4"><PackageCheck className="w-5 h-5 text-amber-400" /><h2 className="text-lg font-bold text-gray-100">Harvest & Lot Details</h2></div>
 
             {loading ? <div className="py-12 text-center text-gray-400">Loading your harvest records...</div> : harvestHistory.length === 0 ? (
-              <div className="py-12 text-center border border-dashed border-[#294136] rounded-xl text-gray-400"><ClipboardList className="w-8 h-8 mx-auto mb-3 text-gray-600" />No harvest lots found for this account yet.</div>
+              <div className="py-12 text-center border border-dashed border-[#294136] rounded-xl text-gray-400">
+                <ClipboardList className="w-8 h-8 mx-auto mb-3 text-gray-600" />
+                <p>No harvest lots found for this account yet.</p>
+                <a href="/farmer/farms" className="inline-flex mt-4 px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-semibold">Open My Farms</a>
+              </div>
             ) : (
               <div className="space-y-3">
                 {harvestHistory.map((harvest) => {
