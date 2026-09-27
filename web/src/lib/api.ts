@@ -95,6 +95,7 @@ export const api = {
       email?: string | null;
       phone?: string | null;
       full_name?: string | null;
+      requested_role?: string | null;
     },
     idToken: string,
   ) => request<{ user: UserProfile }>(
