@@ -10,6 +10,11 @@ class Settings(BaseSettings):
 
     supabase_service_role_key: str | None = None
     supabase_publishable_key: str | None = None
+
+    firebase_project_id: str | None = None
+    firebase_service_account_json: str | None = None
+    firebase_service_account_json_base64: str | None = None
+
     openai_api_key: str | None = None
     cors_origins: str = "https://agrimark-six.vercel.app,https://agrimark-stitch-web.onrender.com,http://localhost:5173,http://localhost:3000,http://localhost:3001"
 
