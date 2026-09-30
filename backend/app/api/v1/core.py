@@ -134,12 +134,6 @@ def list_harvest_batches(
         get_supabase()
         .table("harvest_batches")
         .select("id,cultivation_id,harvested_at,quantity,grade,trace_code")
-        .eq("farm_id", "")  # replaced below after owner farm IDs are collected
-        .limit(0)
-        .execute()
-    )
-    del result
-
     farms = get_supabase().table("farms").select("id").eq("owner_id", str(user.id)).execute()
     farm_ids = [row["id"] for row in (farms.data or [])]
     if not farm_ids:
@@ -300,6 +294,5 @@ def list_listings(status: str = Query(default="active", max_length=30)) -> list[
             except Exception:
                 pass
         item["price_per_kg"] = item.get("price_per_unit")
-        item["location"] = "Tamil Nadu, India"
         items.append(ListingResponse(**item))
     return items
