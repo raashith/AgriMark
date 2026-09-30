@@ -37,7 +37,7 @@ export const Sidebar: React.FC = () => {
 
   const buyerNav = [
     { label: 'Procurement Dashboard', href: '/buyer/marketplace', icon: LayoutDashboard },
-    { label: 'Stocked Produce', href: '/buyer/stock', icon: PackageCheck },
+    { label: 'Market', href: '/buyer/stock', icon: PackageCheck },
     { label: 'Browse Produce', href: '/marketplace', icon: ShoppingCart },
     { label: 'RFQs & Demands', href: '/buyer/rfqs', icon: FileText },
     { label: 'Offers Received', href: '/buyer/offers', icon: Layers },
@@ -96,30 +96,18 @@ export const Sidebar: React.FC = () => {
             </span>
           </div>
         </div>
-
         <nav className="flex-1 space-y-1 overflow-y-auto pr-1">
           {items.map((item, idx) => {
             const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
             return (
-              <Link
-                key={idx}
-                href={item.href}
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition ${isActive ? 'bg-emerald-600 text-white font-bold shadow-md' : 'text-gray-300 hover:text-white hover:bg-[#18241f]'}`}
-              >
+              <Link key={idx} href={item.href} className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition ${isActive ? 'bg-emerald-600 text-white font-bold shadow-md' : 'text-gray-300 hover:text-white hover:bg-[#18241f]'}`}>
                 <item.icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-emerald-400'}`} />
                 <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
         </nav>
-
-        <button
-          type="button"
-          onClick={() => setIsOpen(false)}
-          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-[#18241f] hover:text-white transition"
-          aria-label="Close navigation"
-          title="Close navigation"
-        >
+        <button type="button" onClick={() => setIsOpen(false)} className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-[#18241f] hover:text-white transition" aria-label="Close navigation" title="Close navigation">
           <ChevronLeft className="h-4 w-4" />
         </button>
       </aside>
