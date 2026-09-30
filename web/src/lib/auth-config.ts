@@ -13,7 +13,7 @@ export function getRoleDashboard(role?: string | null): string {
     case 'fpo':
       return '/fpo/dashboard';
     case 'logistics':
-      return '/logistics/deliveries';
+      return '/logistics';
     case 'farmer':
     default:
       return '/farmer/dashboard';
