@@ -30,16 +30,10 @@ export async function GET(request: Request) {
       );
     }
 
-    const responseHeaders = new Headers();
     const supabase = createServerClient(supabaseUrl, supabaseKey, {
       cookies: {
         getAll() {
           return cookieStore.getAll().map(({ name, value }) => ({ name, value }));
-        },
-        setAll(cookiesToSet) {
-          for (const { name, value, options } of cookiesToSet) {
-            responseHeaders.append('Set-Cookie', `${name}=${encodeURIComponent(value)}; Path=${options?.path || '/'}`);
-          }
         },
       },
     });
@@ -86,7 +80,6 @@ export async function GET(request: Request) {
         date_to: to || null,
       },
     });
-    responseHeaders.forEach((value, key) => response.headers.append(key, value));
     return response;
   } catch (error) {
     return NextResponse.json(
