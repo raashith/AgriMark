@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
-const OGD_RESOURCE_ID = '9ef4b77d-9a0c-4988-8573-054bb0058170';
+const OGD_RESOURCE_ID = '35985678-0d79-46b4-9ed6-6f13308a1d24';
 const OGD_BASE_URL = 'https://api.data.gov.in/resource/';
 const PAGE_SIZE = 100;
 const ALLOWED_CATEGORIES = new Set([
