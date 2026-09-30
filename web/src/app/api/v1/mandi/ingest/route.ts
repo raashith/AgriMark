@@ -23,7 +23,7 @@ function stateCodeFor(name: string): string {
   const upper=name.trim().toUpperCase();
   return STATE_CODES[upper] || upper.substring(0,2) || 'IN';
 }
-function parseDate(value?: string): string | null {
+function categoryFor(raw?: unknown): string {\n  const value = String(raw ?? '').trim().toUpperCase();\n  if (ALLOWED_CATEGORIES.has(value)) return value;\n  const lower = value.toLowerCase();\n  if (lower.includes('cereal')) return 'CEREALS';\n  if (lower.includes('pulse')) return 'PULSES';\n  if (lower.includes('oil')) return 'OILSEEDS';\n  if (lower.includes('fruit')) return 'FRUITS';\n  if (lower.includes('spice')) return 'SPICES';\n  if (lower.includes('fiber') || lower.includes('fibre')) return 'FIBER';\n  if (lower.includes('commercial')) return 'COMMERCIAL_CROPS';\n  return 'VEGETABLES';\n}\nfunction parseDate(value?: string): string | null {
   if (!value) return null;
   const raw=value.trim();
   const dmy=raw.split('/');
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
     const apiKey = process.env.DATA_GOV_IN_API_KEY;
     if (!apiKey) return NextResponse.json({ok:false,error:'DATA_GOV_IN_API_KEY is not configured server-side.'},{status:503});
 
-    const arrivalDate = searchParams.get('date') || new Date().toISOString().slice(0, 10);
+    const requestedDate = searchParams.get('date') || new Date().toISOString().slice(0, 10);\n    const arrivalDate = requestedDate;
     const apiUrl = `${OGD_BASE_URL}${OGD_RESOURCE_ID}?api-key=${encodeURIComponent(apiKey)}&format=json&offset=${offset}&limit=${limit}&filters[Arrival_Date]=${encodeURIComponent(arrivalDate)}`;
     const upstream = await fetch(apiUrl,{cache:'no-store'});
     if (!upstream.ok) return NextResponse.json({ok:false,error:`AGMARKNET request failed: HTTP ${upstream.status}`},{status:upstream.status});
@@ -77,7 +77,7 @@ export async function GET(request: Request) {
       const mandiCode=`${districtCode}_${slugify(market)}`;
       const commodityCode=slugify(commodity);
       const variantCode=`${commodityCode}_${slugify(variety)}`;
-      const obsDate=parseDate(String(rec?.Arrival_Date ?? rec?.arrival_date ?? '')) || new Date().toISOString().slice(0,10);
+      const obsDate = parseDate(String(rec?.Arrival_Date ?? rec?.arrival_date ?? ''));\n      if (!obsDate) { skipped++; continue; }
       const minPrice=Number(rec?.['Min Price'] ?? rec?.min_price);
       const maxPrice=Number(rec?.['Max Price'] ?? rec?.max_price);
       const min=minPrice>0?minPrice:modal;
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
           supabase.from('national_states').upsert({state_code:stateCode,name:state,region:REGIONS[stateCode] || 'CENTRAL'},{onConflict:'state_code'}),
           supabase.from('national_districts').upsert({state_code:stateCode,district_code:districtCode,name:district},{onConflict:'district_code'}),
           supabase.from('national_mandis').upsert({district_code:districtCode,mandi_code:mandiCode,name:market},{onConflict:'mandi_code'}),
-          supabase.from('national_commodities').upsert({code:commodityCode,name:commodity,category:ALLOWED_CATEGORIES.has(String(rec?.Category ?? rec?.category ?? '').trim().toUpperCase()) ? String(rec?.Category ?? rec?.category).trim().toUpperCase() : 'VEGETABLES',standard_unit:'QUINTAL'},{onConflict:'code'}),
+          supabase.from('national_commodities').upsert({code:commodityCode,name:commodity,category:categoryFor(rec?.Category ?? rec?.category ?? commodity),standard_unit:'QUINTAL'},{onConflict:'code'}),
           supabase.from('national_commodity_variants').upsert({variant_code:variantCode,variant_name:variety,grade:String(rec?.Grade ?? rec?.grade ?? 'STANDARD')},{onConflict:'variant_code'})
         ]);
         const dimensionError=results.find(r=>r.error)?.error;
