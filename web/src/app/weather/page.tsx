@@ -63,27 +63,13 @@ export default function WeatherPage() {
   const [farmLabel, setFarmLabel] = useState<string>('Farm weather');
 
   const loadWeather = async () => {
-    if (!user?.id) {
-      setLoading(false);
-      return;
-    }
-
     try {
       setRefreshing(true);
+      setLoading(true);
       setError(null);
 
-      let farms: Awaited<ReturnType<typeof dataService.getFarms>> = [];
-      try {
-        farms = await Promise.race([
-          dataService.getFarms(user.id),
-          new Promise<Awaited<ReturnType<typeof dataService.getFarms>>>((resolve) => window.setTimeout(() => resolve([]), 5000)),
-        ]);
-      } catch {}
-
-      const farm = farms.find((item) => item.latitude != null && item.longitude != null);
-
-      let latitude = farm?.latitude ?? null;
-      let longitude = farm?.longitude ?? null;
+      let latitude = manualCoordinates?.latitude ?? null;
+      let longitude = manualCoordinates?.longitude ?? null;
 
       if (latitude == null || longitude == null) {
         const stored = typeof window !== 'undefined'
@@ -95,7 +81,11 @@ export default function WeatherPage() {
             if (Number.isFinite(parsed.latitude) && Number.isFinite(parsed.longitude)) {
               latitude = parsed.latitude as number;
               longitude = parsed.longitude as number;
-              setManualCoordinates({ latitude, longitude, label: parsed.label || 'Selected farm' });
+              setManualCoordinates({
+                latitude,
+                longitude,
+                label: parsed.label || 'Selected farm',
+              });
               setFarmLabel(parsed.label || 'Selected farm');
             }
           } catch {}
@@ -103,14 +93,9 @@ export default function WeatherPage() {
       }
 
       if (latitude == null || longitude == null) {
-        setWeather(null);
-        setForecast([]);
-        setError('No farm GPS coordinates are saved yet. Add coordinates in My Farms, or select a location below to preview live weather.');
-        return;
-      }
-
-      if (farm?.name || farm?.village || farm?.district) {
-        setFarmLabel(farm.name || [farm.village, farm.district].filter(Boolean).join(', ') || 'Farm weather');
+        latitude = 13.1143;
+        longitude = 80.1081;
+        setFarmLabel('AgriMark Weather Preview');
       }
 
       const params = new URLSearchParams({
@@ -119,12 +104,8 @@ export default function WeatherPage() {
       });
 
       const [currentResponse, forecastResponse] = await Promise.all([
-        fetch(`/api/v1/interoperability/weather?${params.toString()}`, {
-          cache: 'no-store',
-        }),
-        fetch(`/api/v1/interoperability/weather/forecast?${params.toString()}`, {
-          cache: 'no-store',
-        }),
+        fetch(`/api/v1/interoperability/weather?${params.toString()}`, { cache: 'no-store' }),
+        fetch(`/api/v1/interoperability/weather/forecast?${params.toString()}`, { cache: 'no-store' }),
       ]);
 
       const [currentPayload, forecastPayload] = await Promise.all([
@@ -133,15 +114,15 @@ export default function WeatherPage() {
       ]);
 
       if (!currentResponse.ok || !forecastResponse.ok) {
-        const message =
+        throw new Error(
           currentPayload?.meta?.message ||
           forecastPayload?.meta?.message ||
-          'Live weather provider is temporarily unavailable.';
-        throw new Error(message);
+          'Live weather provider is temporarily unavailable.',
+        );
       }
 
       setWeather(currentPayload);
-      setForecast(forecastPayload?.data?.items || []);
+      setForecast(Array.isArray(forecastPayload?.data?.items) ? forecastPayload.data.items : []);
     } catch (err) {
       setWeather(null);
       setForecast([]);
@@ -153,33 +134,29 @@ export default function WeatherPage() {
   };
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const stored = window.localStorage.getItem('agrimark.weather.coordinates');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as { latitude?: number; longitude?: number; label?: string };
-        if (Number.isFinite(parsed.latitude) && Number.isFinite(parsed.longitude)) {
-          setManualCoordinates({
-            latitude: parsed.latitude as number,
-            longitude: parsed.longitude as number,
-            label: parsed.label || 'Selected farm',
-          });
-          setFarmLabel(parsed.label || 'Selected farm');
-        }
-      } catch {}
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem('agrimark.weather.coordinates');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as { latitude?: number; longitude?: number; label?: string };
+          if (Number.isFinite(parsed.latitude) && Number.isFinite(parsed.longitude)) {
+            setManualCoordinates({
+              latitude: parsed.latitude as number,
+              longitude: parsed.longitude as number,
+              label: parsed.label || 'Selected farm',
+            });
+            setFarmLabel(parsed.label || 'Selected farm');
+          }
+        } catch {}
+      }
     }
+    void loadWeather();
   }, []);
 
   useEffect(() => {
-    if (user?.id || manualCoordinates) void loadWeather();
-  }, [user?.id, manualCoordinates]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      if (user?.id) void loadWeather();
-    }, 15 * 60 * 1000);
+    const timer = window.setInterval(() => void loadWeather(), 15 * 60 * 1000);
     return () => window.clearInterval(timer);
-  }, [user?.id]);
+  }, []);
 
   const data = weather?.data;
   const observedLabel = useMemo(
