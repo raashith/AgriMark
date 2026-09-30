@@ -138,7 +138,54 @@ export default function BuyerStockPage() {
       </section>
 
       {loading ? (
-        <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] py-16 text-center text-sm text-gray-400">Loading available stock...</div>
+        <section aria-label="Loading market" className="space-y-4">
+          <div className="relative overflow-hidden rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5">
+            <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.8s_infinite] bg-gradient-to-r from-transparent via-emerald-500/[0.06] to-transparent" />
+            <div className="relative flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-800/40 bg-emerald-950/40">
+                <PackageCheck className="h-5 w-5 animate-pulse text-emerald-400" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-3 w-32 animate-pulse rounded-full bg-[#24352d]" />
+                <div className="h-2.5 w-52 animate-pulse rounded-full bg-[#1b2a23]" />
+              </div>
+              <div className="ml-auto hidden items-center gap-2 sm:flex">
+                <div className="h-8 w-20 animate-pulse rounded-xl bg-[#18241f]" />
+                <div className="h-8 w-24 animate-pulse rounded-xl bg-[#18241f]" />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {[0, 1, 2, 3, 4, 5].map((card) => (
+              <article key={card} className="relative overflow-hidden rounded-2xl border border-[#1e2d26] bg-[#121a16] p-4">
+                <div className="absolute inset-0 -translate-x-full animate-[shimmer_2.1s_infinite] bg-gradient-to-r from-transparent via-white/[0.025] to-transparent" />
+                <div className="relative">
+                  <div className="h-32 animate-pulse rounded-xl border border-[#1e2d26] bg-[#0d1712]" />
+                  <div className="mt-4 flex items-start justify-between gap-3">
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-28 animate-pulse rounded-full bg-[#24352d]" />
+                      <div className="h-2.5 w-36 animate-pulse rounded-full bg-[#1b2a23]" />
+                    </div>
+                    <div className="h-6 w-16 animate-pulse rounded-full bg-[#1b2a23]" />
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <div className="h-16 animate-pulse rounded-xl bg-[#0a0f0d]" />
+                    <div className="h-16 animate-pulse rounded-xl bg-[#0a0f0d]" />
+                  </div>
+                  <div className="mt-3 h-2.5 w-40 animate-pulse rounded-full bg-[#1b2a23]" />
+                  <div className="mt-4 h-10 animate-pulse rounded-xl bg-emerald-950/60" />
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-center gap-2 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-500/80">
+            <span className="h-1.5 w-1.5 animate-ping rounded-full bg-emerald-400" />
+            <span>Syncing live produce</span>
+            <span className="h-1.5 w-1.5 animate-ping rounded-full bg-emerald-400 [animation-delay:250ms]" />
+          </div>
+        </section>
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[#294238] bg-[#121a16] py-16 text-center">
           <PackageCheck className="mx-auto mb-3 h-8 w-8 text-gray-600" />
