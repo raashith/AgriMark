@@ -14,6 +14,7 @@ from .api.v1.health import router as health_router
 from .api.v1.marketplace import router as marketplace_router
 from .api.v1.readiness import router as readiness_router
 from .api.v1.tracking import router as tracking_router
+from .api.v1.weather import router as weather_router
 from .core.config import get_settings
 from .core.rate_limit import check_rate_limit
 
@@ -70,6 +71,7 @@ app.include_router(firebase_auth_router, prefix="/api/v1")
 app.include_router(core_router, prefix="/api/v1")
 app.include_router(marketplace_router, prefix="/api/v1")
 app.include_router(tracking_router, prefix="/api/v1")
+app.include_router(weather_router, prefix="/api/v1")
 
 
 @app.get("/")
