@@ -119,7 +119,6 @@ export interface HarvestBatch {
   packaging_type?: string;
   storage_requirement?: string;
   storage_required?: boolean;
-  packaging_type?: string;
   notes?: string | null;
   trace_code: string;
   created_at?: string;
