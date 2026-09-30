@@ -6,7 +6,7 @@
 
 import { WeatherObservation, ClimateIndex, ProvenanceMetadata } from './national-data-model';
 
-export type WeatherProvider = 'IMD_OFFICIAL' | 'OPEN_METEO_VERIFIED' | 'ECMWF_ERA5' | 'MOCK_STAGING';
+export type WeatherProvider = 'IMD_OFFICIAL' | 'OPEN_METEO_VERIFIED' | 'ECMWF_ERA5';
 
 export interface WeatherProviderConfig {
   provider_id: WeatherProvider;
@@ -17,10 +17,9 @@ export interface WeatherProviderConfig {
 
 export class WeatherClimateEngine {
   private static providers: Record<WeatherProvider, WeatherProviderConfig> = {
-    IMD_OFFICIAL: { provider_id: 'IMD_OFFICIAL', is_configured: true, api_key_present: true, base_url: 'https://api.imd.gov.in/v1' },
-    OPEN_METEO_VERIFIED: { provider_id: 'OPEN_METEO_VERIFIED', is_configured: true, api_key_present: true, base_url: 'https://api.open-meteo.com/v1' },
-    ECMWF_ERA5: { provider_id: 'ECMWF_ERA5', is_configured: false, api_key_present: false, base_url: 'https://cds.climate.copernicus.eu/api/v2' },
-    MOCK_STAGING: { provider_id: 'MOCK_STAGING', is_configured: true, api_key_present: true, base_url: 'https://staging.agrimark.internal/weather' }
+    IMD_OFFICIAL: { provider_id: 'IMD_OFFICIAL', is_configured: false, api_key_present: false, base_url: 'https://api.imd.gov.in/v1' },
+    OPEN_METEO_VERIFIED: { provider_id: 'OPEN_METEO_VERIFIED', is_configured: false, api_key_present: false, base_url: 'https://api.open-meteo.com/v1' },
+    ECMWF_ERA5: { provider_id: 'ECMWF_ERA5', is_configured: false, api_key_present: false, base_url: 'https://cds.climate.copernicus.eu/api/v2' }
   };
 
   public static getProviderStatus(provider: WeatherProvider): WeatherProviderConfig {
@@ -41,7 +40,7 @@ export class WeatherClimateEngine {
       soil_moisture_volumetric?: number;
       solar_radiation_mj_m2?: number;
     },
-    provider: WeatherProvider = 'IMD_OFFICIAL'
+    provider: WeatherProvider
   ): WeatherObservation {
     const config = this.getProviderStatus(provider);
     if (!config.is_configured) {
@@ -58,8 +57,8 @@ export class WeatherClimateEngine {
       geography: `${districtCode}, ${stateCode}`,
       unit: 'METRIC',
       schema_version: 'v1.0',
-      quality_score: 0.96,
-      validation_status: 'VALIDATED',
+      quality_score: 0,
+      validation_status: 'UNVERIFIED',
       data_layer: 'CANONICAL'
     };
 
@@ -117,8 +116,8 @@ export class WeatherClimateEngine {
       geography: `${districtCode}, ${stateCode}`,
       unit: 'INDEX_SCORE',
       schema_version: 'v1.0',
-      quality_score: 0.94,
-      validation_status: 'VALIDATED',
+      quality_score: 0,
+      validation_status: 'UNVERIFIED',
       data_layer: 'INTELLIGENCE'
     };
 
