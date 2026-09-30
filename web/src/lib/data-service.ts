@@ -61,19 +61,13 @@ export const dataService = {
   // Crop Catalog & Cultivations
   async getCropCatalog(): Promise<CropCatalogItem[]> {
     try {
-      const { data, error } = await supabase.from('crop_catalog').select('*');
-      if (!error && data && data.length > 0) return data as CropCatalogItem[];
-    } catch {}
-    // Standard agricultural categories reference list
-    return [
-      { id: 'crop-paddy', name: 'Paddy (Rice)', category: 'Cereals', typical_duration_days: 120, season: 'Kharif', agronomy_tips: 'Major staple grain cultivation' },
-      { id: 'crop-wheat', name: 'Wheat', category: 'Cereals', typical_duration_days: 110, season: 'Rabi', agronomy_tips: 'Rabi cereal crop' },
-      { id: 'crop-turmeric', name: 'Turmeric', category: 'Spices', typical_duration_days: 240, season: 'Perennial', agronomy_tips: 'High value rhizome spice' },
-      { id: 'crop-tomato', name: 'Tomato', category: 'Vegetables', typical_duration_days: 90, season: 'Zaid', agronomy_tips: 'Short-duration horticulture crop' },
-      { id: 'crop-cotton', name: 'Cotton', category: 'Cash Crops', typical_duration_days: 160, season: 'Kharif', agronomy_tips: 'Commercial cash crop' },
-      { id: 'crop-sugarcane', name: 'Sugarcane', category: 'Cash Crops', typical_duration_days: 360, season: 'Perennial', agronomy_tips: 'Perennial industrial cash crop' },
-    ];
-  },
+      const { data, error } = await supabase.from('crop_catalog').select('*').order('name');
+      if (error) throw error;
+      return (data ?? []) as CropCatalogItem[];
+    } catch {
+      return [];
+    }
+  }
 
   async getCultivations(farmId?: string, ownerId?: string): Promise<Cultivation[]> {
     try {
