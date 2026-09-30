@@ -218,10 +218,10 @@ export default function DeliveryLocationPage() {
       // Route user to appropriate experience
       const userRole = user?.role || 'buyer';
       if (userRole === 'farmer') router.push('/farmer/dashboard');
-      else if (userRole === 'buyer') router.push('/buyer/marketplace');
+      else if (userRole === 'buyer') router.push('/buyer/stock');
       else if (userRole === 'fpo') router.push('/fpo/dashboard');
       else if (userRole === 'logistics') router.push('/logistics/deliveries');
-      else router.push('/buyer/marketplace');
+      else router.push('/buyer/stock');
     } catch (err: any) {
       setFormError(err.message || 'Unable to save address. Please try again.');
     } finally {
