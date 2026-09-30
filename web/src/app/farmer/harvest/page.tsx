@@ -100,7 +100,7 @@ export default function HarvestPage() {
   const reservedKg = lots
     .filter((lot) => lot.status === 'reserved')
     .reduce((sum, lot) => sum + Number(lot.available_quantity ?? lot.quantity ?? 0), 0);
-  const activeLots = lots.filter((lot) => (lot.status || 'available') === 'available').length;
+  const activeLots = lots.filter((lot) => ['available', 'listed'].includes(lot.status || 'available')).length;
 
   const recordHarvest = async (event: React.FormEvent) => {
     event.preventDefault();
