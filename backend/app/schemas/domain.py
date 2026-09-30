@@ -54,11 +54,14 @@ class CultivationResponse(CultivationCreate):
 class ProduceLotCreate(BaseModel):
     cultivation_id: UUID | None = None
     crop_id: UUID
-    quantity: Decimal = Field(ge=0)
+    quantity: Decimal = Field(gt=0)
     unit: str = "kg"
     quality_grade: str | None = None
     available_quantity: Decimal | None = Field(default=None, ge=0)
     harvested_at: date | None = None
+    harvest_batch_id: UUID | None = None
+    owner_id: UUID | None = None
+    status: str = "available"
 
 
 class ProduceLotResponse(ProduceLotCreate):
@@ -72,6 +75,11 @@ class HarvestBatchCreate(BaseModel):
     harvest_date: date
     total_quantity_kg: Decimal = Field(gt=0)
     quality_grade: str
+    moisture_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    rejection_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    packaging_type: str | None = None
+    storage_required: bool = False
+    notes: str | None = None
 
 
 class HarvestBatchResponse(HarvestBatchCreate):
