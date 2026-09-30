@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import {
   Sprout, LayoutDashboard, MapPin, Calendar, Eye, Layers, ShoppingBag,
   ShoppingCart, TrendingUp, CloudSun, FileText, CheckSquare, ShieldCheck,
-  Bot, Settings, Building2, Truck, Users, ChevronLeft,
+  Bot, Settings, Building2, Truck, Users, ChevronLeft, PackageCheck,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -37,6 +37,7 @@ export const Sidebar: React.FC = () => {
 
   const buyerNav = [
     { label: 'Procurement Dashboard', href: '/buyer/marketplace', icon: LayoutDashboard },
+    { label: 'Stocked Produce', href: '/buyer/stock', icon: PackageCheck },
     { label: 'Browse Produce', href: '/marketplace', icon: ShoppingCart },
     { label: 'RFQs & Demands', href: '/buyer/rfqs', icon: FileText },
     { label: 'Offers Received', href: '/buyer/offers', icon: Layers },
@@ -72,12 +73,7 @@ export const Sidebar: React.FC = () => {
 
   return (
     <>
-      <div
-        aria-hidden="true"
-        className="fixed left-0 top-0 z-[70] hidden lg:block w-3 h-screen"
-        onMouseEnter={() => setIsOpen(true)}
-      />
-
+      <div aria-hidden="true" className="fixed left-0 top-0 z-[70] hidden lg:block w-3 h-screen" onMouseEnter={() => setIsOpen(true)} />
       <aside
         onMouseEnter={() => setIsOpen(true)}
         onMouseLeave={() => setIsOpen(false)}
@@ -108,9 +104,7 @@ export const Sidebar: React.FC = () => {
               <Link
                 key={idx}
                 href={item.href}
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition ${
-                  isActive ? 'bg-emerald-600 text-white font-bold shadow-md' : 'text-gray-300 hover:text-white hover:bg-[#18241f]'
-                }`}
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition ${isActive ? 'bg-emerald-600 text-white font-bold shadow-md' : 'text-gray-300 hover:text-white hover:bg-[#18241f]'}`}
               >
                 <item.icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-emerald-400'}`} />
                 <span className="truncate">{item.label}</span>
