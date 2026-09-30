@@ -1,22 +1,17 @@
 import { NextResponse } from 'next/server';
-import { evaluateDocumentReadiness } from '@/lib/document-readiness-engine';
+
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const farmerId = searchParams.get('farmer_id') || 'FARMER_DEMO_1';
-  const schemeId = searchParams.get('scheme_id') || 'TN_PM_KUSUM_SOLAR_2026';
-
-  const readiness = await evaluateDocumentReadiness(farmerId, schemeId);
-  return NextResponse.json({
-    success: true,
-    data: readiness,
-    meta: {
-      auto_submit_enabled: false,
-      privacy_notice: 'Private farmer identity and land documents are encrypted and protected under RLS policies.'
-    }
-  });
+export async function GET() {
+  return NextResponse.json(
+    {
+      success: false,
+      data: null,
+      meta: {
+        data_origin: 'NO_LIVE_SOURCE',
+        message: 'Document readiness requires authenticated farmer documents and a live scheme definition.',
+      },
+    },
+    { status: 503 },
+  );
 }
-
-
-
