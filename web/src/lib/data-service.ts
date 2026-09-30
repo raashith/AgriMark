@@ -67,7 +67,7 @@ export const dataService = {
     } catch {
       return [];
     }
-  }
+  },
 
   async getCultivations(farmId?: string, ownerId?: string): Promise<Cultivation[]> {
     try {
