@@ -36,8 +36,8 @@ export const Sidebar: React.FC = () => {
   ];
 
   const buyerNav = [
-    { label: 'Procurement Dashboard', href: '/buyer/marketplace', icon: LayoutDashboard },
     { label: 'Market', href: '/buyer/stock', icon: PackageCheck },
+    { label: 'Procurement Dashboard', href: '/buyer/marketplace', icon: LayoutDashboard },
     { label: 'Browse Produce', href: '/marketplace', icon: ShoppingCart },
     { label: 'RFQs & Demands', href: '/buyer/rfqs', icon: FileText },
     { label: 'Offers Received', href: '/buyer/offers', icon: Layers },
