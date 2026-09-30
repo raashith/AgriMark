@@ -60,7 +60,6 @@ class ProduceLotCreate(BaseModel):
     available_quantity: Decimal | None = Field(default=None, ge=0)
     harvested_at: date | None = None
     harvest_batch_id: UUID | None = None
-    owner_id: UUID | None = None
     status: str = "available"
 
 
