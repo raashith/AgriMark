@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { LayoutDashboard, ShoppingCart, TrendingUp, Bot, Menu } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, TrendingUp, Bot, Truck } from 'lucide-react';
 
 export const MobileNav: React.FC<{ onOpenMobileMenu?: () => void }> = ({ onOpenMobileMenu }) => {
   const pathname = usePathname();
