@@ -42,9 +42,11 @@ export default function FarmerDashboardPage() {
     avgHealth: 0,
     latestRainfall: 0,
     latestHumidity: 0,
+    latestTemperature: 0: 0,
   });
 
   const [weatherAlert, setWeatherAlert] = useState<string | null>(null);
+  const [weatherLocation, setWeatherLocation] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -54,14 +56,18 @@ export default function FarmerDashboardPage() {
         return;
       }
       try {
-        const [farms, cultivations, lots, orders, tasks, weather] = await Promise.all([
+        const [farms, cultivations, lots, orders, tasks] = await Promise.all([
           dataService.getFarms(user.id),
           dataService.getCultivations(undefined, user.id),
           dataService.getProduceLots(user.id),
           dataService.getOrders(user.id, 'farmer'),
           dataService.getTasks(user.id),
-          dataService.getWeather(user.district || user.location),
         ]);
+
+        const farmWithCoords = farms.find((f) => f.latitude != null && f.longitude != null);
+        const weather = farmWithCoords
+          ? await dataService.getLiveWeather(farmWithCoords.latitude as number, farmWithCoords.longitude as number)
+          : null;
 
         if (!isMounted) return;
 
@@ -69,9 +75,9 @@ export default function FarmerDashboardPage() {
         const totalStock = lots.reduce((acc, l) => acc + (l.quantity_kg || 0), 0);
         const revenue = orders.filter((o) => o.status === 'delivered' || o.status === 'confirmed' || o.payment_status === 'escrowed').reduce((acc, o) => acc + (o.total_price || o.total_amount || 0), 0);
         const pendingT = tasks.filter((t) => t.status === 'pending').length;
-        const avgHealth = Math.round(weather.reduce((acc, w) => acc + Number(w.humidity_pct || 0), 0) / Math.max(weather.length, 1));
-        const latestRainfall = Number(weather[0]?.rainfall_mm || 0);
-        const latestHumidity = Number(weather[0]?.humidity_pct || 0);
+        const latestRainfall = Number(weather?.data?.rain_1h_mm || 0);
+        const latestHumidity = Number(weather?.data?.humidity_pct || 0);
+        const latestTemperature = Number(weather?.data?.temperature_c || 0);
 
         setStats({
           activeCrops: cultivations.length,
@@ -81,16 +87,13 @@ export default function FarmerDashboardPage() {
           revenueInr: revenue,
           pendingTasks: pendingT,
           cultivationAcres: totalAcres,
-          avgHealth,
+          avgHealth: latestHumidity,
           latestRainfall,
           latestHumidity,
+          latestTemperature,
         });
-
-        if (weather && weather.length > 0 && weather[0].crop_warning) {
-          setWeatherAlert(weather[0].crop_warning);
-        } else {
-          setWeatherAlert(null);
-        }
+        setWeatherLocation(weather?.data?.location_name || null);
+        setWeatherAlert(null);
       } catch {
       } finally {
         if (isMounted) setLoading(false);
@@ -194,13 +197,13 @@ export default function FarmerDashboardPage() {
             </div>
             <div className="mt-5 rounded-2xl border border-white/5 bg-black/20 p-4">
               <div className="flex items-center justify-between text-xs text-gray-500">
-                <span>Operations pulse</span>
-                <span>Live from connected farm data</span>
+                <span>Connected farm status</span>
+                <span>{stats.totalFarms} farm{stats.totalFarms === 1 ? '' : 's'} configured</span>
               </div>
-              <div className="mt-4 h-24 flex items-end gap-2">
-                {[34,46,38,52,65,58,72,66,80,74,88,82].map((h, i) => (
-                  <div key={i} className="flex-1 rounded-t-md bg-gradient-to-t from-emerald-950 via-emerald-700 to-emerald-300/80 opacity-80" style={{ height: `${h}%` }} />
-                ))}
+              <div className="mt-4 grid grid-cols-3 gap-3">
+                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3"><p className="text-[10px] uppercase text-gray-500">Area</p><p className="mt-1 font-bold text-white">{stats.cultivationAcres.toFixed(1)} ac</p></div>
+                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3"><p className="text-[10px] uppercase text-gray-500">Temperature</p><p className="mt-1 font-bold text-white">{stats.latestTemperature || '—'}°C</p></div>
+                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3"><p className="text-[10px] uppercase text-gray-500">Weather</p><p className="mt-1 font-bold capitalize text-emerald-300">{weatherLocation || 'GPS required'}</p></div>
               </div>
             </div>
           </div>
@@ -210,7 +213,7 @@ export default function FarmerDashboardPage() {
               <CloudRain className="h-5 w-5 text-sky-300" />
               <div>
                 <p className="text-xs uppercase tracking-[0.18em] text-sky-300">Weather Today</p>
-                <h2 className="mt-1 text-xl font-bold text-white">{user?.location || 'Your farm region'}</h2>
+                <h2 className="mt-1 text-xl font-bold text-white">{weatherLocation || 'Your farm region'}</h2>
               </div>
             </div>
             <div className="mt-5 grid grid-cols-2 gap-3">
@@ -225,18 +228,9 @@ export default function FarmerDashboardPage() {
                 <p className="text-xs text-gray-500">rainfall</p>
               </div>
             </div>
-            {weatherAlert ? (
-              <div className="mt-4 rounded-2xl border border-amber-800/50 bg-amber-950/20 p-4 text-sm text-amber-200">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
-                  <span>{weatherAlert}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-4 rounded-2xl border border-emerald-900/40 bg-emerald-950/20 p-4 text-sm text-emerald-200">
-                No active weather alert in the connected data.
-              </div>
-            )}
+            <div className="mt-4 rounded-2xl border border-emerald-900/40 bg-emerald-950/20 p-4 text-sm text-emerald-200">
+              {weatherLocation ? 'Live weather is connected to the farm coordinates saved in AgriMark.' : 'Add GPS coordinates to a farm to activate live weather here.'}
+            </div>
             <Link href="/weather" className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-sky-300 hover:text-white">
               Open weather & climate <ArrowUpRight className="h-3.5 w-3.5" />
             </Link>
