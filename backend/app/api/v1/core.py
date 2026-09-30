@@ -203,10 +203,16 @@ def create_harvest_batch(
             harvest_date=str(created["harvested_at"])[:10],
             total_quantity_kg=created["quantity"],
             quality_grade=created["grade"],
+            moisture_pct=created.get("moisture_pct"),
+            rejection_pct=created.get("rejection_pct"),
+            packaging_type=created.get("packaging_type"),
+            storage_required=created.get("storage_required", False),
+            notes=created.get("notes"),
             trace_code=created["trace_code"],
         )
     except Exception as exc:
-        raise HTTPException(status_code=400, detail="Unable to create harvest batch") from exc
+        detail = str(getattr(exc, "message", None) or exc)
+        raise HTTPException(status_code=400, detail=detail[:300]) from exc
 
 
 @router.get("/produce-lots", response_model=list[ProduceLotResponse])
