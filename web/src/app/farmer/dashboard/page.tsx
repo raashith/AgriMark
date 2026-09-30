@@ -41,7 +41,7 @@ export default function FarmerDashboardPage() {
     avgHealth: 0,
     latestRainfall: 0,
     latestHumidity: 0,
-    latestTemperature: 0: 0,
+    latestTemperature: 0,
   });
 
   const [weatherLocation, setWeatherLocation] = useState<string | null>(null);
