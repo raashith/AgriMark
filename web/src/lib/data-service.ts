@@ -283,6 +283,44 @@ export const dataService = {
     return [];
   },
 
+  async getLiveWeather(latitude: number, longitude: number) {
+    const params = new URLSearchParams({
+      latitude: String(latitude),
+      longitude: String(longitude),
+    });
+
+    const response = await fetch(`/api/v1/interoperability/weather?${params.toString()}`, {
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(
+        payload && typeof payload === 'object' && 'meta' in payload
+          ? String((payload as { meta?: { message?: unknown } }).meta?.message || 'Live weather request failed.')
+          : 'Live weather request failed.',
+      );
+    }
+
+    return response.json() as Promise<{
+      success: true;
+      data: {
+        latitude: number;
+        longitude: number;
+        timezone: string;
+        elevation_m: number;
+        current: Record<string, number | string | null>;
+        current_units: Record<string, string>;
+      };
+      meta: {
+        data_origin: string;
+        provider: string;
+        observed_at: string | null;
+        freshness: string;
+      };
+    }>;
+  },
+
   // Finance, Tasks, Documents
   async getFinance(userId?: string): Promise<FinanceRecord[]> {
     try {
