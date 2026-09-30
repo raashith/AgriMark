@@ -118,6 +118,8 @@ export interface HarvestBatch {
   rejection_pct?: number;
   packaging_type?: string;
   storage_requirement?: string;
+  storage_required?: boolean;
+  notes?: string | null;
   trace_code: string;
   created_at?: string;
 }
@@ -139,7 +141,7 @@ export interface ProduceLot {
   storage_location?: string;
   trace_code?: string;
   is_listed?: boolean;
-  status?: 'available' | 'reserved' | 'sold' | 'expired';
+  status?: 'available' | 'reserved' | 'sold' | 'expired' | 'listed';
   created_at?: string;
 }
 

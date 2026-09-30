@@ -4,26 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import {
-  Sprout,
-  LayoutDashboard,
-  MapPin,
-  Calendar,
-  Eye,
-  Layers,
-  ShoppingBag,
-  ShoppingCart,
-  TrendingUp,
-  CloudSun,
-  FileText,
-  CheckSquare,
-  ShieldCheck,
-  Bot,
-  Settings,
-  Building2,
-  Truck,
-  Users,
-} from 'lucide-react';
+import { Sprout, LayoutDashboard, MapPin, Calendar, Eye, Layers, ShoppingBag, ShoppingCart, TrendingUp, CloudSun, FileText, CheckSquare, ShieldCheck, Bot, Settings, Building2, Truck, Users } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
   const pathname = usePathname();
@@ -48,7 +29,6 @@ export const Sidebar: React.FC = () => {
     { label: 'AgriAI Assistant', href: '/ai-assistant', icon: Bot },
     { label: 'Settings', href: '/farmer/settings', icon: Settings },
   ];
-
   const buyerNav = [
     { label: 'Procurement Dashboard', href: '/buyer/marketplace', icon: LayoutDashboard },
     { label: 'Browse Produce', href: '/marketplace', icon: ShoppingCart },
@@ -61,7 +41,6 @@ export const Sidebar: React.FC = () => {
     { label: 'Cold Storage', href: '/storage', icon: Building2 },
     { label: 'AgriAI Assistant', href: '/ai-assistant', icon: Bot },
   ];
-
   const adminNav = [
     { label: 'Admin Operations', href: '/admin/dashboard', icon: ShieldCheck },
     { label: 'Marketplace', href: '/marketplace', icon: ShoppingCart },
@@ -72,40 +51,26 @@ export const Sidebar: React.FC = () => {
     { label: 'AgriAI Engine', href: '/ai-assistant', icon: Bot },
   ];
 
-  let items = farmerNav;
-  if (role === 'buyer') items = buyerNav;
-  if (role === 'admin') items = adminNav;
+  const items = role === 'buyer' ? buyerNav : role === 'admin' ? adminNav : farmerNav;
 
   return (
-    <aside className="hidden lg:flex flex-col w-64 bg-[#121a16] border-r border-[#1e2d26] min-h-[calc(100vh-4rem)] p-4 space-y-6 shrink-0">
-      {/* User Role Profile Badge */}
-      <div className="p-3.5 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl flex items-center gap-3">
-        <div className="w-10 h-10 bg-emerald-950 border border-emerald-700/60 rounded-xl flex items-center justify-center text-emerald-400 font-bold shrink-0">
+    <aside className="hidden lg:flex w-[235px] shrink-0 flex-col min-h-[calc(100vh-4rem)] border-r border-[#24382e] bg-[#0c120f] p-4">
+      <div className="mb-4 flex items-center gap-3 rounded-[18px] border border-white/10 bg-[#07110d] p-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#3e7b54]/60 bg-[#1b4d3e]/25 text-sm font-bold text-[#52a67a]">
           {user?.full_name ? user.full_name[0].toUpperCase() : 'A'}
         </div>
-        <div className="overflow-hidden">
-          <h4 className="font-bold text-sm text-white truncate">{user?.full_name || 'AgriMark User'}</h4>
-          <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-400 px-2 py-0.5 bg-emerald-950/80 border border-emerald-800/40 rounded-full inline-block">
-            {role || 'Farmer'}
-          </span>
+        <div className="min-w-0">
+          <h4 className="truncate text-sm font-bold text-[#f7f5ee]">{user?.full_name || 'AgriMark User'}</h4>
+          <span className="mt-1 inline-block rounded-full border border-[#3e7b54]/50 bg-[#1b4d3e]/30 px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-[#9bc7a2]">{role || 'Farmer'}</span>
         </div>
       </div>
-
-      {/* Nav List */}
+      <div className="mb-3 px-3 text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-gray-500">Workspace</div>
       <nav className="flex-1 space-y-1 overflow-y-auto pr-1">
-        {items.map((item, idx) => {
-          const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+        {items.map((item) => {
+          const active = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
           return (
-            <Link
-              key={idx}
-              href={item.href}
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition ${
-                isActive
-                  ? 'bg-emerald-600 text-white font-bold shadow-md'
-                  : 'text-gray-300 hover:text-white hover:bg-[#18241f]'
-              }`}
-            >
-              <item.icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-emerald-400'}`} />
+            <Link key={item.href} href={item.href} className={`group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm transition ${active ? 'bg-[#1b4d3e] font-semibold text-[#f7f5ee] shadow-md shadow-black/20' : 'font-medium text-[#adbdb2] hover:bg-[#16221c] hover:text-[#f7f5ee]'}`}>
+              <item.icon className={`h-4 w-4 shrink-0 ${active ? 'text-[#f7f5ee]' : 'text-[#52a67a] group-hover:text-[#9bc7a2]'}`} />
               <span className="truncate">{item.label}</span>
             </Link>
           );

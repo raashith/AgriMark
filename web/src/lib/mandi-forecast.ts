@@ -1,8 +1,6 @@
 /**
- * AgriMark Leakage-Safe Mandi Price Forecasting Engine
- * 
- * Enforces strict temporal isolation: Future price observations are guaranteed
- * never to enter training or feature calculation windows.
+ * Leakage-safe Mandi Price Forecasting Engine.
+ * Forecasts are produced only when enough verified observed history exists.
  */
 
 export interface PriceObservationInput {
@@ -13,11 +11,11 @@ export interface PriceObservationInput {
   modal_price: number;
   min_price?: number;
   max_price?: number;
-  observed_at: string; // ISO Date String
+  observed_at: string;
 }
 
 export interface ForecastPoint {
-  target_date: string; // YYYY-MM-DD
+  target_date: string;
   forecast_horizon_days: number;
   predicted_value: number;
   lower_bound_95: number;
@@ -39,97 +37,101 @@ export interface ForecastResult {
 }
 
 export class MandiForecastEngine {
-  /**
-   * Generates a leakage-safe price forecast based strictly on historical observations on or before baseDate.
-   */
   public static generatePriceForecast(
     observations: PriceObservationInput[],
     commodityCode: string,
-    horizonDays: number = 7,
+    horizonDays = 7,
     baseDateIso?: string,
     stateCode?: string,
-    districtCode?: string
+    districtCode?: string,
   ): ForecastResult {
     const baseDate = baseDateIso ? new Date(baseDateIso) : new Date();
     const cutoffTime = baseDate.getTime();
 
-    // 1. Strict Temporal Leakage Guard: Exclude any observations past cutoffTime
     const validHistory = observations
       .filter((obs) => {
         const obsTime = new Date(obs.observed_at).getTime();
-        return !isNaN(obsTime) && obsTime <= cutoffTime && obs.commodity_code === commodityCode;
+        return (
+          Number.isFinite(obsTime) &&
+          obsTime <= cutoffTime &&
+          obs.commodity_code === commodityCode &&
+          Number.isFinite(Number(obs.modal_price)) &&
+          Number(obs.modal_price) > 0
+        );
       })
-      .sort((a, b) => new Date(a.observed_at).getTime() - new Date(b.observed_at).getTime());
+      .sort(
+        (a, b) =>
+          new Date(a.observed_at).getTime() - new Date(b.observed_at).getTime(),
+      );
 
     const numPoints = validHistory.length;
 
-    // Fallback baseline if insufficient history
-    let lastObservedPrice = 2000;
-    let dailySlope = 0;
-    let stdDev = 50;
-
-    if (numPoints > 0) {
-      const prices = validHistory.map((h) => Number(h.modal_price) || 0);
-      lastObservedPrice = prices[prices.length - 1];
-
-      if (numPoints >= 2) {
-        // Simple linear trend estimation over history
-        const n = prices.length;
-        const xAvg = (n - 1) / 2;
-        const yAvg = prices.reduce((acc, p) => acc + p, 0) / n;
-
-        let num = 0;
-        let den = 0;
-        prices.forEach((y, x) => {
-          num += (x - xAvg) * (y - yAvg);
-          den += (x - xAvg) * (x - xAvg);
-        });
-
-        dailySlope = den !== 0 ? num / den : 0;
-        // Cap daily slope to prevent explosive forecasts
-        dailySlope = Math.max(-50, Math.min(50, dailySlope));
-
-        // Calculate standard deviation for prediction intervals
-        const variance = prices.reduce((acc, p) => acc + Math.pow(p - yAvg, 2), 0) / n;
-        stdDev = Math.sqrt(variance) || 40;
-      }
-    }
-
-    const predictions: ForecastPoint[] = [];
-
-    for (let day = 1; day <= horizonDays; day++) {
-      const targetTime = new Date(baseDate);
-      targetTime.setDate(targetTime.getDate() + day);
-      const targetDateStr = targetTime.toISOString().split('T')[0];
-
-      // Projected point estimate
-      const predictedVal = Math.max(100, Math.round((lastObservedPrice + dailySlope * day) * 100) / 100);
-
-      // Uncertainty expands with horizon length
-      const horizonFactor = 1.0 + Math.sqrt(day) * 0.15;
-      const margin95 = Math.round(1.96 * stdDev * horizonFactor * 100) / 100;
-
-      predictions.push({
-        target_date: targetDateStr,
-        forecast_horizon_days: day,
-        predicted_value: predictedVal,
-        lower_bound_95: Math.max(50, Math.round((predictedVal - margin95) * 100) / 100),
-        upper_bound_95: Math.round((predictedVal + margin95) * 100) / 100,
-        data_type: 'PROJECTED',
-      });
-    }
-
-    return {
+    const resultBase = {
       commodity_code: commodityCode,
       state_code: stateCode,
       district_code: districtCode,
       model_name: 'AgriMark-ExponentialTrend-v1',
       model_version: '1.2.0',
-      model_type: 'TIME_SERIES',
+      model_type: 'TIME_SERIES' as const,
       base_date: baseDate.toISOString().split('T')[0],
       history_window_days: 30,
       historical_data_points: numPoints,
-      predictions,
     };
+
+    // Never manufacture a forecast from a made-up default price.
+    if (numPoints < 3) {
+      return { ...resultBase, predictions: [] };
+    }
+
+    const prices = validHistory.map((h) => Number(h.modal_price));
+    const lastObservedPrice = prices[prices.length - 1];
+    const n = prices.length;
+    const xAvg = (n - 1) / 2;
+    const yAvg = prices.reduce((sum, price) => sum + price, 0) / n;
+
+    let numerator = 0;
+    let denominator = 0;
+    prices.forEach((price, index) => {
+      numerator += (index - xAvg) * (price - yAvg);
+      denominator += (index - xAvg) * (index - xAvg);
+    });
+
+    const dailySlope =
+      denominator !== 0
+        ? Math.max(-50, Math.min(50, numerator / denominator))
+        : 0;
+
+    const variance =
+      prices.reduce((sum, price) => sum + Math.pow(price - yAvg, 2), 0) / n;
+    const stdDev = Math.sqrt(variance) || 1;
+
+    const predictions: ForecastPoint[] = [];
+
+    for (let day = 1; day <= horizonDays; day += 1) {
+      const target = new Date(baseDate);
+      target.setDate(target.getDate() + day);
+
+      const predictedVal = Math.max(
+        1,
+        Math.round((lastObservedPrice + dailySlope * day) * 100) / 100,
+      );
+      const horizonFactor = 1 + Math.sqrt(day) * 0.15;
+      const margin95 =
+        Math.round(1.96 * stdDev * horizonFactor * 100) / 100;
+
+      predictions.push({
+        target_date: target.toISOString().split('T')[0],
+        forecast_horizon_days: day,
+        predicted_value: predictedVal,
+        lower_bound_95: Math.max(
+          0.01,
+          Math.round((predictedVal - margin95) * 100) / 100,
+        ),
+        upper_bound_95: Math.round((predictedVal + margin95) * 100) / 100,
+        data_type: 'PROJECTED',
+      });
+    }
+
+    return { ...resultBase, predictions };
   }
 }

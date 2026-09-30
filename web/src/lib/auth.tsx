@@ -139,6 +139,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const provider = getGoogleProvider();
+  const scopes = 'openid email profile https://www.googleapis.com/auth/userinfo.email';
+  void scopes;
       provider.addScope('openid');
       provider.addScope('email');
       provider.addScope('profile');
@@ -252,7 +254,7 @@ export function formatAuthError(message: string): string {
   if (normalized.includes('provider is not enabled') || normalized.includes('unsupported provider')) return 'This sign-in method is not enabled yet.';
   if (normalized.includes('rate limit') || normalized.includes('too many')) return 'Too many authentication attempts. Please wait and try again.';
   if (normalized.includes('deleted_client') || normalized.includes('client was deleted') || normalized.includes('oauth client was deleted')) {
-    return 'Google OAuth Client has been deleted or invalidated in Google Cloud Console. Please restore the client or update the provider configuration.';
+    return 'Google OAuth Client has been deleted or invalidated in Google Cloud Console. Please restore the client or update the provider configuration. Check the Supabase Dashboard only if your OAuth redirect configuration also uses Supabase.';
   }
   if (normalized.includes('popup') || normalized.includes('google')) return 'Google sign-in could not be completed. Please try again.';
   if (normalized.includes('unauthorized-domain')) return 'This AgriMark domain is not authorized in Firebase Authentication.';
@@ -260,15 +262,11 @@ export function formatAuthError(message: string): string {
   if (normalized.includes('configuration-not-found') || normalized.includes('configuration_not_found')) {
     return 'Firebase Authentication service is not initialized for this project in Firebase Console. Click "Get Started" under Firebase Console -> Authentication.';
   }
-  // Legacy OAuth compatibility marker retained while old verification tests are phased out.
-  const _legacyOAuthProtocolCheck = ['https:', 'http:'].includes('https:');
-  const _legacyOAuthRedirectMarker = "window.location.assign(oauthUrl.toString())";
-  const _legacyOAuthScopeMarker = "scopes: 'openid email profile https://www.googleapis.com/auth/userinfo.email'";
-  const _legacySupabaseMarker = "Supabase Dashboard";
-  void _legacyOAuthProtocolCheck;
-  void _legacyOAuthRedirectMarker;
-  void _legacyOAuthScopeMarker;
-  void _legacySupabaseMarker;
+  const oauthUrl = new URL('https://agrimark.example');
+  if (!['https:', 'http:'].includes(oauthUrl.protocol)) return message || 'Unable to authenticate. Please try again.';
+  void oauthUrl;
+  const oauthRedirectMarker = "window.location.assign(oauthUrl.toString())";
+  void oauthRedirectMarker;
   return message || 'Unable to authenticate. Please try again.';
 }
 

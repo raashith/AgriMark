@@ -30,7 +30,7 @@ logging.basicConfig(
 logger = logging.getLogger("ingest_agmarknet")
 
 # Constants
-OGD_RESOURCE_ID = "9ef4b77d-9a0c-4988-8573-054bb0058170"
+OGD_RESOURCE_ID = "35985678-0d79-46b4-9ed6-6f13308a1d24"
 OGD_BASE_URL = "https://api.data.gov.in/resource/"
 
 STATE_MAPPINGS: Dict[str, Tuple[str, str, str]] = {
@@ -230,74 +230,11 @@ def fetch_agmarknet_data(
                     logger.info(f"Successfully retrieved {len(records)} records from OGD API (total available: {total})")
                     return records, total
         except Exception as e:
-            logger.warning(f"OGD API fetch failed: {e}. Falling back to baseline AGMARKNET dataset generator.")
+            logger.warning(f"OGD API fetch failed: {e}. No fallback data will be generated.")
 
-    # High-fidelity baseline seed generator for historical coverage
-    logger.info("Generating canonical AGMARKNET historical observation dataset...")
-    commodities_sample = [
-        ("Onion", "ONION", "Red Onion", "VEGETABLES", 1800, 3200, 2450),
-        ("Potato", "POTATO", "Jyoti", "VEGETABLES", 1200, 2200, 1650),
-        ("Tomato", "TOMATO", "Hybrid", "VEGETABLES", 1500, 4500, 2800),
-        ("Rice", "RICE", "Sona Masoori", "CEREALS", 2800, 4200, 3500),
-        ("Wheat", "WHEAT", "Sharbati", "CEREALS", 2100, 2900, 2400),
-        ("Maize", "MAIZE", "Yellow", "CEREALS", 1600, 2400, 1950),
-        ("Soyabean", "SOYABEAN", "Yellow", "OILSEEDS", 3800, 5200, 4500),
-        ("Cotton", "COTTON", "Medium Staple", "FIBER", 5500, 7800, 6600),
-        ("Red Chilli", "CHILLI", "Guntur", "SPICES", 12000, 22000, 16500),
-        ("Turmeric", "TURMERIC", "Erode PTS-10", "SPICES", 8500, 15500, 11800),
-        ("Garlic", "GARLIC", "Desi", "VEGETABLES", 4500, 11000, 7200),
-        ("Mustard", "MUSTARD", "Black", "OILSEEDS", 4200, 5800, 5100),
-        ("Chickpea", "CHICKPEA", "Desi Chana", "PULSES", 4500, 6200, 5300),
-    ]
-
-    mandis_sample = [
-        ("Tamil Nadu", "Kallakurichi", "Kallakurichi Main Mandi"),
-        ("Tamil Nadu", "Erode", "Erode Turmeric Market Yard"),
-        ("Maharashtra", "Nashik", "Lasalgaon Onion Mandi"),
-        ("Maharashtra", "Pune", "Gultekdi APMC Market"),
-        ("Karnataka", "Kolar", "Kolar Tomato Market"),
-        ("Uttar Pradesh", "Agra", "Agra Potato Mandi"),
-        ("Punjab", "Khanna", "Khanna Grain Market"),
-        ("Haryana", "Karnal", "Karnal Rice APMC"),
-        ("Madhya Pradesh", "Indore", "Indore Mandi Samiti"),
-        ("Gujarat", "Rajkot", "Rajkot Cotton Yard"),
-        ("West Bengal", "Hooghly", "Singur APMC"),
-        ("Andhra Pradesh", "Guntur", "Guntur Chilli Yard"),
-        ("Telangana", "Warangal", "Warangal Enam Yard"),
-        ("Rajasthan", "Kota", "Kota Mandi Yard"),
-    ]
-
-    generated_records = []
-    
-    # Generate structured observations for the specified period or years 2019-2024
-    start_dt = datetime.strptime(start_date or "2024-01-01", "%Y-%m-%d")
-    end_dt = datetime.strptime(end_date or "2024-01-07", "%Y-%m-%d")
-    
-    current_dt = start_dt
-    day_count = 0
-    while current_dt <= end_dt and day_count < 365:
-        date_str = current_dt.strftime("%d/%m/%Y")
-        for state, district, market in mandis_sample:
-            for comm_name, comm_code, var_name, cat, base_min, base_max, base_modal in commodities_sample:
-                # Slight variation over time
-                variation = (current_dt.day % 7 - 3) * 20
-                rec = {
-                    "state": state,
-                    "district": district,
-                    "market": market,
-                    "commodity": comm_name,
-                    "variety": var_name,
-                    "arrival_date": date_str,
-                    "min_price": max(100, base_min + variation),
-                    "max_price": max(150, base_max + variation),
-                    "modal_price": max(120, base_modal + variation),
-                    "arrival_quantity_mt": round(15.5 + (current_dt.day % 10), 2),
-                }
-                generated_records.append(rec)
-        current_dt = datetime.fromtimestamp(current_dt.timestamp() + 86400)
-        day_count += 1
-
-    return generated_records, len(generated_records)
+    # No fallback dataset is permitted. Production data must originate from the official OGD/AGMARKNET feed.
+    logger.error("Official AGMARKNET OGD feed returned no usable response; refusing to generate synthetic records.")
+    raise RuntimeError("AGMARKNET official feed unavailable; synthetic fallback is disabled.")
 
 
 def run_ingestion(

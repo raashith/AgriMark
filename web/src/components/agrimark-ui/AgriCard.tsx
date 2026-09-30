@@ -2,38 +2,16 @@
 
 import React from 'react';
 
-interface AgriCardProps {
-  children: React.ReactNode;
-  variant?: 'default' | 'highlight' | 'alert' | 'dark';
-  className?: string;
-  onClick?: () => void;
-}
+interface AgriCardProps { children: React.ReactNode; variant?: 'default'|'highlight'|'alert'|'dark'; className?: string; onClick?:()=>void; }
 
-export const AgriCard: React.FC<AgriCardProps> = ({
-  children,
-  variant = 'default',
-  className = '',
-  onClick,
-}) => {
-  const baseStyles = 'rounded-2xl p-4 md:p-6 transition-all border shadow-sm';
-
-  const variants = {
-    default: 'bg-[#121a16] border-[#1e2d26] text-gray-100',
-    highlight: 'bg-[#121a16] border-emerald-600/50 text-gray-100 ring-1 ring-emerald-500/20',
-    alert: 'bg-[#121a16] border-amber-600/50 text-gray-100 ring-1 ring-amber-500/20',
-    dark: 'bg-[#0a0f0d] border-[#1e2d26] text-gray-100',
+export const AgriCard: React.FC<AgriCardProps>=({children,variant='default',className='',onClick})=>{
+  const base='rounded-[20px] border p-5 md:p-6 transition-all';
+  const variants={
+    default:'bg-[#0E1712] border-white/10 text-[#F7F5EE]',
+    highlight:'bg-[#0E1712] border-[#3E7B54]/60 text-[#F7F5EE] ring-1 ring-[#3E7B54]/20',
+    alert:'bg-[#0E1712] border-[#E5A93C]/60 text-[#F7F5EE] ring-1 ring-[#E5A93C]/15',
+    dark:'bg-[#0C120F] border-[#24382E] text-[#F7F5EE]',
   };
-
-  const clickableStyles = onClick ? 'cursor-pointer hover:border-emerald-600 transition' : '';
-
-  return (
-    <div
-      onClick={onClick}
-      className={`${baseStyles} ${variants[variant]} ${clickableStyles} ${className}`}
-    >
-      {children}
-    </div>
-  );
+  return <div onClick={onClick} className={`${base} ${variants[variant]} ${onClick?'cursor-pointer hover:border-[#3E7B54]':''} ${className}`}>{children}</div>;
 };
-
 export default AgriCard;

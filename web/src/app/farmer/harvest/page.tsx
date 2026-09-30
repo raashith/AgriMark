@@ -1,246 +1,354 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, ClipboardList, PackageCheck, Plus, RefreshCw } from 'lucide-react';
-import { useI18n } from '@/lib/i18n';
+import React, { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { AlertCircle, CheckCircle2, ClipboardList, PackageCheck, Plus, RefreshCw, ShieldCheck, Sprout, Warehouse } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
-import { Farm, ProduceLot } from '@/types';
+import type { Farm, ProduceLot } from '@/types';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 type CropOption = { id: string; name: string; category?: string | null };
+type HarvestRow = {
+  id: string;
+  cultivation_id: string;
+  harvest_date: string;
+  total_quantity_kg: number;
+  quality_grade: string;
+  trace_code: string;
+};
+
+const gradeOptions = ['Grade A', 'Grade B', 'Grade C', 'Export Quality'];
 
 export default function HarvestPage() {
-  const { t } = useI18n();
   const { user } = useAuth();
-  const profileId = user?.id;
   const [farms, setFarms] = useState<Farm[]>([]);
+  const [cultivations, setCultivations] = useState<any[]>([]);
+  const [crops, setCrops] = useState<CropOption[]>([]);
+  const [harvests, setHarvests] = useState<HarvestRow[]>([]);
   const [lots, setLots] = useState<ProduceLot[]>([]);
-  const [cropOptions, setCropOptions] = useState<CropOption[]>([]);
   const [farmId, setFarmId] = useState('');
+  const [cultivationId, setCultivationId] = useState('');
   const [cropId, setCropId] = useState('');
   const [quantityKg, setQuantityKg] = useState('');
   const [qualityGrade, setQualityGrade] = useState('Grade A');
   const [harvestDate, setHarvestDate] = useState(new Date().toISOString().slice(0, 10));
+  const [packagingType, setPackagingType] = useState('Jute Bags');
+  const [storageRequired, setStorageRequired] = useState(false);
+  const [moisturePct, setMoisturePct] = useState('');
+  const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState('');
-  const [errorDetails, setErrorDetails] = useState('');
-  const [harvestHistory, setHarvestHistory] = useState<Array<{ id: string; cultivation_id: string; harvest_date: string; total_quantity_kg: number; quality_grade: string; trace_code: string }>>([]);
+  const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const [loadError, setLoadError] = useState('');
 
-  const loadData = async (id: string) => {
+  const load = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    setErrorDetails('');
+    setLoadError('');
     try {
-      const [farmRes, lotRes, harvestRes, cropRes] = await Promise.all([
-        api.getFarms(id),
-        api.getProduceLots(),
-        api.getHarvestBatches(),
+      const [farmsRes, cultRes, cropsRes, harvestRes, lotsRes] = await Promise.all([
+        api.getFarms(user.id),
+        api.getCultivations(),
         api.getCrops(),
+        api.getHarvestBatches(),
+        api.getProduceLots(),
       ]);
-      setFarms(farmRes);
-      setLots(lotRes);
-      setHarvestHistory(harvestRes);
-      setCropOptions(cropRes.items || []);
+      setFarms(farmsRes);
+      setCultivations(cultRes);
+      setCrops(cropsRes.items || []);
+      setHarvests(harvestRes || []);
+      setLots(lotsRes || []);
 
-      if (!farmId && farmRes[0]?.id) setFarmId(farmRes[0].id);
-      if (!cropId && cropRes.items?.[0]?.id) setCropId(cropRes.items[0].id);
+      const firstFarm = farmsRes[0];
+      if (!farmId && firstFarm?.id) setFarmId(firstFarm.id);
+      const firstCultivation = (cultRes || []).find((c: any) => !firstFarm?.id || c.farm_id === firstFarm.id) || cultRes?.[0];
+      if (!cultivationId && firstCultivation?.id) {
+        setCultivationId(firstCultivation.id);
+        if (firstCultivation.crop_id) setCropId(firstCultivation.crop_id);
+      }
+      if (!cropId && cropsRes.items?.[0]?.id) setCropId(cropsRes.items[0].id);
     } catch (error) {
-      setErrorDetails(error instanceof Error ? error.message : 'Unable to load harvest data.');
+      setLoadError(error instanceof Error ? error.message : 'Unable to load your harvest workspace.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (profileId) void loadData(profileId);
-    else setLoading(false);
-  }, [profileId]);
+    void load();
+  }, [user?.id]);
 
-  const handleRecordHarvest = async (event: React.FormEvent) => {
+  const farmCultivations = useMemo(
+    () => cultivations.filter((c: any) => !farmId || c.farm_id === farmId),
+    [cultivations, farmId],
+  );
+
+  useEffect(() => {
+    if (!cultivationId && farmCultivations[0]?.id) {
+      setCultivationId(farmCultivations[0].id);
+      if (farmCultivations[0].crop_id) setCropId(farmCultivations[0].crop_id);
+    }
+  }, [farmCultivations, cultivationId]);
+
+  const selectedCrop = crops.find((c) => c.id === cropId);
+  const selectedCultivation = farmCultivations.find((c: any) => c.id === cultivationId);
+  const stockKg = lots.reduce((sum, lot) => sum + Number(lot.available_quantity ?? lot.quantity ?? 0), 0);
+  const reservedKg = lots
+    .filter((lot) => lot.status === 'reserved')
+    .reduce((sum, lot) => sum + Number(lot.available_quantity ?? lot.quantity ?? 0), 0);
+  const activeLots = lots.filter((lot) => ['available', 'listed'].includes(lot.status || 'available')).length;
+
+  const recordHarvest = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!profileId) {
-      setMessage('Error: Please sign in as a farmer to record a harvest.');
+    if (!user?.id) {
+      setNotice({ kind: 'error', text: 'Please sign in as a farmer before recording a harvest.' });
       return;
     }
 
     const quantity = Number(quantityKg);
-    if (!farmId || !cropId) {
-      setMessage('Error: Select a farm and crop first.');
+    const moisture = moisturePct ? Number(moisturePct) : undefined;
+    if (!farmId || !cultivationId || !cropId) {
+      setNotice({ kind: 'error', text: 'Select a farm, cultivation and crop before saving.' });
       return;
     }
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      setMessage('Error: Enter a harvest quantity greater than 0 kg.');
+      setNotice({ kind: 'error', text: 'Harvest quantity must be greater than 0 kg.' });
+      return;
+    }
+    if (moisture !== undefined && (!Number.isFinite(moisture) || moisture < 0 || moisture > 100)) {
+      setNotice({ kind: 'error', text: 'Moisture must be between 0% and 100%.' });
       return;
     }
 
     setSubmitting(true);
-    setMessage('');
-    setErrorDetails('');
-
+    setNotice(null);
     try {
-      const cultivation = await api.createCultivation({
-        farm_id: farmId,
-        crop_id: cropId,
-        expected_harvest_date: harvestDate,
-        status: 'harvested',
-      });
-
-      if (!cultivation?.id) throw new Error('Cultivation was not created, so the harvest could not be linked.');
-
       const harvest = await api.createHarvestBatch({
-        cultivation_id: cultivation.id,
+        cultivation_id: cultivationId,
         harvest_date: harvestDate,
         total_quantity_kg: quantity,
         quality_grade: qualityGrade,
+        packaging_type: packagingType,
+        storage_required: storageRequired,
+        moisture_pct: moisture,
+        notes,
       });
-      if (!harvest?.id) throw new Error('Harvest batch was not created.');
+      if (!harvest?.id) throw new Error('The harvest batch was not created.');
 
-      const lot = await api.createProduceLot({
-        cultivation_id: cultivation.id,
-        crop_id: cropId,
-        quantity,
-        unit: 'kg',
-        quality_grade: qualityGrade,
-        available_quantity: quantity,
-        harvested_at: harvestDate,
-      });
-
-      if (!lot?.id) throw new Error('Produce lot was not created.');
-
-      setMessage('Harvest recorded successfully and a produce lot was generated.');
       setQuantityKg('');
-      await loadData(profileId);
+      setMoisturePct('');
+      setNotes('');
+      setNotice({
+        kind: 'success',
+        text: 'Harvest recorded. The traceable produce lot is now available in Produce Stock.',
+      });
+      await load();
     } catch (error) {
-      setMessage('Error: ' + (error instanceof Error ? error.message : 'Unable to record harvest.'));
+      setNotice({
+        kind: 'error',
+        text: error instanceof Error ? error.message : 'Unable to record harvest.',
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
-  const selectedCrop = cropOptions.find((crop) => crop.id === cropId);
-  const totalAvailableKg = lots.reduce((sum, lot) => sum + Number(lot.available_quantity ?? lot.quantity ?? 0), 0);
-
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-100">{t('harvest')} & Produce Lots</h1>
-          <p className="text-sm text-gray-400 mt-1">Record real harvest batches, generate traceable lots, and see inventory details immediately.</p>
-        </div>
-        {profileId && (
-          <button type="button" onClick={() => void loadData(profileId)} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[#294136] bg-[#121a16] text-gray-200 hover:border-emerald-600">
-            <RefreshCw className="w-4 h-4" /> Refresh
-          </button>
-        )}
-      </div>
-
-      {message && (
-        <div className={'p-4 rounded-xl text-sm flex items-center gap-2 ' + (message.startsWith('Error') ? 'bg-red-950/60 border border-red-800 text-red-300' : 'bg-emerald-950/60 border border-emerald-800 text-emerald-300')}>
-          {message.startsWith('Error') ? <AlertCircle className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
-          <span>{message}</span>
-        </div>
-      )}
-      {errorDetails && !message && <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-900 text-amber-200 text-sm">{errorDetails}</div>}
-
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)] gap-6">
-        <div className="bg-[#121a16] border border-[#1e2d26] p-6 rounded-2xl shadow-md">
-          <h2 className="text-lg font-bold text-gray-100 flex items-center gap-2 mb-5"><Plus className="w-5 h-5 text-amber-400" /> {t('recordHarvest')}</h2>
-          <form onSubmit={handleRecordHarvest} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Select Farm</label>
-              <select required value={farmId} onChange={(event) => setFarmId(event.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#294136] rounded-xl text-white">
-                <option value="">{farms.length ? 'Choose a farm' : 'No farm registered yet'}</option>
-                {farms.map((farm) => <option key={farm.id} value={farm.id}>{farm.name || 'Farm'}</option>)}
-              </select>
-              {profileId && !loading && farms.length === 0 && (
-                <p className="text-xs text-amber-300 mt-2">Create a farm first in <a href="/farmer/farms" className="underline hover:text-amber-200">My Farms</a>.</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Crop</label>
-              <select required value={cropId} onChange={(event) => setCropId(event.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#294136] rounded-xl text-white">
-                <option value="">{cropOptions.length ? 'Choose a crop' : 'Loading crop catalog…'}</option>
-                {cropOptions.map((crop) => <option key={crop.id} value={crop.id}>{crop.name}</option>)}
-              </select>
-              {selectedCrop?.category && <p className="text-xs text-gray-500 mt-1">{selectedCrop.category}</p>}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Quantity (KG)</label>
-                <input type="number" min="0.1" step="0.1" required value={quantityKg} onChange={(event) => setQuantityKg(event.target.value)} placeholder="500" className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#294136] rounded-xl text-white" />
+    <ProtectedRoute allowedRoles={['farmer', 'fpo', 'admin']}>
+      <div className="space-y-6">
+        <section className="overflow-hidden rounded-[28px] border border-[#24382e] bg-[#07110d] shadow-[0_24px_90px_rgba(0,0,0,0.32)]">
+          <div className="relative p-6 md:p-8">
+            <div className="pointer-events-none absolute inset-0 tech-grid opacity-30" />
+            <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-3xl">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#3e7b54]/60 bg-[#1b4d3e]/30 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-[#9bc7a2]">
+                  <Sprout className="h-3.5 w-3.5" /> Harvest Operations
+                </div>
+                <h1 className="mt-4 text-3xl font-black tracking-tight text-[#f7f5ee] md:text-5xl">Harvest & Produce Lots</h1>
+                <p className="mt-3 text-sm leading-6 text-[#adbdb2]">
+                  Capture the harvest event once, generate a traceable lot, and keep stock ready for storage or marketplace listing.
+                </p>
               </div>
+              <div className="flex gap-3">
+                <Link href="/farmer/sell" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-[#3e7b54] bg-[#0e1712] px-4 text-sm font-bold text-[#f7f5ee]">
+                  Sell a lot
+                </Link>
+                <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 text-sm font-bold text-[#f7f5ee]">
+                  <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} /> Refresh
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {notice && (
+          <div className={notice.kind === 'success'
+            ? 'flex items-center gap-3 rounded-2xl border border-emerald-800/60 bg-emerald-950/30 p-4 text-sm text-emerald-200'
+            : 'flex items-center gap-3 rounded-2xl border border-rose-900/60 bg-rose-950/25 p-4 text-sm text-rose-200'}>
+            {notice.kind === 'success' ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+            {notice.text}
+          </div>
+        )}
+
+        {loadError && (
+          <div className="rounded-2xl border border-amber-800/50 bg-amber-950/20 p-4 text-sm text-amber-200">{loadError}</div>
+        )}
+
+        <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {[
+            { label: 'Total produce stock', value: `${(stockKg / 1000).toFixed(2)} t`, icon: PackageCheck },
+            { label: 'Available lots', value: String(activeLots), icon: ClipboardList },
+            { label: 'Reserved / escrow-linked', value: `${(reservedKg / 1000).toFixed(2)} t`, icon: ShieldCheck },
+          ].map(({ label, value, icon: Icon }) => (
+            <div key={label} className="rounded-2xl border border-white/10 bg-[#0e1712] p-5">
+              <div className="flex items-center justify-between text-xs font-semibold text-[#adbdb2]">
+                <span>{label}</span><Icon className="h-4 w-4 text-[#52a67a]" />
+              </div>
+              <div className="mt-3 text-3xl font-black text-[#f7f5ee]">{loading ? '—' : value}</div>
+            </div>
+          ))}
+        </section>
+
+        <section className="grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+          <div className="rounded-[22px] border border-white/10 bg-[#0e1712] p-5 md:p-6">
+            <div className="mb-5 flex items-center gap-2">
+              <Plus className="h-5 w-5 text-[#e5a93c]" />
               <div>
-                <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Quality Grade</label>
-                <select value={qualityGrade} onChange={(event) => setQualityGrade(event.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#294136] rounded-xl text-white">
-                  <option>Grade A</option><option>Grade B</option><option>Grade C</option><option>Export Quality</option>
+                <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-[#e5a93c]">Record event</p>
+                <h2 className="text-xl font-bold text-[#f7f5ee]">Create harvest lot</h2>
+              </div>
+            </div>
+
+            <form onSubmit={recordHarvest} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-[#70887a]">Farm</label>
+                <select value={farmId} onChange={(e) => { setFarmId(e.target.value); setCultivationId(''); }} required disabled={!farms.length} className="min-h-12 w-full rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 text-sm text-[#f7f5ee]">
+                  <option value="">{farms.length ? 'Select a farm' : 'No farm registered'}</option>
+                  {farms.map((farm) => <option key={farm.id} value={farm.id}>{farm.name || 'Farm'} · {farm.village || farm.district || 'Location not set'}</option>)}
+                </select>
+                {!farms.length && <Link href="/farmer/farms" className="mt-2 inline-block text-xs text-[#52a67a] underline">Register your farm first</Link>}
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-[#70887a]">Cultivation</label>
+                <select value={cultivationId} onChange={(e) => { setCultivationId(e.target.value); const c = farmCultivations.find((row: any) => row.id === e.target.value); if (c?.crop_id) setCropId(c.crop_id); }} required disabled={!farmCultivations.length} className="min-h-12 w-full rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 text-sm text-[#f7f5ee]">
+                  <option value="">{farmCultivations.length ? 'Select a cultivation' : 'No cultivation linked to this farm'}</option>
+                  {farmCultivations.map((cult: any) => <option key={cult.id} value={cult.id}>{crops.find((crop) => crop.id === cult.crop_id)?.name || cult.crop_id || 'Crop'} · {cult.area_acres || 0} ac</option>)}
+                </select>
+                {!farmCultivations.length && farmId && <Link href="/farmer/crops" className="mt-2 inline-block text-xs text-[#52a67a] underline">Create a cultivation plan</Link>}
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-[#70887a]">Crop</label>
+                <select value={cropId} onChange={(e) => setCropId(e.target.value)} required disabled={!crops.length} className="min-h-12 w-full rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 text-sm text-[#f7f5ee]">
+                  <option value="">Select a crop</option>
+                  {crops.map((crop) => <option key={crop.id} value={crop.id}>{crop.name}{crop.category ? ` · ${crop.category}` : ''}</option>)}
+                </select>
+                {selectedCrop && <p className="mt-2 text-[11px] text-[#70887a]">Linked crop: <span className="text-[#adbdb2]">{selectedCrop.name}</span></p>}
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase text-[#70887a]">Harvest quantity (kg)</label>
+                  <input type="number" min="0.1" step="0.1" required value={quantityKg} onChange={(e) => setQuantityKg(e.target.value)} placeholder="500" className="min-h-12 w-full rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 text-sm text-[#f7f5ee]" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase text-[#70887a]">Harvest date</label>
+                  <input type="date" required value={harvestDate} onChange={(e) => setHarvestDate(e.target.value)} className="min-h-12 w-full rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 text-sm text-[#f7f5ee]" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase text-[#70887a]">Quality grade</label>
+                  <select value={qualityGrade} onChange={(e) => setQualityGrade(e.target.value)} className="min-h-12 w-full rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 text-sm text-[#f7f5ee]">
+                    {gradeOptions.map((grade) => <option key={grade}>{grade}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase text-[#70887a]">Moisture % <span className="normal-case text-[#596d61]">(optional)</span></label>
+                  <input type="number" min="0" max="100" step="0.1" value={moisturePct} onChange={(e) => setMoisturePct(e.target.value)} placeholder="12.5" className="min-h-12 w-full rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 text-sm text-[#f7f5ee]" />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-[#70887a]">Packaging</label>
+                <select value={packagingType} onChange={(e) => setPackagingType(e.target.value)} className="min-h-12 w-full rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 text-sm text-[#f7f5ee]">
+                  <option>Jute Bags</option><option>PP Bags</option><option>Crates</option><option>Bulk</option><option>Other</option>
                 </select>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Harvest Date</label>
-              <input type="date" required value={harvestDate} onChange={(event) => setHarvestDate(event.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#294136] rounded-xl text-white" />
-            </div>
+              <label className="flex items-center gap-3 rounded-xl border border-[#26372f] bg-[#07110d] p-4 text-sm text-[#adbdb2]">
+                <input type="checkbox" checked={storageRequired} onChange={(e) => setStorageRequired(e.target.checked)} className="h-4 w-4" />
+                Need storage / cold-chain handling after harvest
+              </label>
 
-            <button type="submit" disabled={submitting || loading || farms.length === 0 || cropOptions.length === 0 || !profileId} className="w-full py-3 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-950 disabled:text-amber-700 text-white font-bold rounded-xl">
-              {submitting ? 'Saving harvest...' : farms.length === 0 ? 'Add a Farm to Continue' : 'Record Harvest & Generate Lot'}
-            </button>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Field notes, sorting observations, storage instructions..." className="w-full rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 py-3 text-sm text-[#f7f5ee]" />
 
-            {!profileId && <p className="text-xs text-amber-300">Sign in to create a farm harvest record.</p>}
-          </form>
-        </div>
-
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="bg-[#121a16] border border-[#1e2d26] rounded-2xl p-5"><p className="text-xs uppercase text-gray-500">Produce lots</p><p className="text-2xl font-black text-white mt-1">{lots.length}</p></div>
-            <div className="bg-[#121a16] border border-[#1e2d26] rounded-2xl p-5"><p className="text-xs uppercase text-gray-500">Available stock</p><p className="text-2xl font-black text-emerald-300 mt-1">{totalAvailableKg.toLocaleString()} kg</p></div>
-            <div className="bg-[#121a16] border border-[#1e2d26] rounded-2xl p-5"><p className="text-xs uppercase text-gray-500">Available lots</p><p className="text-2xl font-black text-amber-300 mt-1">{lots.filter((lot) => (lot.status ?? 'available') === 'available').length}</p></div>
+              <button type="submit" disabled={submitting || loading || !farms.length || !farmCultivations.length || !cropId} className="min-h-12 w-full rounded-xl bg-[#e5a93c] px-4 text-sm font-black text-[#19201d] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40">
+                {submitting ? 'Recording harvest…' : 'Record Harvest & Generate Traceable Lot'}
+              </button>
+            </form>
           </div>
 
-          <div className="bg-[#121a16] border border-[#1e2d26] p-5 rounded-2xl shadow-md">
-            <div className="flex items-center gap-2 mb-4"><PackageCheck className="w-5 h-5 text-amber-400" /><h2 className="text-lg font-bold text-gray-100">Harvest & Lot Details</h2></div>
-
-            {loading ? <div className="py-12 text-center text-gray-400">Loading your harvest records...</div> : harvestHistory.length === 0 ? (
-              <div className="py-12 text-center border border-dashed border-[#294136] rounded-xl text-gray-400">
-                <ClipboardList className="w-8 h-8 mx-auto mb-3 text-gray-600" />
-                <p>No harvest lots found for this account yet.</p>
-                <a href="/farmer/farms" className="inline-flex mt-4 px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-semibold">Open My Farms</a>
+          <div className="rounded-[22px] border border-white/10 bg-[#0e1712] p-5 md:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-[#3e7b54]">Traceability ledger</p>
+                <h2 className="mt-1 text-xl font-bold text-[#f7f5ee]">Harvest history & lots</h2>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {harvestHistory.map((harvest) => {
-                  const linkedLot = lots.find((lot) => lot.cultivation_id === harvest.cultivation_id && lot.harvested_at === harvest.harvest_date);
-                  const stock = Number(linkedLot?.available_quantity ?? linkedLot?.quantity ?? harvest.total_quantity_kg ?? 0);
-                  const qty = Number(linkedLot?.quantity ?? harvest.total_quantity_kg ?? 0);
-                  const status = linkedLot?.status ?? 'available';
+              <Link href="/farmer/sell" className="inline-flex items-center gap-2 text-xs font-semibold text-[#52a67a]">Continue to selling <Warehouse className="h-3.5 w-3.5" /></Link>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {loading ? (
+                Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-[#07110d]" />)
+              ) : harvests.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[#2a3b32] p-10 text-center text-sm text-[#70887a]">
+                  <ClipboardList className="mx-auto mb-3 h-8 w-8 text-[#3e7b54]" />
+                  <p>No harvest events have been recorded for this account.</p>
+                  <p className="mt-1 text-xs text-[#596d61]">Use the form to create the first traceable lot.</p>
+                </div>
+              ) : (
+                harvests.map((harvest) => {
+                  const linkedLot = lots.find((lot) => lot.harvest_batch_id === harvest.id || (lot.cultivation_id === harvest.cultivation_id && lot.harvested_at === harvest.harvest_date));
+                  const quantity = Number(linkedLot?.quantity ?? linkedLot?.quantity_kg ?? harvest.total_quantity_kg ?? 0);
+                  const available = Number(linkedLot?.available_quantity ?? quantity);
+                  const cultivation = cultivations.find((c: any) => c.id === harvest.cultivation_id);
                   return (
-                    <div key={harvest.id} className="rounded-2xl border border-[#294136] bg-[#0a0f0d] p-5">
-                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                    <article key={harvest.id} className="rounded-2xl border border-[#26372f] bg-[#07110d] p-5">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2"><h3 className="font-bold text-amber-300">Harvest {harvest.id.slice(0, 8)}</h3><span className="text-[11px] px-2.5 py-1 rounded-full border border-emerald-900 bg-emerald-950/50 text-emerald-300">{status}</span></div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-3 mt-4 text-sm">
-                            <div><p className="text-gray-500 text-xs">Crop</p><p className="text-white">{linkedLot?.crop_name || linkedLot?.crop_id || 'Linked crop'}</p></div>
-                            <div><p className="text-gray-500 text-xs">Quantity</p><p className="text-white">{qty.toLocaleString()} {linkedLot?.unit || 'kg'}</p></div>
-                            <div><p className="text-gray-500 text-xs">Available</p><p className="text-emerald-300">{stock.toLocaleString()} {linkedLot?.unit || 'kg'}</p></div>
-                            <div><p className="text-gray-500 text-xs">Quality</p><p className="text-white">{harvest.quality_grade || linkedLot?.quality_grade || 'Not specified'}</p></div>
-                            <div><p className="text-gray-500 text-xs">Harvested</p><p className="text-white">{harvest.harvest_date}</p></div>
-                            <div><p className="text-gray-500 text-xs">Trace code</p><p className="text-white font-mono break-all">{harvest.trace_code || 'Generated trace code'}</p></div>
-                            <div><p className="text-gray-500 text-xs">Listed</p><p className="text-white">{linkedLot?.is_listed ? 'Yes' : 'No'}</p></div>
-                            <div><p className="text-gray-500 text-xs">Lot ID</p><p className="text-gray-300 font-mono text-xs break-all">{linkedLot?.id || 'Generated from harvest'}</p></div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-bold text-[#e5a93c]">Lot {linkedLot?.id?.slice(0, 8) || harvest.id.slice(0, 8)}</h3>
+                            <span className="rounded-full border border-[#3e7b54]/70 bg-[#1b4d3e]/30 px-2.5 py-1 text-[10px] font-mono font-bold uppercase text-[#9bc7a2]">{linkedLot?.status || 'available'}</span>
                           </div>
+                          <p className="mt-1 text-xs text-[#52a67a]">{crops.find((crop) => crop.id === cultivation?.crop_id)?.name || linkedLot?.crop_name || 'Crop'} · Traceable harvest</p>
                         </div>
-                        <div className="shrink-0 text-xs text-gray-500 flex items-center gap-1"><ClipboardList className="w-4 h-4" />Harvest batch recorded</div>
+                        <div className="text-xs text-[#596d61]">{harvest.harvest_date}</div>
                       </div>
-                    </div>
+                      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                        <div><p className="text-[10px] uppercase text-[#596d61]">Quantity</p><p className="mt-1 font-bold text-[#f7f5ee]">{quantity.toLocaleString()} kg</p></div>
+                        <div><p className="text-[10px] uppercase text-[#596d61]">Available</p><p className="mt-1 font-bold text-[#52a67a]">{available.toLocaleString()} kg</p></div>
+                        <div><p className="text-[10px] uppercase text-[#596d61]">Quality</p><p className="mt-1 font-bold text-[#f7f5ee]">{harvest.quality_grade || '—'}</p></div>
+                        <div><p className="text-[10px] uppercase text-[#596d61]">Trace code</p><p className="mt-1 break-all font-mono text-xs text-[#adbdb2]">{harvest.trace_code || '—'}</p></div>
+                      </div>
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/5 pt-3 text-xs text-[#70887a]">
+                        <span>Harvest batch: {harvest.id}</span>
+                        <span>Listed: {linkedLot?.is_listed ? 'Yes' : 'No'}</span>
+                      </div>
+                    </article>
                   );
-                })}
-              </div>
-            )}
+                })
+              )}
+            </div>
           </div>
-        </div>
+        </section>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 }

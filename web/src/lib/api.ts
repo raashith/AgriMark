@@ -148,6 +148,11 @@ export const api = {
     harvest_date: string;
     total_quantity_kg: number;
     quality_grade: string;
+    packaging_type?: string;
+    storage_required?: boolean;
+    moisture_pct?: number;
+    rejection_pct?: number;
+    notes?: string;
   }) =>
     request<{
       id: string;
