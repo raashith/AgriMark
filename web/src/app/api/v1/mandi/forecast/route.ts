@@ -16,40 +16,28 @@ export async function GET(request: Request) {
     const baseDate = searchParams.get('base_date') || new Date().toISOString().split('T')[0];
 
     if (!commodityCode) {
-      return NextResponse.json(
-        { success: false, error: 'commodity_code is required.' },
-        { status: 400 },
-      );
+      return NextResponse.json({ success: false, error: 'commodity_code is required.' }, { status: 400 });
     }
 
     const cookieStore = cookies();
-    const supabaseUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xrcqzpnstdbbtafhcwbb.supabase.co';
-    const supabaseKey =
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-      '';
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xrcqzpnstdbbtafhcwbb.supabase.co';
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
     if (!supabaseKey) {
-      return NextResponse.json(
-        { success: false, error: 'Supabase publishable key is not configured.' },
-        { status: 503 },
-      );
+      return NextResponse.json({ success: false, error: 'Supabase server configuration is incomplete.' }, { status: 503 });
     }
 
     const supabase = createServerClient(supabaseUrl, supabaseKey, {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
+        getAll() {
+          return cookieStore.getAll().map(({ name, value }) => ({ name, value }));
         },
       },
     });
 
     let query = supabase
       .from('national_market_price_observations')
-      .select(
-        'commodity_code,state_code,district_code,mandi_code,modal_price,min_price,max_price,observed_at',
-      )
+      .select('commodity_code,state_code,district_code,mandi_code,modal_price,min_price,max_price,observed_at')
       .eq('commodity_code', commodityCode)
       .eq('price_signal_type', 'OBSERVED_MANDI')
       .eq('validation_status', 'VALIDATED')
@@ -63,12 +51,7 @@ export async function GET(request: Request) {
     if (mandiCode) query = query.eq('mandi_code', mandiCode);
 
     const { data: historyData, error } = await query;
-    if (error) {
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 502 },
-      );
-    }
+    if (error) return NextResponse.json({ success: false, error: error.message }, { status: 502 });
 
     const observations: PriceObservationInput[] = (historyData || []).map((row) => ({
       commodity_code: row.commodity_code,
@@ -101,27 +84,9 @@ export async function GET(request: Request) {
       });
     }
 
-    const forecastResult = MandiForecastEngine.generatePriceForecast(
-      observations,
-      commodityCode,
-      horizonDays,
-      baseDate,
-      stateCode,
-      districtCode,
-    );
-
-    return NextResponse.json({
-      success: true,
-      timestamp: new Date().toISOString(),
-      forecast: forecastResult,
-    });
+    const forecastResult = MandiForecastEngine.generatePriceForecast(observations, commodityCode, horizonDays, baseDate, stateCode, districtCode);
+    return NextResponse.json({ success: true, timestamp: new Date().toISOString(), forecast: forecastResult });
   } catch (err) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: err instanceof Error ? err.message : 'Server forecast error',
-      },
-      { status: 500 },
-    );
+    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : 'Server forecast error' }, { status: 500 });
   }
 }
