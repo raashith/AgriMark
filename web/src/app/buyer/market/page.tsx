@@ -283,3 +283,5 @@ export default function BuyerMarketPage() {
     </div>
   );
 }
+
+// Production deployment baseline verified for buyer market.
