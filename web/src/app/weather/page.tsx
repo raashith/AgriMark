@@ -54,6 +54,7 @@ const iconUrl = (icon?: string | null) =>
 
 export default function WeatherPage() {
   const { user } = useAuth();
+  const [manualCoordinates, setManualCoordinates] = useState<{ latitude: number; longitude: number; label: string } | null>(null);
   const [weather, setWeather] = useState<LiveWeather | null>(null);
   const [forecast, setForecast] = useState<ForecastItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,7 +72,14 @@ export default function WeatherPage() {
       setRefreshing(true);
       setError(null);
 
-      const farms = await dataService.getFarms(user.id);
+      let farms: Awaited<ReturnType<typeof dataService.getFarms>> = [];
+      try {
+        farms = await Promise.race([
+          dataService.getFarms(user.id),
+          new Promise<Awaited<ReturnType<typeof dataService.getFarms>>>((resolve) => window.setTimeout(() => resolve([]), 5000)),
+        ]);
+      } catch {}
+
       const farm = farms.find((item) => item.latitude != null && item.longitude != null);
 
       let latitude = farm?.latitude ?? null;
@@ -87,6 +95,7 @@ export default function WeatherPage() {
             if (Number.isFinite(parsed.latitude) && Number.isFinite(parsed.longitude)) {
               latitude = parsed.latitude as number;
               longitude = parsed.longitude as number;
+              setManualCoordinates({ latitude, longitude, label: parsed.label || 'Selected farm' });
               setFarmLabel(parsed.label || 'Selected farm');
             }
           } catch {}
@@ -144,8 +153,26 @@ export default function WeatherPage() {
   };
 
   useEffect(() => {
-    if (user?.id) void loadWeather();
-  }, [user?.id]);
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem('agrimark.weather.coordinates');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as { latitude?: number; longitude?: number; label?: string };
+        if (Number.isFinite(parsed.latitude) && Number.isFinite(parsed.longitude)) {
+          setManualCoordinates({
+            latitude: parsed.latitude as number,
+            longitude: parsed.longitude as number,
+            label: parsed.label || 'Selected farm',
+          });
+          setFarmLabel(parsed.label || 'Selected farm');
+        }
+      } catch {}
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user?.id || manualCoordinates) void loadWeather();
+  }, [user?.id, manualCoordinates]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
