@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, formatAuthError } from '@/lib/auth';
+import { getFirebaseAuth } from '@/lib/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import Link from 'next/link';
 import { Sprout, ArrowRight, AlertCircle, ShieldCheck, Mail, Lock } from 'lucide-react';
 
@@ -25,6 +27,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   useEffect(() => {
     if (!authLoading && user && isAuthenticated) {
@@ -50,6 +53,26 @@ export default function LoginPage() {
       router.replace(getRoleRoute(profile.role));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to sign in.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetPassword = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      setError('Enter your email address first, then choose Forgot password.');
+      return;
+    }
+
+    setError('');
+    setResetSent(false);
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(getFirebaseAuth(), normalizedEmail);
+      setResetSent(true);
+    } catch (err) {
+      setError(formatAuthError(err instanceof Error ? err.message : 'Unable to send the password reset email.'));
     } finally {
       setLoading(false);
     }
@@ -89,6 +112,12 @@ export default function LoginPage() {
             <span>{error}</span>
           </div>
         )}
+        {resetSent && (
+          <div className="p-3.5 bg-emerald-950/60 border border-emerald-800/60 rounded-2xl text-emerald-200 text-xs">
+            Password reset email sent. Check your inbox and spam folder, then return here with your new password.
+          </div>
+        )}
+
 
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
@@ -121,6 +150,11 @@ export default function LoginPage() {
                 className="w-full pl-10 pr-4 py-3.5 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl text-white focus:border-emerald-500 focus:outline-none"
               />
             </div>
+          </div>
+          <div className="flex justify-end -mt-2">
+            <button type="button" onClick={resetPassword} disabled={loading || authLoading} className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 hover:underline disabled:text-gray-600">
+              Forgot password?
+            </button>
           </div>
 
           <button
