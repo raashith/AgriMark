@@ -10,7 +10,7 @@ export const MobileNav: React.FC<{ onOpenMobileMenu?: () => void }> = ({ onOpenM
   const pathname = usePathname();
   const { role } = useAuth();
 
-  const mainDashboard = role === 'buyer' ? '/buyer/marketplace' : role === 'admin' ? '/admin/dashboard' : '/farmer/dashboard';
+  const mainDashboard = role === 'buyer' ? '/buyer/stock' : role === 'admin' ? '/admin/dashboard' : '/farmer/dashboard';
 
   const navItems = [
     { label: 'Home', href: '/', icon: LayoutDashboard },
