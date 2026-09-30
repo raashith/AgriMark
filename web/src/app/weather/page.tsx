@@ -4,18 +4,21 @@ import React, { useState, useEffect } from 'react';
 import { WeatherForecast } from '@/types';
 import { dataService } from '@/lib/data-service';
 import { CloudSun, Droplets, Wind, AlertTriangle, MapPin, Sun } from 'lucide-react';
+import { StitchWeatherWidget } from '@/components/stitch/weather/StitchWeatherWidget';
+import { StitchBadge } from '@/components/stitch/common/StitchBadge';
 
 export default function WeatherPage() {
   const [forecasts, setForecasts] = useState<WeatherForecast[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<string>('Thanjavur Delta Region, Tamil Nadu');
 
   useEffect(() => {
     dataService.getWeather().then(setForecasts);
   }, []);
 
   const today = forecasts[0] || {
-    location: 'Thanjavur Delta Region',
+    location: selectedLocation,
     district: 'Thanjavur',
-    date: '2026-03-15',
+    date: new Date().toISOString().split('T')[0],
     temp_c: 32,
     temp_min_c: 24,
     temp_max_c: 34,
@@ -28,7 +31,7 @@ export default function WeatherPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       <div className="bg-[#121a16] border border-[#1e2d26] p-6 md:p-8 rounded-3xl space-y-2 shadow-xl">
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-950/80 border border-emerald-800/60 rounded-full text-xs font-mono font-bold text-emerald-400">
           <CloudSun className="w-4 h-4" /> Climate & Crop Hazard Intelligence
@@ -41,7 +44,10 @@ export default function WeatherPage() {
         </p>
       </div>
 
-      {/* Main Weather Card */}
+      {/* Primary Live Telemetry Widget */}
+      <StitchWeatherWidget location={selectedLocation} />
+
+      {/* Secondary Weather & Agronomic Warning Detail Card */}
       <div className="bg-[#121a16] border border-[#1e2d26] p-6 md:p-8 rounded-3xl space-y-6 shadow-2xl">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-[#1e2d26] pb-6">
           <div>
@@ -51,9 +57,7 @@ export default function WeatherPage() {
             <p className="text-xs text-gray-400 font-mono mt-0.5">{today.date}</p>
           </div>
 
-          <span className="px-3.5 py-1.5 bg-amber-950/80 border border-amber-800/60 text-amber-300 text-xs font-mono font-bold rounded-full uppercase">
-            {today.alert_level} Advisory
-          </span>
+          <StitchBadge label={`${today.alert_level || 'ADVISORY'} STATUS`} variant="amber" size="md" />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
@@ -100,3 +104,4 @@ export default function WeatherPage() {
     </div>
   );
 }
+
