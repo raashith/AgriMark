@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import {
-  Sprout, LayoutDashboard, MapPin, Calendar, Eye, Layers, ShoppingBag,
+  Sprout, LayoutDashboard, MapPin, Navigation, Calendar, Eye, Layers, ShoppingBag,
   ShoppingCart, TrendingUp, CloudSun, FileText, CheckSquare, ShieldCheck,
   Bot, Settings, Building2, Truck, Users, ChevronLeft, PackageCheck,
 } from 'lucide-react';
