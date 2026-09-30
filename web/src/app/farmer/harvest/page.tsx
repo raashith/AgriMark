@@ -136,23 +136,8 @@ export default function HarvestPage() {
         storage_required: storageRequired,
         moisture_pct: moisture,
         notes,
-      } as any);
-
-      if (!harvest?.id) throw new Error('The harvest batch was not created.');
-
-      const lot = await api.createProduceLot({
-        harvest_batch_id: harvest.id,
-        cultivation_id: cultivationId,
-        crop_id: cropId,
-        quantity,
-        unit: 'kg',
-        quality_grade: qualityGrade,
-        available_quantity: quantity,
-        status: 'available',
-        harvested_at: harvestDate,
       });
-
-      if (!lot?.id) throw new Error('The produce lot was not created.');
+      if (!harvest?.id) throw new Error('The harvest batch was not created.');
 
       setQuantityKg('');
       setMoisturePct('');
