@@ -9,16 +9,16 @@ DEFAULT_LIMIT = 120
 AUTH_LIMIT = 12
 AI_LIMIT = 20
 WRITE_LIMIT = 60
+MAX_BUCKETS = 10_000
 
 _buckets: dict[str, deque[float]] = defaultdict(deque)
 _lock = Lock()
 
 
 def _client_key(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    # Uvicorn/Render should normalize trusted proxy headers before the app sees them.
+    # Never use a raw, caller-controlled X-Forwarded-For value as the identity.
+    return request.client.host if request.client and request.client.host else "unknown"
 
 
 def _limit_for(request: Request) -> int:
@@ -49,4 +49,11 @@ def check_rate_limit(request: Request) -> tuple[bool, int, int, int]:
             return True, limit, current, retry_after
 
         bucket.append(now)
+
+        # Keep stale/unused buckets bounded in a single-instance deployment.
+        if len(_buckets) > MAX_BUCKETS:
+            stale_keys = [k for k, v in _buckets.items() if not v]
+            for stale_key in stale_keys[: max(1, len(stale_keys) - MAX_BUCKETS // 2)]:
+                _buckets.pop(stale_key, None)
+
         return False, limit, current + 1, 0
