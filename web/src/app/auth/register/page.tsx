@@ -37,7 +37,7 @@ export default function RegisterPage() {
   };
 
   const routeForRole = (userRole?: string | null) => {
-    if (userRole === 'buyer') return '/buyer/marketplace';
+    if (userRole === 'buyer') return '/buyer/stock';
     if (userRole === 'fpo') return '/fpo/dashboard';
     if (userRole === 'logistics') return '/logistics/deliveries';
     if (userRole === 'admin') return '/admin/dashboard';
