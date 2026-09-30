@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server';
-import { getUpcomingDeadlines } from '@/lib/deadline-intelligence-engine';
+
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const farmerId = searchParams.get('farmer_id') || 'FARMER_DEMO_1';
-
-  const deadlines = await getUpcomingDeadlines(farmerId);
-  return NextResponse.json({ success: true, data: deadlines });
+export async function GET() {
+  return NextResponse.json(
+    {
+      success: false,
+      data: [],
+      meta: {
+        data_origin: 'NO_LIVE_SOURCE',
+        message: 'Policy deadlines require a live, versioned government scheme source.',
+      },
+    },
+    { status: 503 },
+  );
 }
-
-
-
