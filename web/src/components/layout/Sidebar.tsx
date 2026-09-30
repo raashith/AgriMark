@@ -14,6 +14,7 @@ export const Sidebar: React.FC = () => {
   const pathname = usePathname();
   const { user, role } = useAuth();
   const normalizedRole = String(role || user?.role || '').trim().toLowerCase();
+  const isBuyerRoute = pathname === '/buyer' || pathname.startsWith('/buyer/');
   const [isOpen, setIsOpen] = useState(false);
 
   const farmerNav = [
@@ -61,7 +62,7 @@ export const Sidebar: React.FC = () => {
   ];
 
   let items = farmerNav;
-  if (normalizedRole === 'buyer') items = buyerNav;
+  if (normalizedRole === 'buyer' || isBuyerRoute) items = buyerNav;
   if (normalizedRole === 'admin') items = adminNav;
 
   useEffect(() => {
