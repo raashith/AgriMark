@@ -35,6 +35,9 @@ export async function GET(request: Request) {
         getAll() {
           return cookieStore.getAll().map(({ name, value }) => ({ name, value }));
         },
+        setAll() {
+          // Read-only route: no auth cookie mutation is required.
+        },
       },
     });
 
