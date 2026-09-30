@@ -189,6 +189,11 @@ def create_harvest_batch(
         "quantity": request.total_quantity_kg,
         "unit": "kg",
         "grade": request.quality_grade,
+        "moisture_pct": request.moisture_pct,
+        "rejection_pct": request.rejection_pct,
+        "packaging_type": request.packaging_type,
+        "storage_required": request.storage_required,
+        "notes": request.notes,
     }
     try:
         created = _single(get_supabase().table("harvest_batches").insert(payload).execute())
@@ -230,10 +235,21 @@ def create_produce_lot(
         farm = get_supabase().table("farms").select("id").eq("id", cultivation_row["farm_id"]).eq("owner_id", str(user.id)).limit(1).execute()
         _single(farm)
 
-    payload = request.model_dump(exclude_none=True, mode="json")
+    payload = request.model_dump(
+        exclude_none=True,
+        mode="json",
+        exclude={"owner_id", "status", "harvest_batch_id"},
+    )
     payload["owner_id"] = str(user.id)
     if "available_quantity" not in payload or payload["available_quantity"] is None:
         payload["available_quantity"] = payload["quantity"]
+    payload["status"] = request.status or "available"
+    if request.harvest_batch_id:
+        batch = get_supabase().table("harvest_batches").select("id,cultivation_id,farm_id").eq("id", str(request.harvest_batch_id)).limit(1).execute()
+        batch_row = _single(batch)
+        if batch_row["cultivation_id"] != str(request.cultivation_id):
+            raise HTTPException(status_code=400, detail="Harvest batch and cultivation do not match.")
+        payload["harvest_batch_id"] = str(request.harvest_batch_id)
     if request.cultivation_id:
         cultivation_row = get_supabase().table("cultivations").select("farm_id").eq("id", str(request.cultivation_id)).limit(1).execute().data[0]
         payload["cultivation_id"] = str(request.cultivation_id)
