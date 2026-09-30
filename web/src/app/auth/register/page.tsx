@@ -22,6 +22,20 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const formatRegistrationError = (message: string) => {
+    const normalized = message.toLowerCase();
+    if (normalized.includes('email-already-in-use') || normalized.includes('email already in use')) {
+      return 'An account with this email already exists. Please use Log in instead, or reset your password if you do not remember it.';
+    }
+    if (normalized.includes('weak-password')) {
+      return 'Choose a stronger password with at least 6 characters.';
+    }
+    if (normalized.includes('invalid-email')) {
+      return 'Enter a valid email address.';
+    }
+    return message || 'Registration failed. Please try again.';
+  };
+
   const routeForRole = (userRole?: string | null) => {
     if (userRole === 'buyer') return '/buyer/marketplace';
     if (userRole === 'fpo') return '/fpo/dashboard';
@@ -54,7 +68,8 @@ export default function RegisterPage() {
 
       router.push(user.needs_onboarding ? '/auth/onboarding' : routeForRole(user.role));
     } catch (err: any) {
-      setError(String(err?.message || 'Registration failed. Please try again.'));
+      const rawMessage = String(err?.message || 'Registration failed. Please try again.');
+      setError(formatRegistrationError(rawMessage));
     } finally {
       setLoading(false);
     }
