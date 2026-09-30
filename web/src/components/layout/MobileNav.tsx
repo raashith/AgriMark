@@ -10,12 +10,12 @@ export const MobileNav: React.FC<{ onOpenMobileMenu?: () => void }> = ({ onOpenM
   const pathname = usePathname();
   const { role } = useAuth();
 
-  const mainDashboard = role === 'buyer' ? '/buyer/market' : role === 'admin' ? '/admin/dashboard' : '/farmer/dashboard';
+  const mainDashboard = role === 'buyer' ? '/buyer/market' : role === 'logistics' ? '/logistics' : role === 'admin' ? '/admin/dashboard' : '/farmer/dashboard';
 
   const navItems = [
     { label: 'Home', href: '/', icon: LayoutDashboard },
     { label: 'Dashboard', href: mainDashboard, icon: LayoutDashboard },
-    { label: 'Market', href: '/buyer/market', icon: ShoppingCart },
+    { label: role === 'logistics' ? 'Deliveries' : 'Market', href: role === 'logistics' ? '/logistics/deliveries' : '/buyer/market', icon: role === 'logistics' ? Truck : ShoppingCart },
     { label: 'Prices', href: '/market-prices', icon: TrendingUp },
     { label: 'AgriAI', href: '/ai-assistant', icon: Bot },
   ];
