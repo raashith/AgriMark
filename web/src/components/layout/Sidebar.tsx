@@ -13,6 +13,7 @@ import {
 export const Sidebar: React.FC = () => {
   const pathname = usePathname();
   const { user, role } = useAuth();
+  const normalizedRole = String(role || user?.role || '').trim().toLowerCase();
   const [isOpen, setIsOpen] = useState(false);
 
   const farmerNav = [
@@ -60,8 +61,8 @@ export const Sidebar: React.FC = () => {
   ];
 
   let items = farmerNav;
-  if (role === 'buyer') items = buyerNav;
-  if (role === 'admin') items = adminNav;
+  if (normalizedRole === 'buyer') items = buyerNav;
+  if (normalizedRole === 'admin') items = adminNav;
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
