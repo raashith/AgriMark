@@ -66,7 +66,7 @@ export default function FarmerDashboardPage() {
 
         const farmWithCoords = farms.find((f) => f.latitude != null && f.longitude != null);
         const weather = farmWithCoords
-          ? await dataService.getLiveWeather(farmWithCoords.latitude as number, farmWithCoords.longitude as number)
+          ? await dataService.getLiveWeather(Number(farmWithCoords.latitude), Number(farmWithCoords.longitude))
           : null;
 
         if (!isMounted) return;
