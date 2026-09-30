@@ -82,6 +82,11 @@ export default function HarvestPage() {
     void load();
   }, [user?.id]);
 
+  useEffect(() => {
+    const selected = farmCultivations.find((c: any) => c.id === cultivationId);
+    if (selected?.crop_id) setCropId(selected.crop_id);
+  }, [cultivationId, farmCultivations]);
+
   const farmCultivations = useMemo(
     () => cultivations.filter((c: any) => !farmId || c.farm_id === farmId),
     [cultivations, farmId],
@@ -141,17 +146,16 @@ export default function HarvestPage() {
       if (!harvest?.id) throw new Error('The harvest batch was not created.');
 
       const lot = await api.createProduceLot({
-        owner_id: user.id,
         harvest_batch_id: harvest.id,
         cultivation_id: cultivationId,
         crop_id: cropId,
-        quantity: quantity,
+        quantity,
         unit: 'kg',
         quality_grade: qualityGrade,
         available_quantity: quantity,
         status: 'available',
         harvested_at: harvestDate,
-      } as any);
+      });
 
       if (!lot?.id) throw new Error('The produce lot was not created.');
 
