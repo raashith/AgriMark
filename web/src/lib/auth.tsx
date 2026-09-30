@@ -247,7 +247,7 @@ export function formatAuthError(message: string): string {
   if (normalized.includes('invalid api key') || normalized.includes('api key')) return 'AgriMark authentication is temporarily unavailable. Please try again.';
   if (normalized.includes('email not confirmed')) return 'Please confirm your email address before logging in.';
   if (normalized.includes('invalid login credentials') || normalized.includes('auth/invalid-credential') || normalized.includes('invalid-credential')) return 'Incorrect email or password. If you recently registered with Google, use “Continue with Google” or reset your password.';
-  if (normalized.includes('already registered')) return 'An account with this email already exists. Please log in instead.';
+  if (normalized.includes('email-already-in-use') || normalized.includes('email already in use') || normalized.includes('already registered')) return 'An account with this email already exists. Please log in instead, or reset your password if you do not remember it.';
   if (normalized.includes('redirect') || normalized.includes('pkce') || normalized.includes('invalid_grant')) return 'Authentication configuration needs attention. Please try again.';
   if (normalized.includes('provider is not enabled') || normalized.includes('unsupported provider')) return 'This sign-in method is not enabled yet.';
   if (normalized.includes('rate limit') || normalized.includes('too many')) return 'Too many authentication attempts. Please wait and try again.';
