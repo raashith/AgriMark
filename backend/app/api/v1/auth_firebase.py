@@ -1,3 +1,5 @@
+import logging
+
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, status
@@ -8,6 +10,7 @@ from ...core.firebase_auth import verify_firebase_id_token
 from ...schemas.domain import ProfileResponse
 
 router = APIRouter(prefix="/auth/firebase", tags=["auth-firebase"])
+logger = logging.getLogger(__name__)
 
 
 class FirebaseSyncRequest(BaseModel):
@@ -68,8 +71,12 @@ def sync_firebase_profile(request: FirebaseSyncRequest):
             .execute()
         )
     except Exception as exc:
-        # Surface the real infrastructure failure instead of hiding it behind
-        # the misleading "unable to create profile" fallback.
+        logger.exception(
+            "Firebase profile sync failed: %s (%s)",
+            str(exc),
+            type(exc).__name__,
+        )
+        # Do not expose database credentials or internal stack details to the browser.
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="AgriMark profile service is temporarily unavailable. Please try again.",
