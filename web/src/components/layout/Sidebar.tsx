@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import {
   Sprout, LayoutDashboard, MapPin, Navigation, Calendar, Eye, Layers, ShoppingBag,
   ShoppingCart, TrendingUp, CloudSun, FileText, CheckSquare, ShieldCheck,
-  Bot, Settings, Building2, Truck, Users, ChevronLeft, PackageCheck,
+  Bot, Settings, Building2, Truck, Users, ChevronLeft, PackageCheck, ClipboardList, BellRing,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -54,8 +54,17 @@ export const Sidebar: React.FC = () => {
 
   const logisticsNav = [
     { label: 'Operations', href: '/logistics', icon: LayoutDashboard },
-    { label: 'Delivery Board', href: '/logistics/deliveries', icon: Truck },
-    { label: 'Live Tracking', href: '/tracking', icon: Navigation },
+    { label: 'Dispatch Control', href: '/logistics/dispatch', icon: Truck },
+    { label: 'Delivery Board', href: '/logistics/deliveries', icon: PackageCheck },
+    { label: 'Live Tracking', href: '/logistics/routes', icon: Navigation },
+    { label: 'Fleet Management', href: '/logistics/fleet', icon: Truck },
+    { label: 'Driver Operations', href: '/logistics/drivers', icon: Users },
+    { label: 'Cold Chain', href: '/logistics/cold-chain', icon: CloudSun },
+    { label: 'Routes & ETA', href: '/logistics/routes', icon: Navigation },
+    { label: 'Docks & Gate Pass', href: '/logistics/docks', icon: Building2 },
+    { label: 'Pickup Requests', href: '/logistics/requests', icon: ClipboardList },
+    { label: 'Alerts & Exceptions', href: '/logistics/alerts', icon: BellRing },
+    { label: 'Analytics', href: '/logistics/analytics', icon: TrendingUp },
     { label: 'Marketplace Orders', href: '/marketplace', icon: ShoppingCart },
     { label: 'Cold Storage', href: '/storage', icon: Building2 },
     { label: 'AgriAI Assistant', href: '/ai-assistant', icon: Bot },
