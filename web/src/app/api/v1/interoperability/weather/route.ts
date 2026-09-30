@@ -1,35 +1,10 @@
-import { Request } from 'next/dist/compiled/@edge-runtime/primitives';
-import { parsePaginationParams, createInteroperabilityResponse } from '@/lib/interoperability-api-helpers';
-import { InteroperabilityContractEngine } from '@/lib/interoperability-contracts';
+import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: Request) {
-  const requestId = `req-${Date.now()}`;
-  const pagination = parsePaginationParams(request.url);
-
-  const sampleWxPayload = {
-    district_code: 'THANJAVUR',
-    state_code: 'TN',
-    observation_date: new Date().toISOString().split('T')[0],
-    rainfall_mm: 14.8,
-    temp_avg_c: 29.35,
-    soil_moisture_volumetric: 0.28
-  };
-
-  const contract = InteroperabilityContractEngine.createContract(
-    'WeatherObservation',
-    sampleWxPayload,
-    {
-      source: 'IMD_OFFICIAL',
-      producer: 'METEOROLOGICAL_DEPT',
-      geography: 'THANJAVUR, TN',
-      unit: 'METRIC',
-      provenance_id: 'prov-wx-thj-01'
-    }
-  );
-
-  return createInteroperabilityResponse([contract], pagination, requestId);
+export async function GET() {
+  return NextResponse.json({
+    success: false,
+    data: [],
+    meta: { data_origin: 'NO_LIVE_SOURCE', message: 'No live weather observations are connected to this endpoint.' },
+  }, { status: 503 });
 }
-
-
-
