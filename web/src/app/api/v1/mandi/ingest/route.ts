@@ -1,115 +1,318 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
 const OGD_RESOURCE_ID = '9ef4b77d-9a0c-4988-8573-054bb0058170';
 const OGD_BASE_URL = 'https://api.data.gov.in/resource/';
-const DEFAULT_PAGE_SIZE = 200;
-const MAX_PAGE_SIZE = 100;\nconst ALLOWED_CATEGORIES = new Set(['CEREALS','PULSES','OILSEEDS','VEGETABLES','FRUITS','SPICES','COMMERCIAL_CROPS','FIBER']);
+const PAGE_SIZE = 100;
+const ALLOWED_CATEGORIES = new Set([
+  'CEREALS',
+  'PULSES',
+  'OILSEEDS',
+  'VEGETABLES',
+  'FRUITS',
+  'SPICES',
+  'COMMERCIAL_CROPS',
+  'FIBER',
+]);
 
-const STATE_CODES: Record<string,string> = {
-  'TAMIL NADU':'TN','MAHARASHTRA':'MH','KARNATAKA':'KA','UTTAR PRADESH':'UP','PUNJAB':'PB','HARYANA':'HR','MADHYA PRADESH':'MP','GUJARAT':'GJ','WEST BENGAL':'WB','ANDHRA PRADESH':'AP','TELANGANA':'TS','RAJASTHAN':'RJ','BIHAR':'BR','KERALA':'KL','ODISHA':'OD','ASSAM':'AS','CHHATTISGARH':'CG','JHARKHAND':'JH','HIMACHAL PRADESH':'HP','UTTARAKHAND':'UK','GOA':'GA','DELHI':'DL'
-};
-const REGIONS: Record<string,'NORTH'|'SOUTH'|'EAST'|'WEST'|'CENTRAL'|'NORTHEAST'> = {
-  TN:'SOUTH',KA:'SOUTH',AP:'SOUTH',TS:'SOUTH',KL:'SOUTH',MH:'WEST',GJ:'WEST',GA:'WEST',RJ:'WEST',UP:'NORTH',PB:'NORTH',HR:'NORTH',HP:'NORTH',UK:'NORTH',DL:'NORTH',MP:'CENTRAL',CG:'CENTRAL',WB:'EAST',BR:'EAST',OD:'EAST',JH:'EAST',AS:'NORTHEAST'
+const STATE_CODES: Record<string, string> = {
+  'TAMIL NADU': 'TN',
+  MAHARASHTRA: 'MH',
+  KARNATAKA: 'KA',
+  'UTTAR PRADESH': 'UP',
+  PUNJAB: 'PB',
+  HARYANA: 'HR',
+  'MADHYA PRADESH': 'MP',
+  GUJARAT: 'GJ',
+  'WEST BENGAL': 'WB',
+  'ANDHRA PRADESH': 'AP',
+  TELANGANA: 'TS',
+  RAJASTHAN: 'RJ',
+  BIHAR: 'BR',
+  KERALA: 'KL',
+  ODISHA: 'OD',
+  ASSAM: 'AS',
+  CHHATTISGARH: 'CG',
+  JHARKHAND: 'JH',
+  'HIMACHAL PRADESH': 'HP',
+  UTTARAKHAND: 'UK',
+  GOA: 'GA',
+  DELHI: 'DL',
 };
 
-function slugify(text: string): string {
-  return text.trim().toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+const REGIONS: Record<string, string> = {
+  TN: 'SOUTH',
+  KA: 'SOUTH',
+  AP: 'SOUTH',
+  TS: 'SOUTH',
+  KL: 'SOUTH',
+  MH: 'WEST',
+  GJ: 'WEST',
+  GA: 'WEST',
+  RJ: 'WEST',
+  UP: 'NORTH',
+  PB: 'NORTH',
+  HR: 'NORTH',
+  HP: 'NORTH',
+  UK: 'NORTH',
+  DL: 'NORTH',
+  MP: 'CENTRAL',
+  CG: 'CENTRAL',
+  WB: 'EAST',
+  BR: 'EAST',
+  OD: 'EAST',
+  JH: 'EAST',
+  AS: 'NORTHEAST',
+};
+
+function slugify(value: unknown): string {
+  return String(value ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
 }
-function stateCodeFor(name: string): string {
-  const upper=name.trim().toUpperCase();
-  return STATE_CODES[upper] || upper.substring(0,2) || 'IN';
-}
-function categoryFor(raw?: unknown): string {\n  const value = String(raw ?? '').trim().toUpperCase();\n  if (ALLOWED_CATEGORIES.has(value)) return value;\n  const lower = value.toLowerCase();\n  if (lower.includes('cereal')) return 'CEREALS';\n  if (lower.includes('pulse')) return 'PULSES';\n  if (lower.includes('oil')) return 'OILSEEDS';\n  if (lower.includes('fruit')) return 'FRUITS';\n  if (lower.includes('spice')) return 'SPICES';\n  if (lower.includes('fiber') || lower.includes('fibre')) return 'FIBER';\n  if (lower.includes('commercial')) return 'COMMERCIAL_CROPS';\n  return 'VEGETABLES';\n}\nfunction parseDate(value?: string): string | null {
-  if (!value) return null;
-  const raw=value.trim();
-  const dmy=raw.split('/');
-  if (dmy.length===3) {
-    const [d,m,y]=dmy;
-    if (y?.length===4) return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+
+function parseDate(value: unknown): string | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const dmy = raw.split('/');
+  if (dmy.length === 3 && dmy[2].length === 4) {
+    return `${dmy[2]}-${dmy[1].padStart(2, '0')}-${dmy[0].padStart(2, '0')}`;
   }
   if (/^\\d{4}-\\d{2}-\\d{2}$/.test(raw)) return raw;
   return null;
 }
 
+function categoryFor(value: unknown): string {
+  const raw = String(value ?? '').trim().toUpperCase();
+  if (ALLOWED_CATEGORIES.has(raw)) return raw;
+  if (raw.includes('CEREAL')) return 'CEREALS';
+  if (raw.includes('PULSE')) return 'PULSES';
+  if (raw.includes('OIL')) return 'OILSEEDS';
+  if (raw.includes('FRUIT')) return 'FRUITS';
+  if (raw.includes('SPICE')) return 'SPICES';
+  if (raw.includes('FIBER') || raw.includes('FIBRE')) return 'FIBER';
+  if (raw.includes('COMMERCIAL')) return 'COMMERCIAL_CROPS';
+  return 'VEGETABLES';
+}
+
+function isAuthorized(request: Request): boolean {
+  const cronSecret = process.env.CRON_SECRET;
+  const authorization = request.headers.get('authorization');
+  return Boolean(cronSecret && authorization === `Bearer ${cronSecret}`);
+}
+
 export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const offset = Math.max(0, Number.parseInt(searchParams.get('offset') || '0',10) || 0);
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, Number.parseInt(searchParams.get('limit') || String(DEFAULT_PAGE_SIZE),10) || DEFAULT_PAGE_SIZE));
-    const apiKey = process.env.DATA_GOV_IN_API_KEY;
-    if (!apiKey) return NextResponse.json({ok:false,error:'DATA_GOV_IN_API_KEY is not configured server-side.'},{status:503});
+  if (!isAuthorized(request)) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  }
 
-    const requestedDate = searchParams.get('date') || new Date().toISOString().slice(0, 10);\n    const arrivalDate = requestedDate;
-    const apiUrl = `${OGD_BASE_URL}${OGD_RESOURCE_ID}?api-key=${encodeURIComponent(apiKey)}&format=json&offset=${offset}&limit=${limit}&filters[Arrival_Date]=${encodeURIComponent(arrivalDate)}`;
-    const upstream = await fetch(apiUrl,{cache:'no-store'});
-    if (!upstream.ok) return NextResponse.json({ok:false,error:`AGMARKNET request failed: HTTP ${upstream.status}`},{status:upstream.status});
+  const apiKey = process.env.DATA_GOV_IN_API_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    const payload = await upstream.json();
-    const records = Array.isArray(payload?.records) ? payload.records : [];
-    const cookieStore = cookies();
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xrcqzpnstdbbtafhcwbb.supabase.co';
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-    if (!supabaseKey) {
-      return NextResponse.json({ ok: false, error: 'Supabase service role key is not configured in Vercel.' }, { status: 503 });
-    }
-    const supabase = createServerClient(
-      supabaseUrl,
-      supabaseKey,
-      { cookies: { get(name: string){ return cookieStore.get(name)?.value; } } }
+  if (!apiKey || !supabaseUrl || !serviceRoleKey) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'Mandi ingestion is not configured. Required server secrets: DATA_GOV_IN_API_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, CRON_SECRET.',
+      },
+      { status: 503 },
     );
+  }
 
-    let ingested=0, skipped=0, errors=0;
-    for (const rec of records) {
-      const state=String(rec?.State ?? rec?.state ?? '').trim();
-      const district=String(rec?.District ?? rec?.district ?? '').trim();
-      const market=String(rec?.Market ?? rec?.market ?? '').trim();
-      const commodity=String(rec?.Commodity ?? rec?.commodity ?? '').trim();
-      const variety=String(rec?.Variety ?? rec?.variety ?? 'Standard').trim() || 'Standard';
-      const modal=Number(rec?.['Modal Price'] ?? rec?.modal_price);
-      if (!state || !district || !market || !commodity || !Number.isFinite(modal)) { skipped++; continue; }
+  const { searchParams } = new URL(request.url);
+  const arrivalDate = searchParams.get('date') || new Date().toISOString().slice(0, 10);
+  const maxPages = Math.min(10, Math.max(1, Number.parseInt(searchParams.get('pages') || '10', 10) || 10));
 
-      const stateCode=stateCodeFor(state);
-      const districtCode=`${stateCode}_${slugify(district)}`;
-      const mandiCode=`${districtCode}_${slugify(market)}`;
-      const commodityCode=slugify(commodity);
-      const variantCode=`${commodityCode}_${slugify(variety)}`;
-      const obsDate = parseDate(String(rec?.Arrival_Date ?? rec?.arrival_date ?? ''));\n      if (!obsDate) { skipped++; continue; }
-      const minPrice=Number(rec?.['Min Price'] ?? rec?.min_price);
-      const maxPrice=Number(rec?.['Max Price'] ?? rec?.max_price);
-      const min=minPrice>0?minPrice:modal;
-      const max=maxPrice>0?maxPrice:modal;
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 
-      try {
-        const results = await Promise.all([
-          supabase.from('national_states').upsert({state_code:stateCode,name:state,region:REGIONS[stateCode] || 'CENTRAL'},{onConflict:'state_code'}),
-          supabase.from('national_districts').upsert({state_code:stateCode,district_code:districtCode,name:district},{onConflict:'district_code'}),
-          supabase.from('national_mandis').upsert({district_code:districtCode,mandi_code:mandiCode,name:market},{onConflict:'mandi_code'}),
-          supabase.from('national_commodities').upsert({code:commodityCode,name:commodity,category:categoryFor(rec?.Category ?? rec?.category ?? commodity),standard_unit:'QUINTAL'},{onConflict:'code'}),
-          supabase.from('national_commodity_variants').upsert({variant_code:variantCode,variant_name:variety,grade:String(rec?.Grade ?? rec?.grade ?? 'STANDARD')},{onConflict:'variant_code'})
-        ]);
-        const dimensionError=results.find(r=>r.error)?.error;
-        if (dimensionError) { errors++; continue; }
+  const runInsert = await supabase
+    .from('mandi_data_ingestion_runs')
+    .insert({
+      source: 'AGMARKNET_OFFICIAL',
+      resource_id: OGD_RESOURCE_ID,
+      requested_date: arrivalDate,
+      status: 'RUNNING',
+    })
+    .select('id')
+    .single();
 
-        const {error: obsError}=await supabase.from('national_market_price_observations').upsert({
-          commodity_code:commodityCode,variant_code:variantCode,mandi_code:mandiCode,district_code:districtCode,state_code:stateCode,
-          price_signal_type:'OBSERVED_MANDI',min_price:min,max_price:max,modal_price:modal,observed_at:`${obsDate}T00:00:00.000Z`,
-          source:'AGMARKNET_OFFICIAL',source_url:OGD_BASE_URL+OGD_RESOURCE_ID,geography:`${district}, ${state}`,unit:'INR_PER_QUINTAL',
-          validation_status:'VALIDATED',data_layer:'CANONICAL',is_synthetic:false,commodity_name:commodity,variety_name:variety,grade_name:String(rec?.Grade ?? rec?.grade ?? 'STANDARD'),
-          mandi_name:market,arrival_unit:null,raw_payload:rec
-        },{onConflict:'commodity_code,variant_code,mandi_code,observed_at,source'});
-        if (obsError) { errors++; continue; }
+  if (runInsert.error || !runInsert.data?.id) {
+    return NextResponse.json(
+      { ok: false, error: runInsert.error?.message || 'Could not create ingestion run.' },
+      { status: 500 },
+    );
+  }
 
-        await supabase.from('market_prices').upsert({mandi_name:market,district,state,commodity,observation_date:obsDate,min_price:min,modal_price:modal,max_price:max,unit:'QUINTAL',source_name:'AGMARKNET_OFFICIAL'});
-        ingested++;
-      } catch { errors++; }
+  const runId = runInsert.data.id;
+  let recordsSeen = 0;
+  let recordsIngested = 0;
+  let recordsSkipped = 0;
+  let recordsFailed = 0;
+
+  try {
+    for (let page = 0; page < maxPages; page += 1) {
+      const offset = page * PAGE_SIZE;
+      const apiUrl =
+        `${OGD_BASE_URL}${OGD_RESOURCE_ID}?api-key=${encodeURIComponent(apiKey)}&format=json&offset=${offset}&limit=${PAGE_SIZE}&filters[Arrival_Date]=${encodeURIComponent(arrivalDate)}`;
+
+      const upstream = await fetch(apiUrl, { cache: 'no-store' });
+      if (!upstream.ok) {
+        throw new Error(`Government OGD returned HTTP ${upstream.status}.`);
+      }
+
+      const payload = await upstream.json();
+      const records = Array.isArray(payload?.records) ? payload.records : [];
+      recordsSeen += records.length;
+
+      for (const record of records) {
+        const state = String(record?.State ?? record?.state ?? '').trim();
+        const district = String(record?.District ?? record?.district ?? '').trim();
+        const market = String(record?.Market ?? record?.market ?? '').trim();
+        const commodity = String(record?.Commodity ?? record?.commodity ?? '').trim();
+        const variety = String(record?.Variety ?? record?.variety ?? 'Standard').trim() || 'Standard';
+        const grade = String(record?.Grade ?? record?.grade ?? 'STANDARD').trim() || 'STANDARD';
+        const modal = Number(record?.['Modal Price'] ?? record?.modal_price);
+        const minPriceRaw = Number(record?.['Min Price'] ?? record?.min_price);
+        const maxPriceRaw = Number(record?.['Max Price'] ?? record?.max_price);
+        const obsDate = parseDate(record?.Arrival_Date ?? record?.arrival_date);
+
+        if (!state || !district || !market || !commodity || !obsDate || !Number.isFinite(modal) || modal <= 0) {
+          recordsSkipped += 1;
+          continue;
+        }
+
+        const minPrice = Number.isFinite(minPriceRaw) && minPriceRaw > 0 ? minPriceRaw : modal;
+        const maxPrice = Number.isFinite(maxPriceRaw) && maxPriceRaw >= minPrice ? maxPriceRaw : modal;
+        const stateCode = STATE_CODES[state.toUpperCase()] || slugify(state).slice(0, 10) || 'IN';
+        const districtCode = `${stateCode}_${slugify(district)}`;
+        const mandiCode = `${districtCode}_${slugify(market)}`;
+        const commodityCode = slugify(commodity);
+        const variantCode = `${commodityCode}_${slugify(variety) || 'STANDARD'}`;
+
+        try {
+          const dims = await Promise.all([
+            supabase.from('national_states').upsert(
+              { state_code: stateCode, name: state, region: REGIONS[stateCode] || 'CENTRAL' },
+              { onConflict: 'state_code' },
+            ),
+            supabase.from('national_districts').upsert(
+              { state_code: stateCode, district_code: districtCode, name: district },
+              { onConflict: 'district_code' },
+            ),
+            supabase.from('national_mandis').upsert(
+              { district_code: districtCode, mandi_code: mandiCode, name: market },
+              { onConflict: 'mandi_code' },
+            ),
+            supabase.from('national_commodities').upsert(
+              {
+                code: commodityCode,
+                name: commodity,
+                category: categoryFor(commodity),
+                standard_unit: 'QUINTAL',
+              },
+              { onConflict: 'code' },
+            ),
+            supabase.from('national_commodity_variants').upsert(
+              { variant_code: variantCode, variant_name: variety, grade },
+              { onConflict: 'variant_code' },
+            ),
+          ]);
+
+          const dimError = dims.find((result) => result.error)?.error;
+          if (dimError) throw dimError;
+
+          const observation = await supabase.from('national_market_price_observations').upsert(
+            {
+              commodity_code: commodityCode,
+              variant_code: variantCode,
+              mandi_code: mandiCode,
+              district_code: districtCode,
+              state_code: stateCode,
+              price_signal_type: 'OBSERVED_MANDI',
+              min_price: minPrice,
+              max_price: maxPrice,
+              modal_price: modal,
+              arrival_quantity_mt: Number(record?.['Arrival Quantity'] ?? record?.arrival_quantity_mt ?? 0) || 0,
+              observed_at: `${obsDate}T00:00:00.000Z`,
+              source: 'AGMARKNET_OFFICIAL',
+              source_url: `https://www.data.gov.in/resource/current-daily-price-various-commodities-various-markets-mandi`,
+              retrieved_at: new Date().toISOString(),
+              published_at: `${obsDate}T00:00:00.000Z`,
+              license: 'OPEN_GOVERNMENT_DATA',
+              coverage_start: obsDate,
+              coverage_end: obsDate,
+              geography: `${district}, ${state}`,
+              unit: 'INR_PER_QUINTAL',
+              schema_version: 'v1.0',
+              quality_score: 0.95,
+              validation_status: 'VALIDATED',
+              data_layer: 'CANONICAL',
+              is_synthetic: false,
+              commodity_name: commodity,
+              variety_name: variety,
+              grade_name: grade,
+              mandi_name: market,
+              raw_payload: record,
+            },
+            { onConflict: 'commodity_code,variant_code,mandi_code,observed_at,source' },
+          );
+
+          if (observation.error) throw observation.error;
+          recordsIngested += 1;
+        } catch {
+          recordsFailed += 1;
+        }
+      }
+
+      if (records.length < PAGE_SIZE) break;
     }
 
-    return NextResponse.json({ok:true,source:'AGMARKNET_OFFICIAL',resource_id:OGD_RESOURCE_ID,offset,limit,total_records:Number(payload?.total || records.length),page_records:records.length,ingested_count:ingested,skipped_count:skipped,error_count:errors,next_offset:records.length===limit?offset+limit:null,timestamp:new Date().toISOString()});
-  } catch (error:any) {
-    return NextResponse.json({ok:false,error:error?.message || 'Server ingestion error'},{status:500});
+    await supabase
+      .from('mandi_data_ingestion_runs')
+      .update({
+        status: 'SUCCEEDED',
+        finished_at: new Date().toISOString(),
+        records_seen: recordsSeen,
+        records_ingested: recordsIngested,
+        records_skipped: recordsSkipped,
+        records_failed: recordsFailed,
+      })
+      .eq('id', runId);
+
+    return NextResponse.json({
+      ok: true,
+      source: 'AGMARKNET_OFFICIAL',
+      resource_id: OGD_RESOURCE_ID,
+      requested_date: arrivalDate,
+      records_seen: recordsSeen,
+      records_ingested: recordsIngested,
+      records_skipped: recordsSkipped,
+      records_failed: recordsFailed,
+      run_id: runId,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Mandi ingestion failed.';
+    await supabase
+      .from('mandi_data_ingestion_runs')
+      .update({
+        status: 'FAILED',
+        finished_at: new Date().toISOString(),
+        records_seen: recordsSeen,
+        records_ingested: recordsIngested,
+        records_skipped: recordsSkipped,
+        records_failed: recordsFailed,
+        error_message: message,
+      })
+      .eq('id', runId);
+
+    return NextResponse.json({ ok: false, error: message, run_id: runId }, { status: 502 });
   }
 }
