@@ -144,8 +144,13 @@ export default function WeatherPage() {
   };
 
   useEffect(() => {
-    void loadWeather();
-    const timer = window.setInterval(() => void loadWeather(), 15 * 60 * 1000);
+    if (user?.id) void loadWeather();
+  }, [user?.id]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (user?.id) void loadWeather();
+    }, 15 * 60 * 1000);
     return () => window.clearInterval(timer);
   }, [user?.id]);
 
