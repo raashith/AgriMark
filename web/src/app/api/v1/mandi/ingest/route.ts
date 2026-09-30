@@ -4,10 +4,10 @@ import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
-const OGD_RESOURCE_ID = '35985678-0d79-46b4-9ed6-6f13308a1d24';
+const OGD_RESOURCE_ID = '9ef4b77d-9a0c-4988-8573-054bb0058170';
 const OGD_BASE_URL = 'https://api.data.gov.in/resource/';
 const DEFAULT_PAGE_SIZE = 200;
-const MAX_PAGE_SIZE = 100;
+const MAX_PAGE_SIZE = 100;\nconst ALLOWED_CATEGORIES = new Set(['CEREALS','PULSES','OILSEEDS','VEGETABLES','FRUITS','SPICES','COMMERCIAL_CROPS','FIBER']);
 
 const STATE_CODES: Record<string,string> = {
   'TAMIL NADU':'TN','MAHARASHTRA':'MH','KARNATAKA':'KA','UTTAR PRADESH':'UP','PUNJAB':'PB','HARYANA':'HR','MADHYA PRADESH':'MP','GUJARAT':'GJ','WEST BENGAL':'WB','ANDHRA PRADESH':'AP','TELANGANA':'TS','RAJASTHAN':'RJ','BIHAR':'BR','KERALA':'KL','ODISHA':'OD','ASSAM':'AS','CHHATTISGARH':'CG','JHARKHAND':'JH','HIMACHAL PRADESH':'HP','UTTARAKHAND':'UK','GOA':'GA','DELHI':'DL'
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
     const records = Array.isArray(payload?.records) ? payload.records : [];
     const cookieStore = cookies();
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xrcqzpnstdbbtafhcwbb.supabase.co';
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
     if (!supabaseKey) {
       return NextResponse.json({ ok: false, error: 'Supabase publishable key is not configured in Vercel Production.' }, { status: 503 });
     }
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
           supabase.from('national_states').upsert({state_code:stateCode,name:state,region:REGIONS[stateCode] || 'CENTRAL'},{onConflict:'state_code'}),
           supabase.from('national_districts').upsert({state_code:stateCode,district_code:districtCode,name:district},{onConflict:'district_code'}),
           supabase.from('national_mandis').upsert({district_code:districtCode,mandi_code:mandiCode,name:market},{onConflict:'mandi_code'}),
-          supabase.from('national_commodities').upsert({code:commodityCode,name:commodity,category:'AGRICULTURE',standard_unit:'QUINTAL'},{onConflict:'code'}),
+          supabase.from('national_commodities').upsert({code:commodityCode,name:commodity,category:ALLOWED_CATEGORIES.has(String(rec?.Category ?? rec?.category ?? '').trim().toUpperCase()) ? String(rec?.Category ?? rec?.category).trim().toUpperCase() : 'VEGETABLES',standard_unit:'QUINTAL'},{onConflict:'code'}),
           supabase.from('national_commodity_variants').upsert({variant_code:variantCode,variant_name:variety,grade:String(rec?.Grade ?? rec?.grade ?? 'STANDARD')},{onConflict:'variant_code'})
         ]);
         const dimensionError=results.find(r=>r.error)?.error;
