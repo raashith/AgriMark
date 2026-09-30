@@ -39,17 +39,10 @@ def me(user: AuthenticatedUser = Depends(get_current_user)) -> ProfileResponse:
         has_name = bool(prof.get("full_name") and str(prof.get("full_name")).strip())
         return ProfileResponse(**prof, needs_onboarding=not has_name)
 
-    default_profile = {
-        "id": str(user.id),
-        "full_name": user.email.split("@")[0] if user.email else "AgriMark User",
-        "phone": user.phone,
-        "role": "farmer",
-    }
-    try:
-        get_supabase().table("profiles").upsert(default_profile).execute()
-    except Exception:
-        pass
-    return ProfileResponse(**default_profile, needs_onboarding=True)
+    raise HTTPException(
+        status_code=404,
+        detail="AgriMark profile is not initialized for this authenticated user.",
+    )
 
 
 @router.post("/login")
@@ -83,19 +76,12 @@ def login(request: LoginRequest):
         raise HTTPException(status_code=401, detail="Invalid email/phone or password.") from exc
 
     prof_res = get_supabase().table("profiles").select("id,full_name,phone,role").eq("id", str(user_id)).limit(1).execute()
-    if prof_res.data:
-        profile_data = prof_res.data[0]
-    else:
-        profile_data = {
-            "id": user_id,
-            "full_name": email.split("@")[0],
-            "phone": request.phone,
-            "role": "farmer",
-        }
-        try:
-            get_supabase().table("profiles").upsert(profile_data).execute()
-        except Exception:
-            pass
+    if not prof_res.data:
+        raise HTTPException(
+            status_code=409,
+            detail="Authentication succeeded but the AgriMark profile is not initialized.",
+        )
+    profile_data = prof_res.data[0]
 
     return {
         "access_token": access_token,
