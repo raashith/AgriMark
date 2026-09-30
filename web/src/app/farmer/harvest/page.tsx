@@ -82,11 +82,6 @@ export default function HarvestPage() {
     void load();
   }, [user?.id]);
 
-  useEffect(() => {
-    const selected = farmCultivations.find((c: any) => c.id === cultivationId);
-    if (selected?.crop_id) setCropId(selected.crop_id);
-  }, [cultivationId, farmCultivations]);
-
   const farmCultivations = useMemo(
     () => cultivations.filter((c: any) => !farmId || c.farm_id === farmId),
     [cultivations, farmId],
@@ -347,7 +342,7 @@ export default function HarvestPage() {
                             <h3 className="font-bold text-[#e5a93c]">Lot {linkedLot?.id?.slice(0, 8) || harvest.id.slice(0, 8)}</h3>
                             <span className="rounded-full border border-[#3e7b54]/70 bg-[#1b4d3e]/30 px-2.5 py-1 text-[10px] font-mono font-bold uppercase text-[#9bc7a2]">{linkedLot?.status || 'available'}</span>
                           </div>
-                          <p className="mt-1 text-xs text-[#52a67a]">{cultivation?.crop_name || linkedLot?.crop_name || 'Crop'} · {cultivation?.variety || 'Traceable harvest'}</p>
+                          <p className="mt-1 text-xs text-[#52a67a]">{crops.find((crop) => crop.id === cultivation?.crop_id)?.name || linkedLot?.crop_name || 'Crop'} · Traceable harvest</p>
                         </div>
                         <div className="text-xs text-[#596d61]">{harvest.harvest_date}</div>
                       </div>
