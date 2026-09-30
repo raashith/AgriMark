@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Cultivation, CropCatalogItem } from '@/types';
 import { dataService } from '@/lib/data-service';
@@ -9,178 +9,226 @@ import { useToast } from '@/components/ui/Toast';
 import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Sprout, Plus } from 'lucide-react';
+import { Sprout, Plus, RefreshCw } from 'lucide-react';
 
 export default function FarmerCropsPage() {
   const { user } = useAuth();
   const { showSuccess, showError } = useToast();
   const [cultivations, setCultivations] = useState<Cultivation[]>([]);
-  const [farms, setFarms] = useState<Array<{id:string;name?:string|null}>>([]);
+  const [farms, setFarms] = useState<Array<{ id: string; name?: string | null }>>([]);
   const [catalog, setCatalog] = useState<CropCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Form
-  const [cropName, setCropName] = useState('Paddy (Rice)');
-  const [variety, setVariety] = useState('CR-1009 Sub1');
-  const [season, setSeason] = useState('Kharif');
-  const [area, setArea] = useState<number>(5.0);
   const [selectedFarmId, setSelectedFarmId] = useState('');
+  const [selectedCropId, setSelectedCropId] = useState('');
+  const [season, setSeason] = useState('Kharif');
+  const [area, setArea] = useState(5);
+  const [sowingDate, setSowingDate] = useState(new Date().toISOString().slice(0, 10));
+  const [expectedHarvestDate, setExpectedHarvestDate] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const loadData = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const [cults, cat, farmList] = await Promise.all([
+        dataService.getCultivations(undefined, user.id),
+        dataService.getCropCatalog(),
+        dataService.getFarms(user.id),
+      ]);
+      setCultivations(cults);
+      setCatalog(cat);
+      setFarms(farmList);
+      if (!selectedFarmId && farmList[0]?.id) setSelectedFarmId(farmList[0].id);
+      if (!selectedCropId && cat[0]?.id) setSelectedCropId(cat[0].id);
+    } catch (error) {
+      showError('Unable to load crops', error instanceof Error ? error.message : 'Please retry.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const [cults, cat, farmList] = await Promise.all([
-          dataService.getCultivations(undefined, user?.id),
-          dataService.getCropCatalog(),
-          dataService.getFarms(user?.id),
-        ]);
-        setFarms(farmList);
-        if (!selectedFarmId && farmList[0]?.id) setSelectedFarmId(farmList[0].id);
-        setCultivations(cults);
-        setCatalog(cat);
-      } catch {
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadData();
-  }, [user]);
+    void loadData();
+  }, [user?.id]);
+
+  const selectedCrop = catalog.find((crop) => crop.id === selectedCropId);
+  const selectedFarm = farms.find((farm) => farm.id === selectedFarmId);
+  const totalArea = useMemo(
+    () => cultivations.reduce((sum, cultivation) => sum + Number(cultivation.area_acres || 0), 0),
+    [cultivations],
+  );
 
   const handleCreateCultivation = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.id) {
-      showError('Authentication Required', 'Please sign in to record a cultivation plan.');
+    if (!user?.id || !selectedFarmId || !selectedCropId) {
+      showError('Missing details', 'Select a farm and crop before saving.');
       return;
     }
+    if (!Number.isFinite(area) || area <= 0) {
+      showError('Invalid area', 'Cultivation area must be greater than 0 acres.');
+      return;
+    }
+
+    setSubmitting(true);
     try {
       const created = await dataService.createCultivation({
-        farmer_id: user.id,
         farm_id: selectedFarmId,
-        crop_name: cropName,
-        variety,
+        crop_id: selectedCropId,
         season,
         area_acres: Number(area),
+        sowing_date: sowingDate || null,
+        expected_harvest_date: expectedHarvestDate || null,
+        status: 'planned',
       });
-      if (created) {
-        setCultivations((prev) => [created, ...prev]);
-        showSuccess('Cultivation Recorded!', `Cultivation plan for ${cropName} (${variety}) saved.`);
-        setIsModalOpen(false);
-      } else {
-        showError('Record Failed', 'Database submission failed.');
-      }
-    } catch (err: any) {
-      showError('Failed to record cultivation', err.message);
+      if (!created) throw new Error('Database submission failed.');
+      setCultivations((prev) => [created, ...prev]);
+      setIsModalOpen(false);
+      setSowingDate(new Date().toISOString().slice(0, 10));
+      setExpectedHarvestDate('');
+      showSuccess(
+        'Cultivation recorded',
+        `${selectedCrop?.name || 'Crop'} linked to ${selectedFarm?.name || 'farm'}.`,
+      );
+    } catch (error) {
+      showError('Failed to record cultivation', error instanceof Error ? error.message : 'Please retry.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
     <ProtectedRoute allowedRoles={['farmer', 'fpo', 'admin']}>
       <div className="space-y-6">
-        <div className="bg-[#121a16] border border-[#1e2d26] p-6 md:p-8 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xl">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-950/80 border border-emerald-800/60 rounded-full text-xs font-mono font-bold text-emerald-400">
-              <Sprout className="w-4 h-4" /> Agronomy & Cultivation Cycle
+        <section className="rounded-[28px] border border-[#24382e] bg-[#07110d] p-6 shadow-[0_24px_90px_rgba(0,0,0,0.32)] md:p-8">
+          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#3e7b54]/60 bg-[#1b4d3e]/30 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-[0.18em] text-[#9bc7a2]">
+                <Sprout className="h-3.5 w-3.5" /> Agronomy Operations
+              </div>
+              <h1 className="mt-4 text-3xl font-black tracking-tight text-[#f7f5ee] md:text-5xl">Crops & Cultivation</h1>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-[#adbdb2]">
+                Link each cultivation to a real farm and catalog crop so every later harvest and produce lot has traceable origin data.
+              </p>
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-white">
-              Crops & Cultivation Seasons
-            </h1>
-            <p className="text-xs text-gray-300 max-w-xl">
-              Track active crop varieties, sowing dates, expected harvest schedules, and organic farming guidelines.
-            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                disabled={!farms.length || !catalog.length}
+                className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#3e7b54] px-4 text-sm font-black text-[#f7f5ee] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Plus className="h-4 w-4" /> Record cultivation
+              </button>
+              <button
+                type="button"
+                onClick={() => void loadData()}
+                disabled={loading}
+                className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 text-sm font-bold text-[#f7f5ee]"
+              >
+                <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} /> Refresh
+              </button>
+            </div>
           </div>
+        </section>
 
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg flex items-center gap-2 transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Record New Cultivation</span>
-          </button>
-        </div>
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-white/10 bg-[#0e1712] p-5">
+            <p className="text-xs uppercase tracking-wider text-[#70887a]">Active records</p>
+            <p className="mt-2 text-3xl font-black text-[#f7f5ee]">{loading ? '—' : cultivations.length}</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-[#0e1712] p-5">
+            <p className="text-xs uppercase tracking-wider text-[#70887a]">Cultivated area</p>
+            <p className="mt-2 text-3xl font-black text-[#f7f5ee]">{loading ? '—' : `${totalArea.toFixed(1)} ac`}</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-[#0e1712] p-5">
+            <p className="text-xs uppercase tracking-wider text-[#70887a]">Registered farms</p>
+            <p className="mt-2 text-3xl font-black text-[#f7f5ee]">{loading ? '—' : farms.length}</p>
+          </div>
+        </section>
 
-        {/* Cultivation List */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-44 rounded-3xl" />
-            ))}
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-44 rounded-3xl" />)}
           </div>
-        ) : cultivations.length === 0 ? (
+        ) : !farms.length ? (
           <EmptyState
-            title="No Cultivation Plans Recorded"
-            description="You have not recorded any active crop cultivations yet. Click 'Record New Cultivation' to begin."
+            title="Register a farm first"
+            description="Harvest tracing starts with a real farm. Add the farm boundary and acreage before recording a cultivation."
+          />
+        ) : !cultivations.length ? (
+          <EmptyState
+            title="No cultivations recorded"
+            description="Create a farm-linked cultivation plan, then use that cultivation in Harvest & Produce Lots."
           />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {cultivations.map((c) => (
-              <div key={c.id} className="bg-[#121a16] border border-[#1e2d26] rounded-3xl p-6 space-y-4 shadow-lg">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-extrabold text-lg text-white">{c.crop_name}</h3>
-                    <p className="text-xs text-emerald-400 font-medium">Variety: {c.variety}</p>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            {cultivations.map((c) => {
+              const crop = catalog.find((entry) => entry.id === c.crop_id);
+              const farm = farms.find((entry) => entry.id === c.farm_id);
+              return (
+                <article key={c.id} className="rounded-3xl border border-[#24382e] bg-[#0e1712] p-6 shadow-lg">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-[#70887a]">Cultivation</p>
+                      <h2 className="mt-1 text-xl font-extrabold text-[#f7f5ee]">{crop?.name || c.crop_id}</h2>
+                      <p className="mt-1 text-xs text-[#52a67a]">{farm?.name || c.farm_id}</p>
+                    </div>
+                    <span className="rounded-full border border-[#3e7b54]/60 bg-[#1b4d3e]/30 px-3 py-1 text-[10px] font-mono uppercase text-[#9bc7a2]">
+                      {c.status}
+                    </span>
                   </div>
-                  <span className="px-3 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 text-xs font-mono font-bold uppercase rounded-full">
-                    {c.status || 'active'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl">
-                    <span className="text-gray-400 uppercase font-mono text-[10px]">Season</span>
-                    <p className="font-bold text-white text-xs mt-0.5">{c.season || 'Kharif'}</p>
+                  <div className="mt-5 grid grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-white/5 bg-[#07110d] p-3"><p className="text-[10px] uppercase text-[#596d61]">Season</p><p className="mt-1 text-sm font-bold text-[#f7f5ee]">{c.season || '—'}</p></div>
+                    <div className="rounded-xl border border-white/5 bg-[#07110d] p-3"><p className="text-[10px] uppercase text-[#596d61]">Area</p><p className="mt-1 text-sm font-bold text-[#f7f5ee]">{Number(c.area_acres || 0).toLocaleString()} ac</p></div>
+                    <div className="rounded-xl border border-white/5 bg-[#07110d] p-3"><p className="text-[10px] uppercase text-[#596d61]">Sowing</p><p className="mt-1 text-sm font-bold text-[#f7f5ee]">{c.sowing_date || '—'}</p></div>
+                    <div className="rounded-xl border border-white/5 bg-[#07110d] p-3"><p className="text-[10px] uppercase text-[#596d61]">Expected harvest</p><p className="mt-1 text-sm font-bold text-[#f7f5ee]">{c.expected_harvest_date || '—'}</p></div>
                   </div>
-                  <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl">
-                    <span className="text-gray-400 uppercase font-mono text-[10px]">Area</span>
-                    <p className="font-bold text-white text-xs mt-0.5">{c.area_acres} Acres</p>
-                  </div>
-                  <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl">
-                    <span className="text-gray-400 uppercase font-mono text-[10px]">Exp Yield</span>
-                    <p className="font-bold text-emerald-400 text-xs mt-0.5">{c.expected_yield_kg ? `${(c.expected_yield_kg / 1000).toFixed(1)} Tons` : 'N/A'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-[#1e2d26]">
-                  <span>Sown: {c.sowing_date || 'N/A'}</span>
-                  <span>Expected Harvest: {c.expected_harvest_date || 'N/A'}</span>
-                </div>
-              </div>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
 
-        {/* Modal */}
-        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Record New Cultivation" subtitle="Enter crop variety and sowing date">
+        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Record New Cultivation" subtitle="Use only real farm and crop records">
           <form onSubmit={handleCreateCultivation} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Farm</label>
-              <select required value={selectedFarmId} onChange={(e) => setSelectedFarmId(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none">
-                <option value="">{farms.length ? 'Choose a farm' : 'No farm registered'}</option>
+              <label className="mb-1 block text-xs font-semibold uppercase text-[#70887a]">Farm</label>
+              <select required value={selectedFarmId} onChange={(e) => setSelectedFarmId(e.target.value)} className="w-full rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 py-3 text-sm text-[#f7f5ee]">
                 {farms.map((farm) => <option key={farm.id} value={farm.id}>{farm.name || 'Farm'}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Crop Selection</label>
-              <select value={cropName} onChange={(e) => setCropName(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-xs focus:border-emerald-500 focus:outline-none">
-                {catalog.map((cat) => (
-                  <option key={cat.id} value={cat.name}>{cat.name} ({cat.category})</option>
-                ))}
+              <label className="mb-1 block text-xs font-semibold uppercase text-[#70887a]">Crop</label>
+              <select required value={selectedCropId} onChange={(e) => setSelectedCropId(e.target.value)} className="w-full rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 py-3 text-sm text-[#f7f5ee]">
+                {catalog.map((crop) => <option key={crop.id} value={crop.id}>{crop.name} · {crop.category}</option>)}
               </select>
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
-                <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Variety Name</label>
-                <input type="text" required value={variety} onChange={(e) => setVariety(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" placeholder="CR-1009 Sub1" />
+                <label className="mb-1 block text-xs font-semibold uppercase text-[#70887a]">Season</label>
+                <select value={season} onChange={(e) => setSeason(e.target.value)} className="w-full rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 py-3 text-sm text-[#f7f5ee]">
+                  <option>Kharif</option><option>Rabi</option><option>Zaid</option><option>Perennial</option>
+                </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Area (Acres)</label>
-                <input type="number" step="0.5" required value={area} onChange={(e) => setArea(Number(e.target.value))} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" />
+                <label className="mb-1 block text-xs font-semibold uppercase text-[#70887a]">Area (acres)</label>
+                <input type="number" min="0.1" step="0.1" required value={area} onChange={(e) => setArea(Number(e.target.value))} className="w-full rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 py-3 text-sm text-[#f7f5ee]" />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase text-[#70887a]">Sowing date</label>
+                <input type="date" required value={sowingDate} onChange={(e) => setSowingDate(e.target.value)} className="w-full rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 py-3 text-sm text-[#f7f5ee]" />
               </div>
             </div>
-
-            <button type="submit" className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition">
-              Save Cultivation Record
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase text-[#70887a]">Expected harvest date <span className="normal-case text-[#596d61]">(optional)</span></label>
+              <input type="date" value={expectedHarvestDate} onChange={(e) => setExpectedHarvestDate(e.target.value)} className="w-full rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 py-3 text-sm text-[#f7f5ee]" />
+            </div>
+            <button type="submit" disabled={submitting || !farms.length || !catalog.length} className="min-h-12 w-full rounded-xl bg-[#e5a93c] text-sm font-black text-[#19201d] disabled:opacity-40">
+              {submitting ? 'Saving…' : 'Save Cultivation Record'}
             </button>
           </form>
         </Modal>
