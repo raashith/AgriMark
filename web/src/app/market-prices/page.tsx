@@ -109,7 +109,7 @@ export default function MarketPricesPage() {
       Array.from(
         new Map(
           rows
-            .map((r) => [r.state_code || '', r.state_code || 'Unknown state'])
+            .map((r): [string, string] => [r.state_code || '', r.state_code || 'Unknown state'])
             .filter(([code]) => Boolean(code)),
         ).entries(),
       ),
@@ -123,7 +123,7 @@ export default function MarketPricesPage() {
           rows
             .filter((r) => selectedCommodity === 'all' || r.commodity_code === selectedCommodity)
             .filter((r) => selectedState === 'all' || r.state_code === selectedState)
-            .map((r) => [r.mandi_code || '', r.mandi_name || r.mandi_code || 'Unknown mandi'])
+            .map((r): [string, string] => [r.mandi_code || '', r.mandi_name || r.mandi_code || 'Unknown mandi'])
             .filter(([code]) => Boolean(code)),
         ).entries(),
       ),
