@@ -11,6 +11,11 @@
 
 html { scroll-behavior: smooth; }
 
+/* Advanced marketplace loading shimmer */
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
 /* Compact application heading scale */
 h1 { font-size: 1.5rem !important; line-height: 1.25 !important; }
 h2 { font-size: 1.25rem !important; line-height: 1.3 !important; }
