@@ -220,7 +220,7 @@ export default function DeliveryLocationPage() {
       if (userRole === 'farmer') router.push('/farmer/dashboard');
       else if (userRole === 'buyer') router.push('/buyer/market');
       else if (userRole === 'fpo') router.push('/fpo/dashboard');
-      else if (userRole === 'logistics') router.push('/logistics/deliveries');
+      else if (userRole === 'logistics') router.push('/logistics');
       else router.push('/buyer/market');
     } catch (err: any) {
       setFormError(err.message || 'Unable to save address. Please try again.');
