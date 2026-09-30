@@ -293,8 +293,9 @@ export const dataService = {
       cache: 'no-store',
     });
 
+    const payload = await response.json().catch(() => null);
+
     if (!response.ok) {
-      const payload = await response.json().catch(() => null);
       throw new Error(
         payload && typeof payload === 'object' && 'meta' in payload
           ? String((payload as { meta?: { message?: unknown } }).meta?.message || 'Live weather request failed.')
@@ -302,15 +303,34 @@ export const dataService = {
       );
     }
 
-    return response.json() as Promise<{
+    return payload as {
       success: true;
       data: {
-        latitude: number;
-        longitude: number;
-        timezone: string;
-        elevation_m: number;
-        current: Record<string, number | string | null>;
-        current_units: Record<string, string>;
+        latitude: number | null;
+        longitude: number | null;
+        timezone_offset_seconds?: number | null;
+        location_name?: string | null;
+        country?: string | null;
+        condition?: string | null;
+        description?: string | null;
+        icon?: string | null;
+        temperature_c?: number | null;
+        feels_like_c?: number | null;
+        min_temperature_c?: number | null;
+        max_temperature_c?: number | null;
+        humidity_pct?: number | null;
+        pressure_hpa?: number | null;
+        wind_speed_mps?: number | null;
+        wind_direction_deg?: number | null;
+        wind_gust_mps?: number | null;
+        cloudiness_pct?: number | null;
+        visibility_m?: number | null;
+        rain_1h_mm?: number | null;
+        snow_1h_mm?: number | null;
+        observed_at_unix?: number | null;
+        observed_at?: string | null;
+        sunrise_unix?: number | null;
+        sunset_unix?: number | null;
       };
       meta: {
         data_origin: string;
@@ -318,7 +338,7 @@ export const dataService = {
         observed_at: string | null;
         freshness: string;
       };
-    }>;
+    };
   },
 
   // Finance, Tasks, Documents
