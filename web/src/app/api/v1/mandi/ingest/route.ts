@@ -54,7 +54,7 @@ export async function GET(request: Request) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xrcqzpnstdbbtafhcwbb.supabase.co';
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
     if (!supabaseKey) {
-      return NextResponse.json({ ok: false, error: 'Supabase publishable key is not configured in Vercel Production.' }, { status: 503 });
+      return NextResponse.json({ ok: false, error: 'Supabase service role key is not configured in Vercel.' }, { status: 503 });
     }
     const supabase = createServerClient(
       supabaseUrl,
