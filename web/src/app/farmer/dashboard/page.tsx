@@ -17,7 +17,6 @@ import {
   FileText,
   CheckSquare,
   Bot,
-  AlertTriangle,
   Gauge,
   CloudRain,
   Droplets,
@@ -45,7 +44,6 @@ export default function FarmerDashboardPage() {
     latestTemperature: 0: 0,
   });
 
-  const [weatherAlert, setWeatherAlert] = useState<string | null>(null);
   const [weatherLocation, setWeatherLocation] = useState<string | null>(null);
 
   useEffect(() => {
@@ -93,7 +91,6 @@ export default function FarmerDashboardPage() {
           latestTemperature,
         });
         setWeatherLocation(weather?.data?.location_name || null);
-        setWeatherAlert(null);
       } catch {
       } finally {
         if (isMounted) setLoading(false);
