@@ -30,7 +30,7 @@ logging.basicConfig(
 logger = logging.getLogger("ingest_agmarknet")
 
 # Constants
-OGD_RESOURCE_ID = "9ef4b77d-9a0c-4988-8573-054bb0058170"
+OGD_RESOURCE_ID = "35985678-0d79-46b4-9ed6-6f13308a1d24"
 OGD_BASE_URL = "https://api.data.gov.in/resource/"
 
 STATE_MAPPINGS: Dict[str, Tuple[str, str, str]] = {
@@ -230,7 +230,7 @@ def fetch_agmarknet_data(
                     logger.info(f"Successfully retrieved {len(records)} records from OGD API (total available: {total})")
                     return records, total
         except Exception as e:
-            logger.warning(f"OGD API fetch failed: {e}. Falling back to baseline AGMARKNET dataset generator.")
+            logger.warning(f"OGD API fetch failed: {e}. No fallback data will be generated.")
 
     # No fallback dataset is permitted. Production data must originate from the official OGD/AGMARKNET feed.
     logger.error("Official AGMARKNET OGD feed returned no usable response; refusing to generate synthetic records.")
