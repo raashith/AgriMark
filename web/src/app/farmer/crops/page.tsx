@@ -15,6 +15,7 @@ export default function FarmerCropsPage() {
   const { user } = useAuth();
   const { showSuccess, showError } = useToast();
   const [cultivations, setCultivations] = useState<Cultivation[]>([]);
+  const [farms, setFarms] = useState<Array<{id:string;name?:string|null}>>([]);
   const [catalog, setCatalog] = useState<CropCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -24,14 +25,18 @@ export default function FarmerCropsPage() {
   const [variety, setVariety] = useState('CR-1009 Sub1');
   const [season, setSeason] = useState('Kharif');
   const [area, setArea] = useState<number>(5.0);
+  const [selectedFarmId, setSelectedFarmId] = useState('');
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [cults, cat] = await Promise.all([
+        const [cults, cat, farmList] = await Promise.all([
           dataService.getCultivations(undefined, user?.id),
           dataService.getCropCatalog(),
+          dataService.getFarms(user?.id),
         ]);
+        setFarms(farmList);
+        if (!selectedFarmId && farmList[0]?.id) setSelectedFarmId(farmList[0].id);
         setCultivations(cults);
         setCatalog(cat);
       } catch {
@@ -51,6 +56,7 @@ export default function FarmerCropsPage() {
     try {
       const created = await dataService.createCultivation({
         farmer_id: user.id,
+        farm_id: selectedFarmId,
         crop_name: cropName,
         variety,
         season,
@@ -146,6 +152,13 @@ export default function FarmerCropsPage() {
         {/* Modal */}
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Record New Cultivation" subtitle="Enter crop variety and sowing date">
           <form onSubmit={handleCreateCultivation} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Farm</label>
+              <select required value={selectedFarmId} onChange={(e) => setSelectedFarmId(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none">
+                <option value="">{farms.length ? 'Choose a farm' : 'No farm registered'}</option>
+                {farms.map((farm) => <option key={farm.id} value={farm.id}>{farm.name || 'Farm'}</option>)}
+              </select>
+            </div>
             <div>
               <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Crop Selection</label>
               <select value={cropName} onChange={(e) => setCropName(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-xs focus:border-emerald-500 focus:outline-none">
