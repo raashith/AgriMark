@@ -58,7 +58,7 @@ export class WeatherClimateEngine {
       unit: 'METRIC',
       schema_version: 'v1.0',
       quality_score: 0,
-      validation_status: 'UNVERIFIED',
+      validation_status: 'PENDING',
       data_layer: 'CANONICAL'
     };
 
@@ -117,7 +117,7 @@ export class WeatherClimateEngine {
       unit: 'INDEX_SCORE',
       schema_version: 'v1.0',
       quality_score: 0,
-      validation_status: 'UNVERIFIED',
+      validation_status: 'PENDING',
       data_layer: 'INTELLIGENCE'
     };
 
