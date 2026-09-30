@@ -63,6 +63,7 @@ export default function MarketPricesPage() {
   const [forecast, setForecast] = useState<ForecastPoint[]>([]);
   const [forecastStatus, setForecastStatus] = useState('Waiting for observed history');
   const [forecastModel, setForecastModel] = useState('');
+  const [navigatorOnline, setNavigatorOnline] = useState(true);
 
   async function load() {
     setLoading(true);
@@ -89,6 +90,18 @@ export default function MarketPricesPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    setNavigatorOnline(typeof navigator !== 'undefined' ? navigator.onLine : true);
+    const onOnline = () => setNavigatorOnline(true);
+    const onOffline = () => setNavigatorOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, []);
 
   useEffect(() => {
     void load();
@@ -228,7 +241,7 @@ export default function MarketPricesPage() {
               <h1 className="text-3xl font-extrabold tracking-tight text-[#f7f5ee] md:text-5xl">
                 Commodity Prices & Mandi Forecast
               </h1>
-              {!navigator.onLine && (
+              {!navigatorOnline && (
                 <span className="hidden items-center rounded-full border border-amber-800/50 bg-amber-950/30 px-2 py-1 text-[10px] font-mono text-amber-200 sm:inline-flex">
                   <CloudOff className="mr-1 h-3 w-3" />
                   Offline
