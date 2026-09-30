@@ -130,10 +130,6 @@ def list_cultivations(
 def list_harvest_batches(
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> list[HarvestBatchResponse]:
-    result = (
-        get_supabase()
-        .table("harvest_batches")
-        .select("id,cultivation_id,harvested_at,quantity,grade,trace_code")
     farms = get_supabase().table("farms").select("id").eq("owner_id", str(user.id)).execute()
     farm_ids = [row["id"] for row in (farms.data or [])]
     if not farm_ids:
