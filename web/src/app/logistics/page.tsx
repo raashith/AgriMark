@@ -6,6 +6,7 @@ import { dataService } from '@/lib/data-service';
 import type { LogisticsRequest } from '@/types';
 import { Truck, MapPin, PackageCheck, RefreshCw, Navigation, Users, Snowflake } from 'lucide-react';
 
+// Production build baseline: Vercel npm ci lockfile restored.
 export default function LogisticsPage() {
   const [requests, setRequests] = useState<LogisticsRequest[]>([]);
   const [loading, setLoading] = useState(true);
