@@ -59,6 +59,7 @@ export default function WeatherPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [farmLabel, setFarmLabel] = useState<string>('Farm weather');
 
   const loadWeather = async () => {
     if (!user?.id) {
@@ -73,16 +74,39 @@ export default function WeatherPage() {
       const farms = await dataService.getFarms(user.id);
       const farm = farms.find((item) => item.latitude != null && item.longitude != null);
 
-      if (!farm) {
+      let latitude = farm?.latitude ?? null;
+      let longitude = farm?.longitude ?? null;
+
+      if (latitude == null || longitude == null) {
+        const stored = typeof window !== 'undefined'
+          ? window.localStorage.getItem('agrimark.weather.coordinates')
+          : null;
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored) as { latitude?: number; longitude?: number; label?: string };
+            if (Number.isFinite(parsed.latitude) && Number.isFinite(parsed.longitude)) {
+              latitude = parsed.latitude as number;
+              longitude = parsed.longitude as number;
+              setFarmLabel(parsed.label || 'Selected farm');
+            }
+          } catch {}
+        }
+      }
+
+      if (latitude == null || longitude == null) {
         setWeather(null);
         setForecast([]);
-        setError('Add GPS coordinates to at least one farm to activate live weather.');
+        setError('No farm GPS coordinates are saved yet. Add coordinates in My Farms, or select a location below to preview live weather.');
         return;
       }
 
+      if (farm?.name || farm?.village || farm?.district) {
+        setFarmLabel(farm.name || [farm.village, farm.district].filter(Boolean).join(', ') || 'Farm weather');
+      }
+
       const params = new URLSearchParams({
-        latitude: String(farm.latitude),
-        longitude: String(farm.longitude),
+        latitude: String(latitude),
+        longitude: String(longitude),
       });
 
       const [currentResponse, forecastResponse] = await Promise.all([
@@ -177,7 +201,7 @@ export default function WeatherPage() {
             <div className="relative mt-6 flex flex-col gap-3 border-t border-white/10 pt-4 text-xs text-gray-400 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <MapPin className="h-3.5 w-3.5 text-emerald-400" />
-                <span className="font-semibold text-gray-200">{data.location_name || 'Farm location'}</span>
+                <span className="font-semibold text-gray-200">{data.location_name || farmLabel}</span>
                 <span>{data.country || ''}</span>
               </div>
               <div className="font-mono">
@@ -192,9 +216,35 @@ export default function WeatherPage() {
         <section className="rounded-2xl border border-amber-800/50 bg-amber-950/20 p-4">
           <div className="flex items-start gap-3 text-sm text-amber-200">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="font-semibold text-amber-100">Weather feed needs attention</p>
               <p className="mt-1 text-amber-200/80">{error}</p>
+              {!weather && (
+                <form
+                  className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const form = event.currentTarget;
+                    const lat = Number((form.elements.namedItem('latitude') as HTMLInputElement).value);
+                    const lon = Number((form.elements.namedItem('longitude') as HTMLInputElement).value);
+                    const label = String((form.elements.namedItem('label') as HTMLInputElement).value || 'Selected farm');
+                    if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+                      setError('Enter valid latitude and longitude values.');
+                      return;
+                    }
+                    window.localStorage.setItem('agrimark.weather.coordinates', JSON.stringify({ latitude: lat, longitude: lon, label }));
+                    setFarmLabel(label);
+                    void loadWeather();
+                  }}
+                >
+                  <input name="label" placeholder="Farm / village name" className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-gray-600 outline-none focus:border-emerald-600" />
+                  <input name="latitude" inputMode="decimal" placeholder="Latitude" className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-gray-600 outline-none focus:border-emerald-600" />
+                  <div className="flex gap-2">
+                    <input name="longitude" inputMode="decimal" placeholder="Longitude" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-gray-600 outline-none focus:border-emerald-600" />
+                    <button type="submit" className="rounded-xl bg-emerald-500 px-4 py-2 text-xs font-black text-[#04100B] hover:bg-emerald-400">Load</button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         </section>
