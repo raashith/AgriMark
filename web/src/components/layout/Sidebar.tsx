@@ -15,6 +15,7 @@ export const Sidebar: React.FC = () => {
   const { user, role } = useAuth();
   const normalizedRole = String(role || user?.role || '').trim().toLowerCase();
   const isBuyerRoute = pathname === '/buyer' || pathname.startsWith('/buyer/');
+  const isLogisticsRoute = pathname === '/logistics' || pathname.startsWith('/logistics/');
   const [isOpen, setIsOpen] = useState(false);
 
   const farmerNav = [
@@ -51,6 +52,17 @@ export const Sidebar: React.FC = () => {
     { label: 'AgriAI Assistant', href: '/ai-assistant', icon: Bot },
   ];
 
+  const logisticsNav = [
+    { label: 'Operations', href: '/logistics', icon: LayoutDashboard },
+    { label: 'Delivery Board', href: '/logistics/deliveries', icon: PackageCheck },
+    { label: 'Live Routes', href: '/logistics/routes', icon: MapPin },
+    { label: 'Fleet', href: '/logistics/fleet', icon: Truck },
+    { label: 'Drivers', href: '/logistics/drivers', icon: Users },
+    { label: 'Cold Chain', href: '/logistics/cold-chain', icon: CloudSun },
+    { label: 'Marketplace Orders', href: '/marketplace', icon: ShoppingCart },
+    { label: 'Settings', href: '/farmer/settings', icon: Settings },
+  ];
+
   const adminNav = [
     { label: 'Admin Operations', href: '/admin/dashboard', icon: ShieldCheck },
     { label: 'Marketplace', href: '/marketplace', icon: ShoppingCart },
@@ -63,6 +75,7 @@ export const Sidebar: React.FC = () => {
 
   let items = farmerNav;
   if (normalizedRole === 'buyer' || isBuyerRoute) items = buyerNav;
+  if (normalizedRole === 'logistics' || isLogisticsRoute) items = logisticsNav;
   if (normalizedRole === 'admin') items = adminNav;
 
   useEffect(() => {
