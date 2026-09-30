@@ -237,7 +237,7 @@ export default function HarvestPage() {
                 <label className="mb-1 block text-xs font-semibold uppercase text-[#70887a]">Cultivation</label>
                 <select value={cultivationId} onChange={(e) => { setCultivationId(e.target.value); const c = farmCultivations.find((row: any) => row.id === e.target.value); if (c?.crop_id) setCropId(c.crop_id); }} required disabled={!farmCultivations.length} className="min-h-12 w-full rounded-xl border border-[#2a3b32] bg-[#07110d] px-4 text-sm text-[#f7f5ee]">
                   <option value="">{farmCultivations.length ? 'Select a cultivation' : 'No cultivation linked to this farm'}</option>
-                  {farmCultivations.map((cult: any) => <option key={cult.id} value={cult.id}>{cult.crop_name || 'Crop'} · {cult.variety || 'Variety not set'} · {cult.area_acres || 0} ac</option>)}
+                  {farmCultivations.map((cult: any) => <option key={cult.id} value={cult.id}>{crops.find((crop) => crop.id === cult.crop_id)?.name || cult.crop_id || 'Crop'} · {cult.area_acres || 0} ac</option>)}
                 </select>
                 {!farmCultivations.length && farmId && <Link href="/farmer/crops" className="mt-2 inline-block text-xs text-[#52a67a] underline">Create a cultivation plan</Link>}
               </div>
