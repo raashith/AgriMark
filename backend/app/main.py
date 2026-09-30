@@ -15,6 +15,7 @@ from .api.v1.marketplace import router as marketplace_router
 from .api.v1.readiness import router as readiness_router
 from .api.v1.tracking import router as tracking_router
 from .core.config import get_settings
+from .core.rate_limit import check_rate_limit
 
 settings = get_settings()
 
