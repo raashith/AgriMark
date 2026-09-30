@@ -7,6 +7,8 @@ import { dataService } from '@/lib/data-service';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { Search, Filter, ShoppingCart, MapPin, Tag, ShieldCheck, ArrowRight, Star } from 'lucide-react';
 
+import { StitchListingCard } from '@/components/stitch/marketplace/StitchListingCard';
+
 export default function MarketplacePage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,68 +164,19 @@ export default function MarketplacePage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {listings.map((item) => (
-            <div
+            <StitchListingCard
               key={item.id}
-              className="bg-[#121a16] border border-[#1e2d26] hover:border-emerald-800 rounded-3xl overflow-hidden transition shadow-lg flex flex-col group"
-            >
-              {/* Image & Badges */}
-              <div className="relative h-48 bg-[#0a0f0d] overflow-hidden">
-                <img
-                  src={item.images?.[0] || 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600'}
-                  alt={item.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                />
-                <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
-                  <span className="px-2.5 py-1 bg-emerald-950/90 border border-emerald-700/80 text-emerald-300 text-[10px] font-mono font-bold rounded-full backdrop-blur-md">
-                    {item.quality_grade || 'Grade A'}
-                  </span>
-                  <span className="px-2.5 py-1 bg-black/80 border border-white/10 text-white text-[10px] font-mono font-bold rounded-full backdrop-blur-md">
-                    {item.crop_category || 'Produce'}
-                  </span>
-                </div>
-                <div className="absolute bottom-3 right-3 px-2.5 py-1 bg-black/80 text-emerald-400 text-xs font-mono font-bold rounded-full flex items-center gap-1 backdrop-blur-md">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Verified Farm
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                <div className="space-y-2">
-                  <h3 className="font-extrabold text-base text-white group-hover:text-emerald-300 transition line-clamp-2">
-                    {item.title}
-                  </h3>
-
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <MapPin className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    <span className="truncate">{item.location || 'Tamil Nadu'}</span>
-                  </div>
-
-                  <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">
-                    {item.description}
-                  </p>
-                </div>
-
-                {/* Pricing & Order Info */}
-                <div className="pt-3 border-t border-[#1e2d26] flex items-end justify-between">
-                  <div>
-                    <span className="text-[10px] uppercase font-mono text-gray-400">Asking Price</span>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-xl font-black text-emerald-400">₹{item.price_per_unit || item.price_per_kg}</span>
-                      <span className="text-xs text-gray-400 font-mono">/ kg</span>
-                    </div>
-                    <span className="text-[10px] text-gray-400">Min Order: {item.min_order_quantity_kg || 100} kg</span>
-                  </div>
-
-                  <Link
-                    href={`/product/${item.id}`}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md flex items-center gap-1.5 transition"
-                  >
-                    <span>View Lot</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
-                </div>
-              </div>
-            </div>
+              id={item.id}
+              title={item.title}
+              commodityName={item.crop_category || 'Produce'}
+              pricePerKg={item.price_per_unit || item.price_per_kg || 40}
+              quantityKg={item.quantity_available_kg || item.min_order_quantity_kg || 500}
+              qualityGrade={item.quality_grade || 'Grade A'}
+              location={item.location || 'Tamil Nadu'}
+              sellerName="Verified Farmer"
+              verified={true}
+              imageUrl={item.images?.[0]}
+            />
           ))}
         </div>
       )}

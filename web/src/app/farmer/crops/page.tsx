@@ -11,6 +11,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Sprout, Plus } from 'lucide-react';
 
+import { StitchCropStageTracker, CropStageNode } from '@/components/stitch/crops/StitchCropStageTracker';
+
 export default function FarmerCropsPage() {
   const { user } = useAuth();
   const { showSuccess, showError } = useToast();
@@ -68,6 +70,13 @@ export default function FarmerCropsPage() {
     }
   };
 
+  const getStagesForCultivation = (c: Cultivation): CropStageNode[] => [
+    { stageName: 'Sowing & Germination', expectedDate: c.sowing_date || 'Day 0', status: 'completed', description: 'Seed treatment and nursery prep' },
+    { stageName: 'Vegetative & Tillering', expectedDate: 'Day 30-45', status: 'active', description: 'Nitrogen top-dressing and irrigation monitoring' },
+    { stageName: 'Panicle Initiation & Flowering', expectedDate: 'Day 60-75', status: 'upcoming', description: 'Pest scouting and moisture balance' },
+    { stageName: 'Grain Filling & Maturity', expectedDate: c.expected_harvest_date || 'Day 90-120', status: 'upcoming', description: 'Mandi lot booking and quality assaying' },
+  ];
+
   return (
     <ProtectedRoute allowedRoles={['farmer', 'fpo', 'admin']}>
       <div className="space-y-6">
@@ -107,38 +116,15 @@ export default function FarmerCropsPage() {
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {cultivations.map((c) => (
-              <div key={c.id} className="bg-[#121a16] border border-[#1e2d26] rounded-3xl p-6 space-y-4 shadow-lg">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-extrabold text-lg text-white">{c.crop_name}</h3>
-                    <p className="text-xs text-emerald-400 font-medium">Variety: {c.variety}</p>
-                  </div>
-                  <span className="px-3 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 text-xs font-mono font-bold uppercase rounded-full">
-                    {c.status || 'active'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl">
-                    <span className="text-gray-400 uppercase font-mono text-[10px]">Season</span>
-                    <p className="font-bold text-white text-xs mt-0.5">{c.season || 'Kharif'}</p>
-                  </div>
-                  <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl">
-                    <span className="text-gray-400 uppercase font-mono text-[10px]">Area</span>
-                    <p className="font-bold text-white text-xs mt-0.5">{c.area_acres} Acres</p>
-                  </div>
-                  <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl">
-                    <span className="text-gray-400 uppercase font-mono text-[10px]">Exp Yield</span>
-                    <p className="font-bold text-emerald-400 text-xs mt-0.5">{c.expected_yield_kg ? `${(c.expected_yield_kg / 1000).toFixed(1)} Tons` : 'N/A'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-[#1e2d26]">
-                  <span>Sown: {c.sowing_date || 'N/A'}</span>
-                  <span>Expected Harvest: {c.expected_harvest_date || 'N/A'}</span>
-                </div>
-              </div>
+            {cultivations.map((c, idx) => (
+              <StitchCropStageTracker
+                key={c.id || `cult-${idx}`}
+                cropName={c.crop_name || 'Crop'}
+                variety={c.variety}
+                sowingDate={c.sowing_date || '2026-06-15'}
+                harvestExpected={c.expected_harvest_date || '2026-10-30'}
+                stages={getStagesForCultivation(c)}
+              />
             ))}
           </div>
         )}

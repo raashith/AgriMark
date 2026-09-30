@@ -1,87 +1,97 @@
-# AgriMark Frontend Design System & Design DNA (Stitch Source of Truth)
+# AgriMark Design System & Design DNA (Stitch Source of Truth)
 
-Authoritative visual and design system specification extracted from Stitch projects:
-- **AgriMark 3D Intelligence Landing Page** (`projects/4468772449935595295`)
+Extracted directly from Stitch Projects:
+- **AgriMark Ecosystem Design System** (`projects/14345374774406971474`)
 - **AgriMark Agriculture Ecosystem** (`projects/14593492555073215209`)
+- **AgriMark 3D Intelligence Landing Page** (`projects/4468772449935595295`)
 
 ---
 
-## 1. Visual Ethos: "Agro-Industrial Sovereign & Precision Telemetry"
+## 1. Brand & Aesthetic Philosophy: "Agricultural Modernism"
 
-The AgriMark frontend design system balances sovereign agronomic heritage with high-density precision software instrumentation. It bridges high-glare field usability for farmers and mandi traders with high-fidelity analytical surfaces for buyers, agronomists, FPOs, and logistics managers.
+This design system expresses **Agricultural Modernism**—a synthesis of agrarian heritage and rigorous digital engineering. It bridges the gap between field pragmatism and institutional commodity trading, serving two primary user groups across India:
+1. Progressive farmers, mandi commission agents, and field agronomists working outdoors under intense sunlight, variable network quality, and demanding physical conditions.
+2. Institutional agri-buyers, FPO executives, and supply chain analysts operating complex trading, logistics, and settlement desks.
+
+The aesthetic rejects sterile, clinical whites in favor of an organic, tactile, and grounded palette. It pairs sun-warmed cotton canvas surfaces with rich chlorophyll emeralds, harvest greens, and luminous sun-gold accents.
+
+The interaction tone is decisive, dignified, and tactile. Interface elements utilize generous touch zones, robust structural hairline borders, clear spatial hierarchy, and high-visibility typographic contrasting to deliver effortless legibility in outdoor glare while projecting sovereign trust for high-value financial transactions.
 
 ---
 
 ## 2. Color Palette & Chromatic Tokens
 
-### Primary Brand Palette
-- **Chlorophyll Emerald / Deep Forest (`#1B4D3E` / `rgb(27, 77, 62)`)**: Primary brand container and navigation anchor.
-- **Harvest Green (`#3E7B54` / `rgb(62, 123, 84)`)**: Secondary active states, healthy crop yield indicators, and positive trends.
-- **Sun Gold / Sovereign Amber (`#E5A93C` / `#D49216`)**: Market pulse signal, active telemetry ticks, CTA highlights, and trade execution triggers.
-- **Warm Cotton Cream (`#F7F5EE` / `#E1EFED`)**: Primary text and high-contrast editorial reader surfaces to prevent eye strain.
-- **Loam Black / Void Substrate (`#07110D` / `#19201D`)**: Deep canvas background absorbing specular noise.
-- **Vitreous Dark Glass (`#121A16` / `#1A241F`)**: Tonal surface containers for card modules, floating sheets, and modals.
-- **Sovereign Red / Alert (`#CB1B1B`)**: Critical risk, urgent market drops, and dispute flags.
+### Primary Palette
+- **Primary Chlorophyll Emerald (`#003629` / Container `#1B4D3E`)**: Sovereign tone of authority. Anchors primary calls-to-action, navigation headers, structural anchors, and balance status cards.
+- **Secondary Harvest Green (`#2C6A44` / Container `#3E7B54`)**: Botanical indicator of growth and vitality. Applied to confirmed yields, verified mandi lots, progress states, and secondary actions.
+- **Tertiary Sun Gold (`#402A00` / Container `#E5A93C`)**: Marker of commerce and immediate liquidity. Highlights market tickers, trade triggers, escrow releases, and key alerts.
+- **Background & Canvas Cotton Cream (`#FBF9F2` / Surface Low `#F6F4ED`)**: Foundational canvas plane. Prevents eye fatigue and reduces glare under outdoor sunlight compared to harsh pure white.
 
-### Neutral Surface Hierarchy
-- `bg-canvas`: `#07110D` (Subterranean Loam Base)
-- `bg-surface-low`: `#0A0F0D` (Panel Floor)
-- `bg-surface`: `#121A16` (Card Container)
-- `bg-surface-high`: `#18241F` (Hover / Elevated Surface)
-- `border-glass`: `#1E2D26` / `rgba(255, 255, 255, 0.08)` (Micro Perimeter Highlight)
-
----
-
-## 3. Typography Scale & Font Hierarchy
-
-- **Display & Headlines**: `Space Grotesk` or `Merriweather`
-  - Display Hero: `56px` / `lineHeight: 64px` / `fontWeight: 700`
-  - Headline LG: `32px` / `lineHeight: 40px` / `fontWeight: 600`
-  - Headline MD: `24px` / `lineHeight: 32px` / `fontWeight: 600`
-  - Headline SM: `20px` / `lineHeight: 28px` / `fontWeight: 500`
-
-- **Interface & Prose**: `Plus Jakarta Sans`
-  - Body XL: `18px` / `lineHeight: 28px`
-  - Body LG: `16px` / `lineHeight: 24px`
-  - Body MD: `14px` / `lineHeight: 20px`
-  - Body SM: `12px` / `lineHeight: 16px`
-
-- **Telemetry & Micro-labels**: `JetBrains Mono`
-  - Label LG: `13px` / `letterSpacing: 0.04em` / `uppercase`
-  - Label MD: `11px` / `letterSpacing: 0.06em` / `uppercase`
-  - Label SM: `10px` / `letterSpacing: 0.08em` / `uppercase`
+### Supporting & Semantic Tokens
+- **`loam-black` (`#19201D`)**: Primary copy and structural contrast, achieving an AAA contrast ratio.
+- **`card-surface` (`#FFFFFF`)**: Pure elevated surface layer creating spatial separation against the warm cotton background.
+- **`husk-border` (`#E2DDD1`)**: Natural, low-intensity hairline border color for card envelopes, dividers, and input borders.
+- **`field-green` (`#257042`)**: State token for completed payouts, KYC clearance, and pristine crop health.
+- **`amber-ochre` (`#D97706`)**: State token for weather advisories, moisture alerts, and trade timeouts.
+- **`rust-crimson` (`#B91C1C` / `#BA1A1A`)**: State token for critical pest threats, lot rejections, and dispute escalations.
+- **`monsoon-indigo` (`#2A6F8F`)**: Dedicated to meteorological data, satellite soil moisture, and cold chain telemetry.
+- **`terminal-dark` (`#0A0F0D`) & `terminal-surface` (`#121A16`)**: Dark containers reserved for agritech intelligence panels and AI vision viewports.
 
 ---
 
-## 4. Layout, Spacing & Corner Radii
+## 3. Typography Architecture
 
-### Grid Systems
-- **Desktop (1200px+)**: 12-column adaptive fluid grid (`gutter: 1.5rem`, `margin: 2rem-3rem`).
-- **Tablet (768px - 1199px)**: 8-column layout (`gutter: 1.25rem`).
-- **Mobile (<768px)**: 4-column single-stack layout (`gutter: 1rem`).
+The type system runs on a dual-engine architecture:
+
+1. **Plus Jakarta Sans (Humanist Interface Engine)**: Serves all interface headings, conversational elements, form labels, and operational instructional copy.
+2. **JetBrains Mono (Telemetry & Quantitative Engine)**: Deployed strictly for analytical and computational data—mandi price rates (`₹/Qtl`), bag tallies, moisture percentages, geolocation coordinates, and lot identification serials.
+
+### Typography Token Hierarchy
+- `display-lg`: Plus Jakarta Sans, 40px, Weight 800, Line-height 48px, Letter-spacing -0.02em
+- `headline-lg`: Plus Jakarta Sans, 28px, Weight 700, Line-height 34px, Letter-spacing -0.01em
+- `headline-md`: Plus Jakarta Sans, 22px, Weight 700, Line-height 28px, Letter-spacing -0.01em
+- `headline-sm`: Plus Jakarta Sans, 18px, Weight 600, Line-height 24px
+- `body-lg`: Plus Jakarta Sans, 17px, Weight 400, Line-height 26px
+- `body-md`: Plus Jakarta Sans, 15px, Weight 400, Line-height 22px
+- `body-sm`: Plus Jakarta Sans, 13px, Weight 400, Line-height 18px
+- `data-metric-lg`: JetBrains Mono, 28px, Weight 700, Line-height 32px, Letter-spacing -0.03em
+- `data-metric-sm`: JetBrains Mono, 16px, Weight 600, Line-height 20px, Letter-spacing -0.01em
+- `label-lg`: Plus Jakarta Sans, 15px, Weight 600, Line-height 20px, Letter-spacing 0.01em
+- `label-md`: Plus Jakarta Sans, 13px, Weight 600, Line-height 16px, Letter-spacing 0.02em
+- `label-sm`: Plus Jakarta Sans, 11px, Weight 700, Line-height 14px, Letter-spacing 0.04em
+
+---
+
+## 4. Layout, Elevation & Corner Radii
+
+### Layout Grid Rhythms
+- **Mobile (<640px)**: 4-column fluid layout (`margin: 1rem`, `gutter: 1rem`), sticky bottom thumb dock (64px safe height).
+- **Tablet (641px–1023px)**: 8-column layout (`margin: 1.5rem`, `gutter: 1.5rem`).
+- **Desktop (≥1024px)**: 12-column layout (`margin: 2rem`, `gutter: 1.5rem`), bound to a maximum width of 1280px.
+
+### Elevation Layers
+- **Level 0 (Field Canvas)**: Flat `#FBF9F2` surface.
+- **Level 1 (Operational Cards)**: `#FFFFFF` card surface wrapped in 1px solid `#E2DDD1` border with subtle contact shadow `0 2px 6px -1px rgba(27, 77, 62, 0.05)`.
+- **Level 2 (Dropdowns & Modals)**: `#FFFFFF` lifted with `0 8px 20px -4px rgba(27, 77, 62, 0.08)` and bordered with `#E2DDD1`.
+- **Level 3 (Action Bars & Docks)**: Floated control planes with shadow `0 14px 32px -4px rgba(27, 77, 62, 0.14)`.
+- **Agronomic Dark Glass**: `#121A16` container with 1px border `rgba(255, 255, 255, 0.08)` and ambient glow `0 12px 30px -4px rgba(0, 0, 0, 0.4)`.
 
 ### Corner Radii
-- `rounded-sm`: `0.25rem` (4px) — Telemetry chips, badges, input controls
-- `rounded-md`: `0.375rem` (6px) — Tactical buttons
-- `rounded-lg`: `0.5rem` (8px) — Cards, inventory lists
-- `rounded-xl`: `0.75rem` (12px) — Structural containers, modals
-- `rounded-2xl`: `1rem` (16px) — Major drawers, onboarding sheets
-- `rounded-full`: `9999px` — Status dots, avatar rings
+- `rounded-sm`: 4px (`0.25rem`) — Table containers, metric badges, small chips
+- `rounded-md`: 8px (`0.5rem`) — Default input fields, standard cards
+- `rounded-lg`: 12px (`0.75rem`) — Produce lot cards, diagnostic containers
+- `rounded-xl`: 16px (`1rem`) — Action sheets, onboarding drawers
+- `rounded-full`: 9999px — Status dots, primary CTA buttons, grade badges
 
 ---
 
-## 5. Reusable Component Patterns (`web/src/components/stitch/`)
+## 5. Screen Inventory & Inspection Map
 
-1. **Navigation & Layout**: `StitchNavbar`, `StitchSidebar`, `StitchFooter`, `StitchMobileDock`
-2. **Dashboard Modules**: `TelemetryCard`, `CropMetricsGrid`, `MandiPriceTicker`, `WeatherWidget`
-3. **Marketplace & Orders**: `ListingCard`, `MandiAuctionTerminal`, `EscrowStatusBadge`, `RFQDrawer`
-4. **Agronomy & Field Operations**: `CropStageProgress`, `SoilHealthPanel`, `ScoutingObservationCard`, `HarvestTallySheet`
-5. **AI Assistant**: `AgriAiChatWindow`, `VoiceCommandTrigger`
-
----
-
-## 6. Functional Integrity Rules
-
-- **Data Binding**: All visual components read directly from real application services (Supabase tables, Weather OpenWeather gateway `/api/v1/interoperability/weather`, AgriMark AI `/api/v1/ai`).
-- **Auth & Authorization**: Firebase Auth + Supabase session sync. Role protection strictly enforced.
-- **Production Asset Pipeline**: Assets served locally under `/public/images/` or Next.js optimized paths.
+- **Farmer Dashboard** (`projects/14345374774406971474/screens/afad98439a29422ca539bd908c2221d8`)
+- **Farm Operations & Phenology** (`projects/14345374774406971474/screens/66b1922fcad2419bb9ddd75aa63873c6`)
+- **Marketplace & Mandis** (`projects/14345374774406971474/screens/582f273e85ca4e09a8acab8add4a33ee`)
+- **Buyer Procurement & RFQs** (`projects/14345374774406971474/screens/9aab766ccf0940c7b9118f6f65b97c87`)
+- **Auth & Role Onboarding** (`projects/14345374774406971474/screens/e86a6f94684b4028a63145656dd88ff2`)
+- **AgriAI Advisory** (`projects/14345374774406971474/screens/356661a03f2240c8b5717324cd5a53d0`)
+- **FPO Aggregation & Pooling** (`projects/14345374774406971474/screens/cfc48826067d484c92f18d92308c50e1`)
+- **Farm & Traceability** (`projects/14345374774406971474/screens/2effe929b04e48ccbda84eb725647c74`)
