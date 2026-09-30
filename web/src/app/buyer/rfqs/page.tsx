@@ -11,6 +11,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FileText, Plus, MapPin, Calendar } from 'lucide-react';
 
+import { StitchBadge } from '@/components/stitch/common/StitchBadge';
+
 export default function BuyerRFQsPage() {
   const { user } = useAuth();
   const { showSuccess, showError } = useToast();
@@ -115,9 +117,7 @@ export default function BuyerRFQsPage() {
                     <h3 className="font-extrabold text-lg text-white">{rfq.crop_name}</h3>
                     <p className="text-xs text-emerald-400 font-medium">{rfq.buyer_name}</p>
                   </div>
-                  <span className="px-2.5 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] font-mono font-bold uppercase rounded-full">
-                    {rfq.status}
-                  </span>
+                  <StitchBadge label={rfq.status.toUpperCase()} variant="emerald" size="sm" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-xs">
