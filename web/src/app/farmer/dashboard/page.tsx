@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { dataService } from '@/lib/data-service';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { TelemetryCard } from '@/components/stitch/common/TelemetryCard';
 import {
   Sprout,
   MapPin,
@@ -144,24 +145,41 @@ export default function FarmerDashboardPage() {
         </section>
 
         <section className="grid grid-cols-2 xl:grid-cols-5 gap-3">
-          {[
-            { label: 'Active Cultivations', value: `${stats.activeCrops}`, suffix: 'crops', icon: Sprout },
-            { label: 'Produce Stock', value: `${(stats.harvestableKg / 1000).toFixed(1)}`, suffix: 'tons', icon: Layers },
-            { label: 'Revenue', value: `₹${stats.revenueInr.toLocaleString()}`, suffix: 'tracked', icon: TrendingUp },
-            { label: 'Pending Tasks', value: `${stats.pendingTasks}`, suffix: 'actions', icon: CheckSquare },
-            { label: 'Humidity Signal', value: `${stats.avgHealth}`, suffix: '%', icon: Gauge },
-          ].map((card) => (
-            <div key={card.label} className="rounded-2xl border border-white/10 bg-[#0d1914] p-4 shadow-lg">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] uppercase tracking-wider text-gray-500">{card.label}</span>
-                <card.icon className="h-4 w-4 text-emerald-300" />
-              </div>
-              <div className="mt-3 flex items-end gap-2">
-                <span className="text-2xl font-black text-white">{loading ? '—' : card.value}</span>
-                <span className="pb-1 text-[11px] text-gray-500">{card.suffix}</span>
-              </div>
-            </div>
-          ))}
+          <TelemetryCard
+            label="Active Cultivations"
+            value={loading ? '—' : stats.activeCrops}
+            unit="crops"
+            accentColor="emerald"
+            icon={Sprout}
+          />
+          <TelemetryCard
+            label="Produce Stock"
+            value={loading ? '—' : (stats.harvestableKg / 1000).toFixed(1)}
+            unit="tons"
+            accentColor="gold"
+            icon={Layers}
+          />
+          <TelemetryCard
+            label="Revenue"
+            value={loading ? '—' : `₹${stats.revenueInr.toLocaleString()}`}
+            unit="tracked"
+            accentColor="emerald"
+            icon={TrendingUp}
+          />
+          <TelemetryCard
+            label="Pending Tasks"
+            value={loading ? '—' : stats.pendingTasks}
+            unit="actions"
+            accentColor="amber"
+            icon={CheckSquare}
+          />
+          <TelemetryCard
+            label="Humidity Signal"
+            value={loading ? '—' : stats.avgHealth}
+            unit="%"
+            accentColor="emerald"
+            icon={Gauge}
+          />
         </section>
 
         <section className="grid grid-cols-1 xl:grid-cols-[1.45fr_0.85fr] gap-6">
