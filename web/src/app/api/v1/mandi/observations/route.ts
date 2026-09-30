@@ -29,13 +29,17 @@ export async function GET(request: Request) {
       );
     }
 
+    const responseHeaders = new Headers();
     const supabase = createServerClient(supabaseUrl, supabaseKey, {
       cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value;
+        getAll() {
+          return cookieStore.getAll().map(({ name, value }) => ({ name, value }));
         },
-        set() {},
-        remove() {},
+        setAll(cookiesToSet) {
+          for (const { name, value, options } of cookiesToSet) {
+            responseHeaders.append('Set-Cookie', `${name}=${encodeURIComponent(value)}; Path=${options?.path || '/'}`);
+          }
+        },
       },
     });
 
@@ -66,7 +70,7 @@ export async function GET(request: Request) {
     const retrievedAt =
       rows.map((row) => row.retrieved_at).filter(Boolean).sort().at(-1) || null;
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       source: 'AGMARKNET_OFFICIAL',
       rows,
@@ -81,6 +85,8 @@ export async function GET(request: Request) {
         date_to: to || null,
       },
     });
+    responseHeaders.forEach((value, key) => response.headers.append(key, value));
+    return response;
   } catch (error) {
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Market observations error' },
