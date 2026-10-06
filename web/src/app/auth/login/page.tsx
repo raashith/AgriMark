@@ -10,7 +10,7 @@ import { Sprout, ArrowRight, AlertCircle, ShieldCheck, Mail, Lock } from 'lucide
 
 function getRoleRoute(role?: string | null): string {
   switch (role) {
-    case 'buyer': return '/buyer/marketplace';
+    case 'buyer': return '/buyer/dashboard';
     case 'fpo': return '/fpo/dashboard';
     case 'logistics': return '/logistics/deliveries';
     case 'admin': return '/admin/dashboard';
