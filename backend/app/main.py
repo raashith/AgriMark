@@ -3,6 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.gzip import GZipMiddleware
 
 from .api.v1.ai import router as ai_router
 from .api.v1.ai_chat import router as ai_chat_router
@@ -21,6 +22,9 @@ from .core.rate_limit import check_rate_limit
 settings = get_settings()
 
 app = FastAPI(title=settings.app_name, version="1.0.0")
+
+# Keep JSON responses compact on the free-tier instance and reduce transfer time.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.add_middleware(
     CORSMiddleware,
@@ -72,6 +76,14 @@ app.include_router(core_router, prefix="/api/v1")
 app.include_router(marketplace_router, prefix="/api/v1")
 app.include_router(tracking_router, prefix="/api/v1")
 app.include_router(weather_router, prefix="/api/v1")
+
+
+@app.get("/live")
+@app.head("/live")
+def live() -> dict[str, str]:
+    # Liveness must stay dependency-free so a cold or degraded database does not
+    # make the process look dead to an external monitor.
+    return {"status": "ok", "service": settings.app_name}
 
 
 @app.get("/")
