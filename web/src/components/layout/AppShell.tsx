@@ -49,7 +49,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         <Navbar />
         <div className="flex-1 flex w-full max-w-[1600px] mx-auto">
           {!isPublicPage && <Sidebar />}
-          <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl w-full mx-auto pb-24 lg:pb-12 space-y-6">
+          <main className="flex-1 min-w-0 p-3 sm:p-4 md:p-6 lg:p-8 max-w-7xl w-full mx-auto pb-24 lg:pb-12 space-y-4 sm:space-y-6">
             {children}
           </main>
         </div>
