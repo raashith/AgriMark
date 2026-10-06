@@ -27,14 +27,14 @@ export default function HarvestPage() {
   const [errorDetails, setErrorDetails] = useState('');
   const [harvestHistory, setHarvestHistory] = useState<Array<{ id: string; cultivation_id: string; harvest_date: string; total_quantity_kg: number; quality_grade: string; trace_code: string }>>([]);
 
-  const loadData = async (id: string) => {
+  const loadData = async (id?: string) => {
     setLoading(true);
     setErrorDetails('');
     try {
       const [farmRes, lotRes, harvestRes, cropRes] = await Promise.all([
-        api.getFarms(id),
-        api.getProduceLots(),
-        api.getHarvestBatches(),
+        id ? api.getFarms(id) : Promise.resolve([] as Farm[]),
+        api.getPublicProduceLots(),
+        api.getPublicHarvestBatches(),
         api.getCrops(),
       ]);
       setFarms(farmRes);
@@ -52,8 +52,7 @@ export default function HarvestPage() {
   };
 
   useEffect(() => {
-    if (profileId) void loadData(profileId);
-    else setLoading(false);
+    void loadData(profileId);
   }, [profileId]);
 
   const handleRecordHarvest = async (event: React.FormEvent) => {
@@ -122,6 +121,9 @@ export default function HarvestPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      <div className="rounded-2xl border border-emerald-900/70 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
+        <span className="font-semibold">Public harvest view:</span> Anyone can browse available AgriMark harvest and produce-lot information. Sign in only when you want to create your own farm harvest record.
+      </div>
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-100">{t('harvest')} & Produce Lots</h1>
@@ -202,11 +204,15 @@ export default function HarvestPage() {
           <div className="bg-[#121a16] border border-[#1e2d26] p-5 rounded-2xl shadow-md">
             <div className="flex items-center gap-2 mb-4"><PackageCheck className="w-5 h-5 text-amber-400" /><h2 className="text-lg font-bold text-gray-100">Harvest & Lot Details</h2></div>
 
-            {loading ? <div className="py-12 text-center text-gray-400">Loading your harvest records...</div> : harvestHistory.length === 0 ? (
+            {loading ? <div className="py-12 text-center text-gray-400">Loading AgriMark harvest records...</div> : harvestHistory.length === 0 ? (
               <div className="py-12 text-center border border-dashed border-[#294136] rounded-xl text-gray-400">
                 <ClipboardList className="w-8 h-8 mx-auto mb-3 text-gray-600" />
-                <p>No harvest lots found for this account yet.</p>
-                <a href="/farmer/farms" className="inline-flex mt-4 px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-semibold">Open My Farms</a>
+                <p>No public harvest lots are available yet.</p>
+                {profileId ? (
+                  <a href="/farmer/farms" className="inline-flex mt-4 px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-semibold">Open My Farms</a>
+                ) : (
+                  <a href="/auth/login" className="inline-flex mt-4 px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-semibold">Sign in to add a harvest</a>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
