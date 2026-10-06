@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { Listing } from '@/types';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import {
   Search, ShoppingCart, MapPin, PackageCheck, X, Minus, Plus,
   CheckCircle2, AlertCircle, SlidersHorizontal
@@ -89,7 +90,8 @@ export default function BuyerMarketPage() {
   const stockValue = items.reduce((sum, item) => sum + getQty(item) * getPrice(item), 0);
 
   return (
-    <div className="min-h-full space-y-5">
+    <ProtectedRoute allowedRoles={['buyer', 'admin']} requireAuth>
+      <div className="min-h-full space-y-5">
       <section className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -280,8 +282,9 @@ export default function BuyerMarketPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ProtectedRoute>
   );
 }
 
-// Production deployment baseline verified for buyer market.
+// Production buyer market requires an authenticated buyer or admin.
