@@ -18,6 +18,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requireAuth = false,
 }) => {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
   const router = useRouter();
   const pathname = usePathname();
 
@@ -26,7 +27,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     // Demo mode intentionally exposes the complete product surface without login.
     // Production deployments should set NEXT_PUBLIC_DEMO_MODE=false.
-    if (!isAuthenticated && requireAuth) {
+    if (!demoMode && !isAuthenticated && requireAuth) {
       router.replace('/auth/login');
       return;
     }
@@ -36,7 +37,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       return;
     }
 
-    if (allowedRoles && allowedRoles.length > 0 && isAuthenticated && user?.role) {
+    if (!demoMode && allowedRoles && allowedRoles.length > 0 && isAuthenticated && user?.role) {
       if (!allowedRoles.includes(user.role)) {
         const dashboardMap: Record<UserRole, string> = {
           farmer: '/farmer/dashboard',
@@ -60,9 +61,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  if (requireAuth && !isAuthenticated) return null;
+  if (!demoMode && requireAuth && !isAuthenticated) return null;
 
   if (
+    !demoMode &&
     allowedRoles &&
     allowedRoles.length > 0 &&
     isAuthenticated &&
