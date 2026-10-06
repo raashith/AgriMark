@@ -27,6 +27,7 @@ export const Sidebar: React.FC = () => {
     { label: 'Harvest & Lots', href: '/farmer/harvest', icon: Layers },
     { label: 'Produce Stock', href: '/farmer/produce', icon: ShoppingBag },
     { label: 'My Listings', href: '/farmer/sell', icon: ShoppingCart },
+    { label: 'Market', href: '/farmer/market', icon: PackageCheck },
     { label: 'Received Orders', href: '/farmer/orders', icon: CheckSquare },
     { label: 'Mandi Prices', href: '/market-prices', icon: TrendingUp },
     { label: 'Weather & Climate', href: '/weather', icon: CloudSun },
