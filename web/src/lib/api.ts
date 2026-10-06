@@ -48,6 +48,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}, explicitT
   };
 
   if (token) headers.Authorization = `Bearer ${token}`;
+  else if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') headers.Authorization = 'Bearer agrimark-demo-token';
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
