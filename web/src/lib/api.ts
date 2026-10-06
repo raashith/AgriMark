@@ -134,6 +134,16 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  getPublicHarvestBatches: () =>
+    request<Array<{
+      id: string;
+      cultivation_id: string;
+      harvest_date: string;
+      total_quantity_kg: number;
+      quality_grade: string;
+      trace_code: string;
+    }>>('/core/public/harvest-batches'),
+  getPublicProduceLots: () => request<ProduceLot[]>('/core/public/produce-lots'),
   getHarvestBatches: () =>
     request<Array<{
       id: string;
