@@ -8,6 +8,31 @@ import { api } from '@/lib/api';
 import { Farm, ProduceLot } from '@/types';
 
 type CropOption = { id: string; name: string; category?: string | null };
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+const DEMO_FARM: Farm = {
+  id: '10000000-0000-0000-0000-000000000001',
+  owner_id: '00000000-0000-0000-0000-000000000001',
+  name: 'Green Valley Farm',
+  village: 'Pallivasal',
+  district: 'Kallakurichi',
+  state: 'Tamil Nadu',
+  area_acres: 6.5,
+};
+const DEMO_CROPS: CropOption[] = [
+  { id: '1897d9a2-2c3b-4d3d-9b5e-f21ed78d0051', name: 'Maize', category: 'Cereal' },
+  { id: 'fba3b635-a794-446d-b22a-9ff2f64d12ee', name: 'Groundnut', category: 'Oilseed' },
+  { id: 'c923fb8b-5e2e-4cde-81f4-e1be8bcff588', name: 'Chilli', category: 'Spice' },
+];
+const DEMO_LOTS: ProduceLot[] = [
+  { id: '30000000-0000-0000-0000-000000000001', owner_id: DEMO_FARM.owner_id, cultivation_id: '20000000-0000-0000-0000-000000000001', crop_id: DEMO_CROPS[0].id, crop_name: 'Maize', quantity: 1250, unit: 'kg', quality_grade: 'Grade A', available_quantity: 980, status: 'available', harvested_at: '2026-09-25' } as ProduceLot,
+  { id: '30000000-0000-0000-0000-000000000002', owner_id: DEMO_FARM.owner_id, cultivation_id: '20000000-0000-0000-0000-000000000002', crop_id: DEMO_CROPS[1].id, crop_name: 'Groundnut', quantity: 860, unit: 'kg', quality_grade: 'Grade A', available_quantity: 620, status: 'available', harvested_at: '2026-09-30' } as ProduceLot,
+  { id: '30000000-0000-0000-0000-000000000003', owner_id: DEMO_FARM.owner_id, cultivation_id: '20000000-0000-0000-0000-000000000003', crop_id: DEMO_CROPS[2].id, crop_name: 'Chilli', quantity: 540, unit: 'kg', quality_grade: 'Export Quality', available_quantity: 410, status: 'available', harvested_at: '2026-10-02' } as ProduceLot,
+];
+const DEMO_HARVESTS = [
+  { id: '40000000-0000-0000-0000-000000000001', cultivation_id: '20000000-0000-0000-0000-000000000001', harvest_date: '2026-09-25', total_quantity_kg: 1250, quality_grade: 'Grade A', trace_code: 'AGR-HRV-260925-001' },
+  { id: '40000000-0000-0000-0000-000000000002', cultivation_id: '20000000-0000-0000-0000-000000000002', harvest_date: '2026-09-30', total_quantity_kg: 860, quality_grade: 'Grade A', trace_code: 'AGR-HRV-260930-002' },
+  { id: '40000000-0000-0000-0000-000000000003', cultivation_id: '20000000-0000-0000-0000-000000000003', harvest_date: '2026-10-02', total_quantity_kg: 540, quality_grade: 'Export Quality', trace_code: 'AGR-HRV-261002-003' },
+];
 
 export default function HarvestPage() {
   const { t } = useI18n();
@@ -37,15 +62,25 @@ export default function HarvestPage() {
         api.getPublicHarvestBatches(),
         api.getCrops(),
       ]);
-      setFarms(farmRes);
-      setLots(lotRes);
-      setHarvestHistory(harvestRes);
-      setCropOptions(cropRes.items || []);
+      setFarms(farmRes.length ? farmRes : (DEMO_MODE ? [DEMO_FARM] : []));
+      setLots(lotRes.length ? lotRes : (DEMO_MODE ? DEMO_LOTS : []));
+      setHarvestHistory(harvestRes.length ? harvestRes : (DEMO_MODE ? DEMO_HARVESTS : []));
+      setCropOptions(cropRes.items?.length ? cropRes.items : (DEMO_MODE ? DEMO_CROPS : []));
 
       if (!farmId && farmRes[0]?.id) setFarmId(farmRes[0].id);
       if (!cropId && cropRes.items?.[0]?.id) setCropId(cropRes.items[0].id);
     } catch (error) {
-      setErrorDetails(error instanceof Error ? error.message : 'Unable to load harvest data.');
+      if (DEMO_MODE) {
+        setFarms([DEMO_FARM]);
+        setLots(DEMO_LOTS);
+        setHarvestHistory(DEMO_HARVESTS);
+        setCropOptions(DEMO_CROPS);
+        setFarmId((current) => current || DEMO_FARM.id);
+        setCropId((current) => current || DEMO_CROPS[0].id);
+        setErrorDetails('');
+      } else {
+        setErrorDetails(error instanceof Error ? error.message : 'Unable to load harvest data.');
+      }
     } finally {
       setLoading(false);
     }
@@ -122,7 +157,10 @@ export default function HarvestPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="rounded-2xl border border-emerald-900/70 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
-        <span className="font-semibold">Public harvest view:</span> Anyone can browse available AgriMark harvest and produce-lot information. Sign in only when you want to create your own farm harvest record.
+        <span className="font-semibold">{DEMO_MODE ? 'AgriMark Demo Mode:' : 'Public harvest view:'}</span>{' '}
+        {DEMO_MODE
+          ? 'Presentation data is available immediately without login. You can browse farms, harvest batches, traceable lots, stock and quality details.'
+          : 'Anyone can browse available AgriMark harvest and produce-lot information. Sign in only when you want to create your own farm harvest record.'}
       </div>
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
@@ -190,7 +228,7 @@ export default function HarvestPage() {
               {submitting ? 'Saving harvest...' : farms.length === 0 ? 'Add a Farm to Continue' : 'Record Harvest & Generate Lot'}
             </button>
 
-            {!profileId && <p className="text-xs text-amber-300">Sign in to create a farm harvest record.</p>}
+            {!profileId && <p className="text-xs text-amber-300">Demo browsing is available without login. Sign in only when you want to save a real farmer record.</p>}
           </form>
         </div>
 
