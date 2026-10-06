@@ -23,6 +23,7 @@ type MarketRow = {
 export default function FarmerMarketPage() {
   const { user } = useAuth();
   const [listings, setListings] = useState<any[]>([]);
+  const [marketListings, setMarketListings] = useState<any[]>([]);
   const [lots, setLots] = useState<any[]>([]);
   const [marketRows, setMarketRows] = useState<MarketRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,8 +35,9 @@ export default function FarmerMarketPage() {
 
     async function load() {
       setLoading(true);
-      const [myListings, myLots] = await Promise.all([
+      const [myListings, marketListingsData, myLots] = await Promise.all([
         dataService.getListings({ sellerId: userId }),
+        dataService.getListings(),
         dataService.getProduceLots(userId),
       ]);
 
@@ -48,6 +50,7 @@ export default function FarmerMarketPage() {
 
       if (!mounted) return;
       setListings(myListings || []);
+      setMarketListings(marketListingsData || []);
       setLots(myLots || []);
       setMarketRows((data || []) as MarketRow[]);
       setLoading(false);
@@ -209,6 +212,35 @@ export default function FarmerMarketPage() {
             <Link href="/farmer/sell" className="mt-5 flex items-center justify-between rounded-xl border border-amber-800/50 bg-amber-950/10 px-4 py-3 text-sm font-bold text-amber-100 hover:bg-amber-950/30">
               Create a listing <ChevronRight className="h-4 w-4" />
             </Link>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-emerald-900/50 bg-[#0b1712] p-5 md:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-400">Live marketplace</p>
+              <h2 className="mt-1 text-xl font-bold text-white">Demo market stock</h2>
+              <p className="mt-1 text-sm text-gray-400">Real active listings loaded from AgriMark inventory for end-to-end testing.</p>
+            </div>
+            <span className="rounded-full border border-emerald-800 bg-emerald-950/50 px-3 py-1 text-[10px] font-bold uppercase text-emerald-300">{marketListings.length} active</span>
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {marketListings.slice(0, 6).map((listing) => (
+              <div key={listing.id} className="rounded-2xl border border-white/10 bg-black/20 p-4 hover:border-emerald-700/60">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-bold text-white">{listing.title || 'Produce listing'}</p>
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                </div>
+                <p className="mt-2 text-2xl font-black text-emerald-300">₹{Number(listing.price_per_kg || listing.price_per_unit || 0).toLocaleString('en-IN')}<span className="text-xs font-medium text-gray-500"> / kg</span></p>
+                <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                  <span>{listing.quality_grade || 'Grade A'}</span>
+                  <span>{Number(listing.min_order_quantity || 50).toLocaleString('en-IN')} kg min</span>
+                </div>
+              </div>
+            ))}
+            {!loading && marketListings.length === 0 && (
+              <div className="sm:col-span-2 lg:col-span-3 rounded-2xl border border-dashed border-white/10 p-7 text-center text-sm text-gray-400">No active marketplace stock is available.</div>
+            )}
           </div>
         </section>
 
