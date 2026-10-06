@@ -219,8 +219,8 @@ export default function FarmerMarketPage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-400">Live marketplace</p>
-              <h2 className="mt-1 text-xl font-bold text-white">Demo market stock</h2>
-              <p className="mt-1 text-sm text-gray-400">Real active listings loaded from AgriMark inventory for end-to-end testing.</p>
+              <h2 className="mt-1 text-xl font-bold text-white">Marketplace stock</h2>
+              <p className="mt-1 text-sm text-gray-400">Real active listings currently available on the AgriMark marketplace.</p>
             </div>
             <span className="rounded-full border border-emerald-800 bg-emerald-950/50 px-3 py-1 text-[10px] font-bold uppercase text-emerald-300">{marketListings.length} active</span>
           </div>
