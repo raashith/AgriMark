@@ -1,9 +1,12 @@
 import './globals.css';
 import './agrimark-3d-landing.css';
 import React from 'react';
+import { Viewport } from 'next';
 import { I18nProvider } from '@/lib/i18n';
 import { AuthProvider } from '@/lib/auth';
 import { AppShell } from '@/components/layout/AppShell';
+
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover' };
 
 export const metadata = {
   title: 'AgriMark — Agricultural Intelligence',
