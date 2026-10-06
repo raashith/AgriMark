@@ -64,7 +64,7 @@ export default function OnboardingPage() {
 
       const redirectMap: Record<string, string> = {
         farmer: '/farmer/dashboard',
-        buyer: '/buyer/marketplace',
+        buyer: '/buyer/dashboard',
         fpo: '/fpo/dashboard',
         logistics: '/logistics/deliveries',
         service_provider: '/farmer/dashboard',
