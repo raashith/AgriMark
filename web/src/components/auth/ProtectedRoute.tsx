@@ -41,7 +41,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       if (!allowedRoles.includes(user.role)) {
         const dashboardMap: Record<UserRole, string> = {
           farmer: '/farmer/dashboard',
-          buyer: '/buyer/marketplace',
+          buyer: '/buyer/dashboard',
           fpo: '/fpo/dashboard',
           logistics: '/logistics/deliveries',
           service_provider: '/farmer/dashboard',
