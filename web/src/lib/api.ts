@@ -36,6 +36,59 @@ async function parseResponseBody(response: Response): Promise<any> {
   };
 }
 
+const RETRYABLE_STATUS_CODES = new Set([502, 503, 504]);
+const MAX_GET_RETRIES = 2;
+const REQUEST_TIMEOUT_MS = 15000;
+
+function isRetryableMethod(method: string): boolean {
+  return method === 'GET' || method === 'HEAD' || method === 'OPTIONS';
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
+async function fetchWithResilience(
+  url: string,
+  options: RequestInit,
+): Promise<Response> {
+  const method = (options.method || 'GET').toUpperCase();
+  const canRetry = isRetryableMethod(method);
+  const attempts = canRetry ? MAX_GET_RETRIES + 1 : 1;
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+
+      if (!canRetry || !RETRYABLE_STATUS_CODES.has(response.status) || attempt === attempts - 1) {
+        return response;
+      }
+
+      // Give a waking/cold backend a little time before retrying.
+      await new Promise((resolve) => window.setTimeout(resolve, 500 * 2 ** attempt));
+    } catch (error) {
+      lastError = error;
+
+      if (!canRetry || attempt === attempts - 1 || isAbortError(error)) {
+        throw error;
+      }
+
+      await new Promise((resolve) => window.setTimeout(resolve, 500 * 2 ** attempt));
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Request failed');
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}, explicitToken?: string | null): Promise<T> {
   const token = explicitToken !== undefined
     ? explicitToken
@@ -51,7 +104,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}, explicitT
   else if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') headers.Authorization = 'Bearer agrimark-demo-token';
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+    const response = await fetchWithResilience(`${API_BASE_URL}${endpoint}`, { ...options, headers });
     const data = await parseResponseBody(response);
 
     if (!response.ok) {
