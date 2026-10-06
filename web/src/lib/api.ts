@@ -45,7 +45,7 @@ function isRetryableMethod(method: string): boolean {
 }
 
 function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === 'AbortError';
+  return error instanceof Error && error.name === 'AbortError';
 }
 
 async function fetchWithResilience(
@@ -59,7 +59,7 @@ async function fetchWithResilience(
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     try {
       const response = await fetch(url, {
@@ -72,7 +72,7 @@ async function fetchWithResilience(
       }
 
       // Give a waking/cold backend a little time before retrying.
-      await new Promise((resolve) => window.setTimeout(resolve, 500 * 2 ** attempt));
+      await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt));
     } catch (error) {
       lastError = error;
 
@@ -82,7 +82,7 @@ async function fetchWithResilience(
 
       await new Promise((resolve) => window.setTimeout(resolve, 500 * 2 ** attempt));
     } finally {
-      window.clearTimeout(timeout);
+      clearTimeout(timeout);
     }
   }
 
