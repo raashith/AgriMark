@@ -44,6 +44,9 @@ export function getSupabaseClient() {
           autoRefreshToken: typeof window !== 'undefined',
           persistSession: typeof window !== 'undefined',
         },
+        global: process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+          ? { headers: { 'x-agrimark-demo-token': 'agrimark-demo-token' } }
+          : undefined,
       },
     );
   }
