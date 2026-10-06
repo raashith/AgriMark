@@ -121,6 +121,15 @@ def _authenticate_supabase(token: str) -> AuthenticatedUser:
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
 ) -> AuthenticatedUser:
+    settings = get_settings()
+    if settings.demo_mode and credentials and credentials.scheme.lower() == "bearer" and credentials.credentials == "agrimark-demo-token":
+        return AuthenticatedUser(
+            id=UUID("00000000-0000-0000-0000-000000000001"),
+            role="farmer",
+            email="demo@agrimark.local",
+            phone="+919000000000",
+        )
+
     if not credentials or credentials.scheme.lower() != "bearer":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
