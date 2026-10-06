@@ -28,14 +28,15 @@ export default function FarmerMarketPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.id) return;
+    const userId = user?.id;
+    if (!userId) return;
     let mounted = true;
 
     async function load() {
       setLoading(true);
       const [myListings, myLots] = await Promise.all([
-        dataService.getListings({ sellerId: user.id }),
-        dataService.getProduceLots(user.id),
+        dataService.getListings({ sellerId: userId }),
+        dataService.getProduceLots(userId),
       ]);
 
       const { data } = await supabase
