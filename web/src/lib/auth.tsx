@@ -23,6 +23,15 @@ interface AuthContextType {
   role: UserRole | null;
 }
 
+
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+const DEMO_USER: UserProfile = {
+  id: '00000000-0000-0000-0000-000000000001',
+  full_name: 'AgriMark Demo Farmer',
+  phone: '+91 90000 00000',
+  role: 'farmer',
+};
+
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
@@ -40,8 +49,8 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<UserProfile | null>(DEMO_MODE ? DEMO_USER : null);
+  const [isLoading, setIsLoading] = useState(!DEMO_MODE);
 
   const clearLocalAuth = () => {
     if (typeof window === 'undefined') return;
@@ -64,6 +73,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    if (DEMO_MODE) {
+      setUser(DEMO_USER);
+      setIsLoading(false);
+      return;
+    }
     let unsubscribe = () => {};
     try {
       if (!isFirebaseConfigured()) {
@@ -198,6 +212,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user?.id]);
 
   const logout = async () => {
+    if (DEMO_MODE) {
+      setUser(DEMO_USER);
+      return;
+    }
     await signOut(getFirebaseAuth()).catch(() => {});
     clearLocalAuth();
     setUser(null);
