@@ -4,21 +4,22 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { LayoutDashboard, ShoppingCart, TrendingUp, Bot, Menu, Store, Map } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, TrendingUp, Bot, Menu, Store, Map, PackageCheck } from 'lucide-react';
 
 export const MobileNav: React.FC<{ onOpenMobileMenu?: () => void }> = ({ onOpenMobileMenu }) => {
   const pathname = usePathname();
   const { role } = useAuth();
 
-  const mainDashboard = role === 'buyer' ? '/buyer/market' : role === 'admin' ? '/admin/dashboard' : '/farmer/dashboard';
+  const mainDashboard = role === 'buyer' ? '/buyer/dashboard' : role === 'admin' ? '/admin/dashboard' : '/farmer/dashboard';
 
   const isBuyer = role === 'buyer';
   const navItems = isBuyer
     ? [
         { label: 'Home', href: mainDashboard, icon: LayoutDashboard },
+        { label: 'Prices', href: '/market-prices', icon: TrendingUp },
         { label: 'Market', href: '/buyer/market', icon: Store },
         { label: 'Orders', href: '/buyer/orders', icon: ShoppingCart },
-        { label: 'Prices', href: '/market-prices', icon: TrendingUp },
+        { label: 'Listed', href: '/buyer/listed', icon: PackageCheck },
         { label: 'AgriAI', href: '/ai-assistant', icon: Bot },
       ]
     : [
