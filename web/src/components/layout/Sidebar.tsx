@@ -40,17 +40,12 @@ export const Sidebar: React.FC = () => {
   ];
 
   const buyerNav = [
+    { label: 'Home', href: '/buyer/dashboard', icon: LayoutDashboard },
+    { label: 'Mandi Prices', href: '/market-prices', icon: TrendingUp },
     { label: 'Market', href: '/buyer/market', icon: PackageCheck },
-    { label: 'Procurement Dashboard', href: '/buyer/marketplace', icon: LayoutDashboard },
-    { label: 'Browse Produce', href: '/marketplace', icon: ShoppingCart },
-    { label: 'RFQs & Demands', href: '/buyer/rfqs', icon: FileText },
-    { label: 'Offers Received', href: '/buyer/offers', icon: Layers },
-    { label: 'My Orders', href: '/buyer/orders', icon: ShoppingBag },
-    { label: 'Verified Suppliers', href: '/farmers', icon: Users },
-    { label: 'Market Prices', href: '/market-prices', icon: TrendingUp },
-    { label: 'Logistics', href: '/logistics', icon: Truck },
-    { label: 'Cold Storage', href: '/storage', icon: Building2 },
-    { label: 'AgriAI Assistant', href: '/ai-assistant', icon: Bot },
+    { label: 'Orders', href: '/buyer/orders', icon: ShoppingBag },
+    { label: 'Listed', href: '/buyer/listed', icon: Layers },
+    { label: 'AgriAI', href: '/ai-assistant', icon: Bot },
   ];
 
   const logisticsNav = [
