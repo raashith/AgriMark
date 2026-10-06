@@ -7,7 +7,7 @@ export const SUPABASE_GOOGLE_CALLBACK = `https://${SUPABASE_EXPECTED_HOST}/auth/
 export function getRoleDashboard(role?: string | null): string {
   switch (role) {
     case 'buyer':
-      return '/buyer/marketplace';
+      return '/buyer/dashboard';
     case 'admin':
       return '/admin/dashboard';
     case 'fpo':
