@@ -126,6 +126,51 @@ def list_cultivations(
     return [CultivationResponse(**{key: value for key, value in row.items() if key != "farms"}) for row in rows]
 
 
+@router.get("/public/harvest-batches")
+def list_public_harvest_batches() -> list[dict]:
+    """Read-only public harvest data. Never exposes farm ownership details."""
+    result = (
+        get_supabase()
+        .table("harvest_batches")
+        .select("id,cultivation_id,harvested_at,quantity,unit,grade,trace_code")
+        .order("harvested_at", desc=True)
+        .limit(200)
+        .execute()
+    )
+    return [
+        {
+            "id": row["id"],
+            "cultivation_id": row["cultivation_id"],
+            "harvest_date": str(row["harvested_at"])[:10],
+            "total_quantity_kg": row["quantity"],
+            "quality_grade": row["grade"],
+            "trace_code": row["trace_code"],
+        }
+        for row in (result.data or [])
+    ]
+
+
+@router.get("/public/produce-lots")
+def list_public_produce_lots() -> list[dict]:
+    """Read-only public stock data. Farm owner IDs are intentionally excluded."""
+    result = (
+        get_supabase()
+        .table("produce_lots")
+        .select("id,cultivation_id,crop_id,quantity,unit,quality_grade,available_quantity,harvested_at,status,is_listed,crops(name)")
+        .order("created_at", desc=True)
+        .limit(200)
+        .execute()
+    )
+    items = []
+    for row in (result.data or []):
+        crop = row.get("crops")
+        item = dict(row)
+        item.pop("crops", None)
+        item["crop_name"] = crop.get("name") if isinstance(crop, dict) else None
+        items.append(item)
+    return items
+
+
 @router.get("/harvest-batches", response_model=list[HarvestBatchResponse])
 def list_harvest_batches(
     user: AuthenticatedUser = Depends(get_current_user),
