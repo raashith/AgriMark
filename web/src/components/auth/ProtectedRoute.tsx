@@ -24,8 +24,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   useEffect(() => {
     if (isLoading) return;
 
-    // Guest access is the default. Auth is only required when a route
-    // explicitly opts in with requireAuth or role restrictions.
+    // Demo mode intentionally exposes the complete product surface without login.
+    // Production deployments should set NEXT_PUBLIC_DEMO_MODE=false.
     if (!isAuthenticated && requireAuth) {
       router.replace('/auth/login');
       return;
