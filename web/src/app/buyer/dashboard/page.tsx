@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { ArrowRight, Bot, PackageCheck, ShoppingBag, TrendingUp, Truck } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 export default function BuyerDashboardPage() {
   const { user } = useAuth();
@@ -29,6 +30,7 @@ export default function BuyerDashboardPage() {
   ];
 
   return (
+    <ProtectedRoute allowedRoles={['buyer', 'admin']} requireAuth>
     <div className="space-y-6">
       <section className="relative overflow-hidden rounded-3xl border border-[#214235] bg-gradient-to-br from-[#10251b] via-[#0d1712] to-[#09100c] p-6 md:p-8">
         <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-emerald-500/10 blur-3xl" />
@@ -55,5 +57,6 @@ export default function BuyerDashboardPage() {
         </div>
       </section>
     </div>
+    </ProtectedRoute>
   );
 }
