@@ -38,14 +38,14 @@ export const Navbar: React.FC = () => {
 
   return (
     <>
-      <nav className="bg-[#121a16] border-b border-[#1e2d26] sticky top-0 z-40 px-4 py-2.5">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+      <nav className="bg-[#121a16] border-b border-[#1e2d26] sticky top-0 z-40 px-2.5 sm:px-4 py-2.5">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-4 min-w-0">
           {/* Brand Logo */}
-          <Link href="/" className="flex items-center gap-2 font-black text-xl text-emerald-400 shrink-0 tracking-tight">
+          <Link href="/" className="flex items-center gap-1.5 sm:gap-2 font-black text-lg sm:text-xl text-emerald-400 shrink-0 tracking-tight">
             <div className="p-1.5 bg-emerald-950 border border-emerald-800/60 rounded-xl">
               <Sprout className="w-6 h-6 text-emerald-400" />
             </div>
-            <span>AgriMark</span>
+            <span className="hidden xs:inline sm:inline">AgriMark</span>
           </Link>
 
           {/* Quick Search / Command Launcher */}
@@ -72,7 +72,7 @@ export const Navbar: React.FC = () => {
                 setIsNotifOpen(false);
                 setIsProfileOpen(false);
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0a0f0d] border border-[#1e2d26] hover:border-emerald-800 rounded-xl text-xs font-semibold text-gray-200 transition shrink-0 max-w-[170px] sm:max-w-[220px]"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-[#0a0f0d] border border-[#1e2d26] hover:border-emerald-800 rounded-xl text-xs font-semibold text-gray-200 transition shrink-0 max-w-[220px]"
               title="Change Delivery Location"
             >
               <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -104,7 +104,7 @@ export const Navbar: React.FC = () => {
                   setIsNotifOpen(false);
                   setIsProfileOpen(false);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0a0f0d] border border-[#1e2d26] hover:border-emerald-800 rounded-xl text-xs font-mono font-bold text-emerald-300 transition"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-[#0a0f0d] border border-[#1e2d26] hover:border-emerald-800 rounded-xl text-xs font-mono font-bold text-emerald-300 transition"
                 title="Select Platform Language"
               >
                 <Globe className="w-3.5 h-3.5 text-emerald-400" />
