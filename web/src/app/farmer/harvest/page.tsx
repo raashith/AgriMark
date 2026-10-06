@@ -263,7 +263,7 @@ export default function HarvestPage() {
               {submitting ? 'Saving harvest...' : farms.length === 0 ? 'Add a Farm to Continue' : 'Record Harvest & Generate Lot'}
             </button>
 
-            {!profileId && <p className="text-xs text-amber-300">Demo browsing is available without login. Sign in only when you want to save a real farmer record.</p>}
+            
           </form>
         </div>
 
