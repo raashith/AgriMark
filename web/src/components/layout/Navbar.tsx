@@ -212,7 +212,7 @@ export const Navbar: React.FC = () => {
                       <button
                         onClick={() => {
                           setIsProfileOpen(false);
-                          router.push(role === 'buyer' ? '/buyer/market' : role === 'admin' ? '/admin/dashboard' : '/farmer/dashboard');
+                          router.push(role === 'buyer' ? '/buyer/dashboard' : role === 'admin' ? '/admin/dashboard' : '/farmer/dashboard');
                         }}
                         className="w-full text-left px-3 py-2 text-xs font-semibold text-gray-300 hover:text-white hover:bg-[#18241f] rounded-xl transition flex items-center gap-2"
                       >
