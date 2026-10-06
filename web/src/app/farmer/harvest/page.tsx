@@ -111,6 +111,41 @@ export default function HarvestPage() {
     setMessage('');
     setErrorDetails('');
 
+    if (DEMO_MODE) {
+      const demoHarvestId = `demo-${Date.now()}`;
+      const demoCultivationId = `demo-cult-${Date.now()}`;
+      const demoLotId = `demo-lot-${Date.now()}`;
+      const demoCrop = cropOptions.find((crop) => crop.id === cropId) || DEMO_CROPS[0];
+      const newHarvest = {
+        id: demoHarvestId,
+        cultivation_id: demoCultivationId,
+        harvest_date: harvestDate,
+        total_quantity_kg: quantity,
+        quality_grade: qualityGrade,
+        trace_code: `AGR-DEMO-${harvestDate.replaceAll('-', '')}-${Date.now().toString().slice(-4)}`,
+      };
+      const newLot = {
+        id: demoLotId,
+        owner_id: DEMO_FARM.owner_id,
+        cultivation_id: demoCultivationId,
+        crop_id: demoCrop.id,
+        crop_name: demoCrop.name,
+        quantity,
+        unit: 'kg',
+        quality_grade: qualityGrade,
+        available_quantity: quantity,
+        status: 'available',
+        harvested_at: harvestDate,
+      } as ProduceLot;
+      setHarvestHistory((current) => [newHarvest, ...current]);
+      setLots((current) => [newLot, ...current]);
+      setFarms((current) => current.length ? current : [DEMO_FARM]);
+      setMessage('Demo harvest recorded successfully. A traceable demo lot was generated for this presentation session.');
+      setQuantityKg('');
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const cultivation = await api.createCultivation({
         farm_id: farmId,
