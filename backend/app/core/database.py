@@ -26,3 +26,18 @@ def get_supabase() -> Client:
         raise RuntimeError("Supabase service role key is required for server-side operations")
 
     return create_client(settings.supabase_url, key)
+
+
+@lru_cache
+def get_supabase_public() -> Client:
+    """Least-privilege client for endpoints explicitly documented as public.
+
+    Public routes must never fall back to the privileged server key. They use the
+    Supabase publishable key and therefore remain constrained by anon RLS.
+    """
+    settings = get_settings()
+    key = settings.supabase_publishable_key
+    if not key:
+        raise RuntimeError("Supabase publishable key is required for public operations")
+
+    return create_client(settings.supabase_url, key)
