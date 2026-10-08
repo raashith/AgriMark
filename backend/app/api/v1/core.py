@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ...core.auth import AuthenticatedUser, get_current_user
-from ...core.database import get_supabase
+from ...core.database import get_supabase, get_supabase_public
 from ...schemas.domain import (
     CropCatalogResponse,
     CropResponse,
@@ -38,7 +38,7 @@ def _owned_profile(user: AuthenticatedUser, profile_id: UUID) -> None:
 
 @router.get("/crops", response_model=CropCatalogResponse)
 def list_crops(search: str | None = Query(default=None, max_length=100)) -> CropCatalogResponse:
-    query = get_supabase().table("crops").select("id,name,category").order("name")
+    query = get_supabase_public().table("crops").select("id,name,category").order("name")
     if search:
         query = query.ilike("name", f"%{search}%")
     result = query.execute()
@@ -130,7 +130,7 @@ def list_cultivations(
 def list_public_harvest_batches() -> list[dict]:
     """Read-only public harvest data. Never exposes farm ownership details."""
     result = (
-        get_supabase()
+        get_supabase_public()
         .table("harvest_batches")
         .select("id,cultivation_id,harvested_at,quantity,unit,grade,trace_code")
         .order("harvested_at", desc=True)
@@ -154,7 +154,7 @@ def list_public_harvest_batches() -> list[dict]:
 def list_public_produce_lots() -> list[dict]:
     """Read-only public stock data. Farm owner IDs are intentionally excluded."""
     result = (
-        get_supabase()
+        get_supabase_public()
         .table("produce_lots")
         .select("id,cultivation_id,crop_id,quantity,unit,quality_grade,available_quantity,harvested_at,status,is_listed,crops(name)")
         .order("created_at", desc=True)
@@ -319,13 +319,13 @@ def create_listing(
 
 @router.get("/listings", response_model=list[ListingResponse])
 def list_listings(status: str = Query(default="active", max_length=30)) -> list[ListingResponse]:
-    result = get_supabase().table("listings").select("*").eq("status", status).order("created_at", desc=True).execute()
+    result = get_supabase_public().table("listings").select("*").eq("status", status).order("created_at", desc=True).execute()
     items = []
     for row in (result.data or []):
         item = dict(row)
         if item.get("lot_id"):
             try:
-                lot_res = get_supabase().table("produce_lots").select("*,crops(name)").eq("id", item["lot_id"]).limit(1).execute()
+                lot_res = get_supabase_public().table("produce_lots").select("*,crops(name)").eq("id", item["lot_id"]).limit(1).execute()
                 if lot_res.data:
                     lot_row = lot_res.data[0]
                     crop = lot_row.get("crops")
