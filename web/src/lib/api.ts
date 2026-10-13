@@ -122,10 +122,30 @@ async function request<T>(endpoint: string, options: RequestInit = {}, explicitT
     return data as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
+
+    // Fetch TypeError is the browser's standard signal for a request that
+    // produced no readable HTTP response (network/DNS/TLS/CORS/connectivity).
+    if (error instanceof TypeError) {
+      throw new ApiError(
+        'Unable to reach AgriMark services. Please check your connection and try again.',
+        0,
+        error.message,
+      );
+    }
+
+    // A timeout is not the same as an invalid credential or an HTTP server error.
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiError(
+        'AgriMark services took too long to respond. Please try again.',
+        0,
+        error.message,
+      );
+    }
+
     throw new ApiError(
-      'Unable to reach AgriMark services. Please check your connection and try again.',
+      'The request could not be completed. Please try again.',
       0,
-      (error as Error).message
+      error instanceof Error ? error.message : 'Unknown client error',
     );
   }
 }
