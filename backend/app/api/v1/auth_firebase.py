@@ -71,9 +71,13 @@ def sync_firebase_profile(request: FirebaseSyncRequest):
             .execute()
         )
     except Exception as exc:
+        # A Supabase 401 here is a server credential/configuration failure,
+        # not a user login failure. Log the detail for operators but never
+        # expose keys, tokens, or internal exception data to the client.
         logger.exception(
-            "Firebase profile sync failed: %s (%s)",
-            str(exc),
+            "Firebase profile sync failed; check SUPABASE_URL and the "
+            "server-only SUPABASE_SERVICE_ROLE_KEY belongs to the same project "
+            "(exception=%s)",
             type(exc).__name__,
         )
         # Do not expose database credentials or internal stack details to the browser.
