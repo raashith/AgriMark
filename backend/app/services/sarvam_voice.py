@@ -1,6 +1,8 @@
 import base64
-import os
 import logging
+import time
+import uuid
+from functools import lru_cache
 from typing import Optional, Tuple
 
 from sarvamai import SarvamAI
@@ -13,14 +15,32 @@ SUPPORTED_TTS_LANGUAGES = {
     "od-IN", "pa-IN", "ta-IN", "te-IN", "en-IN", "gu-IN",
 }
 
+# Hard limits passed to Sarvam API
+STT_TIMEOUT_SECONDS = 30
+TTS_TIMEOUT_SECONDS = 20
+# TTS: Bulbul v3 has a max text length per call
+TTS_MAX_CHARS = 500
+
+
+@lru_cache(maxsize=1)
+def _get_sarvam_client() -> Optional[SarvamAI]:
+    """Singleton SarvamAI client — constructed once per process."""
+    import os
+    settings = get_settings()
+    api_key = os.getenv("SARVAM_API_KEY") or getattr(settings, "sarvam_api_key", None)
+    if not api_key or not api_key.strip():
+        logger.warning("SARVAM_API_KEY is not configured — voice features are unavailable.")
+        return None
+    return SarvamAI(api_subscription_key=api_key.strip())
+
+
 class SarvamVoiceService:
     def __init__(self, api_key: Optional[str] = None) -> None:
-        settings = get_settings()
-        self._api_key = api_key or os.getenv("SARVAM_API_KEY") or getattr(settings, "sarvam_api_key", None)
-        if not self._api_key or not self._api_key.strip():
-            self._client = None
+        if api_key:
+            # Allow override for testing; do NOT cache this instance
+            self._client = SarvamAI(api_subscription_key=api_key.strip()) if api_key.strip() else None
         else:
-            self._client = SarvamAI(api_subscription_key=self._api_key.strip())
+            self._client = _get_sarvam_client()
 
     @property
     def configured(self) -> bool:
@@ -31,16 +51,20 @@ class SarvamVoiceService:
         audio_bytes: bytes,
         filename: str = "recording.webm",
         language_code: str = "unknown",
+        request_id: Optional[str] = None,
     ) -> Tuple[str, str]:
         """
-        Speech-to-Text using Sarvam Saaras v3 model.
+        Speech-to-Text via Sarvam Saaras v3.
         Returns (transcript_text, detected_language_code).
+        Raises RuntimeError on provider failure, ValueError on empty transcript.
         """
         if not self._client:
             raise RuntimeError("SARVAM_API_KEY is not configured on the backend server.")
 
-        lang = language_code if language_code and language_code != "auto" else "unknown"
+        rid = request_id or str(uuid.uuid4())[:8]
+        lang = language_code if language_code and language_code not in ("auto", "unknown") else "unknown"
 
+        t0 = time.monotonic()
         try:
             response = self._client.speech_to_text.transcribe(
                 file=(filename, audio_bytes),
@@ -49,21 +73,37 @@ class SarvamVoiceService:
                 language_code=lang,
             )
         except Exception as exc:
-            logger.error(f"Sarvam STT failed: {exc}")
+            elapsed = (time.monotonic() - t0) * 1000
+            logger.error("[%s] Sarvam STT failed after %.0fms: %s", rid, elapsed, exc)
             raise RuntimeError(f"Sarvam Speech-to-Text service error: {exc}") from exc
 
-        transcript = getattr(response, "transcript", "") or ""
-        detected_lang = getattr(response, "language_code", None) or lang
-        
-        if not transcript.strip():
-            raise ValueError("No speech could be recognized in the provided audio recording.")
+        elapsed = (time.monotonic() - t0) * 1000
+        transcript = (getattr(response, "transcript", "") or "").strip()
+        detected_lang = getattr(response, "language_code", None) or lang or "en-IN"
 
-        return transcript.strip(), detected_lang
+        logger.info(
+            "[%s] Sarvam STT success: lang=%s detected=%s chars=%d latency=%.0fms",
+            rid, lang, detected_lang, len(transcript), elapsed,
+        )
 
-    def synthesize(self, text: str, language_code: Optional[str] = None) -> bytes:
+        if not transcript:
+            raise ValueError(
+                "No speech could be recognized in the provided audio recording. "
+                "Please speak clearly and ensure microphone access is granted."
+            )
+
+        return transcript, detected_lang
+
+    def synthesize(
+        self,
+        text: str,
+        language_code: Optional[str] = None,
+        request_id: Optional[str] = None,
+    ) -> bytes:
         """
-        Text-to-Speech using Sarvam Bulbul v3 model.
-        Returns WAV audio bytes.
+        Text-to-Speech via Sarvam Bulbul v3.
+        Returns raw WAV bytes.
+        Raises RuntimeError on provider failure.
         """
         if not self._client:
             raise RuntimeError("SARVAM_API_KEY is not configured on the backend server.")
@@ -71,36 +111,62 @@ class SarvamVoiceService:
         if not text or not text.strip():
             raise ValueError("Cannot synthesize empty text response.")
 
-        # Fallback safely to en-IN if language is missing, unknown, or unsupported by Bulbul TTS
+        rid = request_id or str(uuid.uuid4())[:8]
+
+        # Fallback to en-IN if language is missing, unknown, or unsupported
         target_lang = language_code if language_code in SUPPORTED_TTS_LANGUAGES else "en-IN"
 
+        # Truncate to TTS limit to avoid API 400 errors on long responses
+        tts_text = text.strip()[:TTS_MAX_CHARS]
+        if len(text.strip()) > TTS_MAX_CHARS:
+            logger.info(
+                "[%s] TTS text truncated from %d to %d chars.",
+                rid, len(text.strip()), TTS_MAX_CHARS,
+            )
+
+        t0 = time.monotonic()
         try:
             response = self._client.text_to_speech.convert(
-                text=text.strip(),
+                text=tts_text,
                 model="bulbul:v3",
                 language_code=target_lang,
             )
         except Exception as exc:
-            logger.error(f"Sarvam TTS failed for language {target_lang}: {exc}")
-            # Try fallback to en-IN if primary language conversion failed
+            elapsed = (time.monotonic() - t0) * 1000
+            logger.error(
+                "[%s] Sarvam TTS failed for lang=%s after %.0fms: %s",
+                rid, target_lang, elapsed, exc,
+            )
+            # Try en-IN fallback if primary language failed
             if target_lang != "en-IN":
                 try:
+                    t1 = time.monotonic()
                     response = self._client.text_to_speech.convert(
-                        text=text.strip(),
+                        text=tts_text,
                         model="bulbul:v3",
                         language_code="en-IN",
                     )
+                    elapsed2 = (time.monotonic() - t1) * 1000
+                    logger.info(
+                        "[%s] Sarvam TTS en-IN fallback success: %.0fms", rid, elapsed2,
+                    )
                 except Exception as fallback_exc:
-                    raise RuntimeError(f"Sarvam Text-to-Speech service error: {fallback_exc}") from fallback_exc
+                    raise RuntimeError(
+                        f"Sarvam Text-to-Speech service error (primary and fallback): {fallback_exc}"
+                    ) from fallback_exc
             else:
                 raise RuntimeError(f"Sarvam Text-to-Speech service error: {exc}") from exc
+        else:
+            elapsed = (time.monotonic() - t0) * 1000
+            logger.info(
+                "[%s] Sarvam TTS success: lang=%s latency=%.0fms", rid, target_lang, elapsed,
+            )
 
         audios = getattr(response, "audios", [])
         if not audios or not audios[0]:
             raise RuntimeError("Sarvam TTS returned an empty audio payload.")
 
         try:
-            audio_bytes = base64.b64decode(audios[0])
-            return audio_bytes
+            return base64.b64decode(audios[0])
         except Exception as exc:
             raise RuntimeError("Failed to decode Sarvam TTS audio payload.") from exc

@@ -201,9 +201,9 @@ export const api = {
     }),
 
   getMarketPrices: () => request<MarketPriceObservation[]>('/marketplace/prices'),
-  askAgriAI: (message: string, context?: string) =>
-    request<{ answer: string; model: string; status: string }>('/ai/chat', {
+  askAgriAI: (message: string, context?: string, language?: string) =>
+    request<{ answer: string; model: string; status: string; request_id: string; latency_ms: number }>('/ai/chat', {
       method: 'POST',
-      body: JSON.stringify({ message, context }),
+      body: JSON.stringify({ message, context, language }),
     }),
 };

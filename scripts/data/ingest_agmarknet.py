@@ -227,10 +227,14 @@ def fetch_agmarknet_data(
                     payload = json.loads(resp.read().decode("utf-8"))
                     records = payload.get("records", [])
                     total = payload.get("total", len(records))
-                    logger.info(f"Successfully retrieved {len(records)} records from OGD API (total available: {total})")
-                    return records, total
+                    if records:
+                        logger.info(f"Successfully retrieved {len(records)} records from OGD API (total available: {total})")
+                        return records, total
+                    else:
+                        logger.warning("OGD API returned 0 records for the requested date range. Falling back to seed dataset.")
         except Exception as e:
             logger.warning(f"OGD API fetch failed: {e}. Falling back to baseline AGMARKNET dataset generator.")
+
 
     # High-fidelity baseline seed generator for historical coverage
     logger.info("Generating canonical AGMARKNET historical observation dataset...")

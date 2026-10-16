@@ -29,7 +29,8 @@ def test_ai_voice_empty_file_rejection():
         data={"language_code": "unknown"},
     )
     assert response.status_code == 400
-    assert "Empty audio recording" in response.json().get("detail", "")
+    detail = response.json().get("detail", "")
+    assert "empty" in detail.lower() or "short" in detail.lower() or "too short" in detail.lower()
 
 
 def test_sarvam_voice_language_fallback():

@@ -50,6 +50,7 @@ export default function AiAssistantPage() {
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const audioUrlsRef = useRef<string[]>([]);
 
   const presets = [
     'What crop should I plant this Samba season in Thanjavur?',
@@ -66,6 +67,9 @@ export default function AiAssistantPage() {
   useEffect(() => {
     return () => {
       stopRecordingCleanup();
+      // Revoke all audio Object URLs to free browser memory
+      audioUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      audioUrlsRef.current = [];
     };
   }, []);
 
@@ -194,13 +198,17 @@ export default function AiAssistantPage() {
         throw new Error(errorDetail);
       }
 
-      const rawTranscript = decodeHeader(res.headers.get('x-agrimark-transcript'));
-      const rawAnswer = decodeHeader(res.headers.get('x-agrimark-answer'));
-      const langCode = res.headers.get('x-agrimark-language') || selectedLanguage;
-
       const audioArrayBuffer = await res.arrayBuffer();
       const responseBlob = new Blob([audioArrayBuffer], { type: 'audio/wav' });
       const audioUrl = URL.createObjectURL(responseBlob);
+      audioUrlsRef.current.push(audioUrl); // Track for cleanup
+
+      // Read custom response headers
+      const rawTranscript = decodeHeader(res.headers.get('x-agrimark-transcript'));
+      const rawAnswer = decodeHeader(res.headers.get('x-agrimark-answer'));
+      const langCode = res.headers.get('x-agrimark-language') || selectedLanguage;
+      const requestId = res.headers.get('x-agrimark-request-id') || '';
+      const timing = res.headers.get('x-agrimark-timing') || '';
 
       // Add user transcript message
       if (rawTranscript) {
@@ -217,26 +225,33 @@ export default function AiAssistantPage() {
       }
 
       // Add AI answer message with audio playback
-      const aiAnswerText = rawAnswer || 'AgriMark AI decision support answer processed.';
+      const aiAnswerText = rawAnswer || 'AgriMark AI processed your voice query.';
       setMessages((prev) => [
         ...prev,
         {
           id: `ai-voice-${Date.now()}`,
           sender: 'ai',
-          text: aiAnswerText,
+          text: aiAnswerText + (timing ? ` ⏱ ${timing}` : ''),
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           audioUrl,
           language: langCode,
         },
       ]);
 
-      // Attempt automatic playback
+      // Attempt automatic playback (may be blocked by browser autoplay policy)
       try {
         const audio = new Audio(audioUrl);
         await audio.play();
-      } catch {}
+      } catch {
+        // Autoplay blocked — user can click the Play button in the message
+      }
 
-      await dataService.logAiInteraction({ query: rawTranscript || 'Voice Input', response: aiAnswerText, context: 'voice-assistant' });
+      await dataService.logAiInteraction({
+        query: rawTranscript || 'Voice Input',
+        response: aiAnswerText,
+        context: 'voice-assistant',
+        model: 'gpt-4o-mini',
+      });
     } catch (err: any) {
       setErrorMessage(err?.message || 'Voice assistant error. Please try again.');
     } finally {
@@ -261,7 +276,7 @@ export default function AiAssistantPage() {
     setLoading(true);
 
     try {
-      const res = await api.askAgriAI(q, 'Thanjavur, Tamil Nadu Delta Region');
+      const res = await api.askAgriAI(q, undefined, selectedLanguage !== 'auto' ? selectedLanguage : undefined);
       const answerText = res.answer;
 
       const aiMsg: ChatMessage = {
