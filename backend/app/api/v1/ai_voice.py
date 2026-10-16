@@ -54,7 +54,7 @@ async def voice_assistant(
         raise HTTPException(status_code=500, detail="Failed to process speech input.") from exc
 
     try:
-        answer_text = AIService().answer(transcript)
+        answer_text = AIService().answer(transcript, language_code=detected_lang)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
