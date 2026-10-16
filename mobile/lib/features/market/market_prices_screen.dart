@@ -180,6 +180,14 @@ class _MarketPricesScreenState extends State<MarketPricesScreen> {
     );
   }
 
+  List<Map<String, String>> _asOptions(dynamic value) {
+    if (value is! List) return <Map<String, String>>[];
+    return value.whereType<Map>().map((row) => <String, String>{
+      'code': row['code']?.toString() ?? '',
+      'name': row['name']?.toString() ?? row['code']?.toString() ?? '',
+    }).where((row) => row['code']!.isNotEmpty).toList();
+  }
+
   Widget _buildFilters() {
     final currentDistricts = _districts;
     return CustomCard(
