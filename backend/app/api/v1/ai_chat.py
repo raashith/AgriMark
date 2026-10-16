@@ -209,11 +209,11 @@ def get_app_context(message: str, user: AuthenticatedUser | None) -> str:
     private_intent = any(term in text for term in (
         "my farm", "my farms", "my crop", "my crops", "my cultivation", "my harvest",
         "my produce", "my listing", "my order", "my orders", "my profile", "my account",
-        "என் பண்ணை", "என் பயிர்", "என்னுடைய", "నా పొలం", "मेरे खेत", "माझे शेत",
+        "என் பண்ணை", "என் பயிர்", "என்னுடைய", "నా పొలం", "मेरे खेत", "माझे शेत", "माझ्या शेतात", "আমার খামার", "আমার ফসল", "મારું ખેતર", "ਮੇਰਾ ਖੇਤ", "ମୋ ଜମି",
     ))
     if user and (private_intent or any(term in text for term in (
         "farm", "crop", "cultivation", "harvest", "produce", "listing", "order", "profile",
-        "பண்ணை", "பயிர்", "விவசாயம்", "खेती", "फसल", "పంట", "കൃഷി", "ಬೆಳೆ",
+        "பண்ணை", "பயிர்", "விவசாயம்", "खेती", "फसल", "शेती", "पीक", "పంట", "కృషి", "കൃഷി", "വിള", "ಬೆಳೆ", "ಕೃಷಿ", "খামার", "ফসল", "চাষ", "ખેતર", "પાક", "ખેતી", "ਖੇਤ", "ਫਸਲ", "ਖੇਤੀ", "ଚାଷ", "ଫସଲ",
     ))):
         try:
             db = get_supabase()
@@ -336,7 +336,7 @@ def get_app_context(message: str, user: AuthenticatedUser | None) -> str:
             except Exception:
                 parts.append("Live weather could not be loaded for this request. Do not guess current conditions.")
 
-    if any(term in text for term in ("marketplace", "listing", "sell", "buy", "buyer", "விற்க", "வாங்க", "बाजार")):
+    if any(term in text for term in ("marketplace", "listing", "sell", "buy", "buyer", "விற்க", "வாங்க", "बाजार", "বাজার", "ખરીદ", "ਵੇਚ", "మార్కెట్", "വിപണി", "ಮಾರುಕಟ್ಟೆ")):
         try:
             listings = get_supabase_public().table("listings").select(
                 "id,title,price_per_unit,currency,status,created_at"
