@@ -104,6 +104,7 @@ class MarketRepository {
       fetchDimension('national_commodities', 'code', 'name'),
       fetchDimension('national_states', 'state_code', 'state_name'),
       fetchDimension('national_districts', 'district_code', 'district_name'),
+      fetchDimension('national_mandis', 'mandi_code', 'mandi_name'),
     ]);
 
     List<Map<String, String>> normalize(List<dynamic> rows, String codeColumn, String nameColumn) {
@@ -123,6 +124,7 @@ class MarketRepository {
       'commodities': normalize(values[0], 'code', 'name'),
       'states': normalize(values[1], 'state_code', 'state_name'),
       'districts': normalize(values[2], 'district_code', 'district_name'),
+      'mandis': normalize(values[3], 'mandi_code', 'mandi_name'),
     };
   }
 
