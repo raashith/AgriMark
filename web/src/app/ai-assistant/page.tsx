@@ -50,6 +50,10 @@ export default function AiAssistantPage() {
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Synchronous guards prevent rapid clicks and recorder events from submitting one utterance twice.
+  const recordingRef = useRef(false);
+  const requestInFlightRef = useRef(false);
+  const stopRequestedRef = useRef(false);
 
   const presets = [
     'What crop should I plant this Samba season in Thanjavur?',
@@ -96,6 +100,9 @@ export default function AiAssistantPage() {
   };
 
   const startVoiceRecording = async () => {
+    if (recordingRef.current || requestInFlightRef.current) return;
+    recordingRef.current = true;
+    stopRequestedRef.current = false;
     setErrorMessage(null);
     audioChunksRef.current = [];
 
@@ -115,9 +122,12 @@ export default function AiAssistantPage() {
       };
 
       mediaRecorder.onstop = async () => {
+        // A recording is one turn only: release the microphone before processing the captured audio.
+        recordingRef.current = false;
         stopRecordingCleanup();
         setRecording(false);
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
+        audioChunksRef.current = [];
         if (audioBlob.size > 0) {
           await handleVoiceSubmit(audioBlob);
         } else {
@@ -132,13 +142,15 @@ export default function AiAssistantPage() {
       timerIntervalRef.current = setInterval(() => {
         setRecordTimer((prev) => {
           if (prev >= 29) {
-            stopVoiceRecording();
+            // Stop exactly once at the 30-second limit; do not keep issuing stop requests.
+            window.setTimeout(() => stopVoiceRecording(), 0);
             return 30;
           }
           return prev + 1;
         });
       }, 1000);
     } catch (err: any) {
+      recordingRef.current = false;
       stopRecordingCleanup();
       setRecording(false);
       setErrorMessage(`Microphone access failed: ${err?.message || 'Please allow microphone permissions.'}`);
@@ -146,9 +158,12 @@ export default function AiAssistantPage() {
   };
 
   const stopVoiceRecording = () => {
+    if (stopRequestedRef.current) return;
+    stopRequestedRef.current = true;
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     } else {
+      recordingRef.current = false;
       stopRecordingCleanup();
       setRecording(false);
     }
@@ -164,6 +179,8 @@ export default function AiAssistantPage() {
   };
 
   const handleVoiceSubmit = async (audioBlob: Blob) => {
+    if (requestInFlightRef.current) return;
+    requestInFlightRef.current = true;
     setLoading(true);
     setErrorMessage(null);
 
@@ -240,14 +257,16 @@ export default function AiAssistantPage() {
     } catch (err: any) {
       setErrorMessage(err?.message || 'Voice assistant error. Please try again.');
     } finally {
+      requestInFlightRef.current = false;
       setLoading(false);
     }
   };
 
   const handleSend = async (queryText?: string) => {
     const q = (queryText || input).trim();
-    if (!q || loading) return;
+    if (!q || loading || recordingRef.current || requestInFlightRef.current) return;
 
+    requestInFlightRef.current = true;
     setErrorMessage(null);
     const userMsg: ChatMessage = {
       id: `usr-${Date.now()}`,
@@ -286,6 +305,7 @@ export default function AiAssistantPage() {
         },
       ]);
     } finally {
+      requestInFlightRef.current = false;
       setLoading(false);
     }
   };
@@ -305,6 +325,7 @@ export default function AiAssistantPage() {
             <span className="text-[11px] font-medium">Language:</span>
             <select
               value={selectedLanguage}
+              disabled={loading || recording}
               onChange={(e) => setSelectedLanguage(e.target.value)}
               className="bg-transparent text-emerald-300 font-semibold border-none outline-none text-xs cursor-pointer"
             >
@@ -437,6 +458,7 @@ export default function AiAssistantPage() {
           <input
             type="text"
             value={input}
+            disabled={loading || recording}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask AgriAI or tap the microphone to speak..."
             className="flex-1 px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-xs focus:border-emerald-500 focus:outline-none"
@@ -457,7 +479,7 @@ export default function AiAssistantPage() {
             <button
               type="button"
               onClick={startVoiceRecording}
-              disabled={loading}
+              disabled={loading || recording}
               className="px-4 py-3 bg-emerald-950 border border-emerald-700 hover:bg-emerald-900 text-emerald-400 font-bold rounded-xl shadow-lg transition flex items-center gap-1.5"
               title="Speak Question"
             >
@@ -468,7 +490,7 @@ export default function AiAssistantPage() {
 
           <button
             type="submit"
-            disabled={loading || !input.trim()}
+            disabled={loading || recording || !input.trim()}
             className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition flex items-center gap-1.5"
           >
             <Send className="w-4 h-4" />
