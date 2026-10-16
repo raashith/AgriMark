@@ -59,7 +59,7 @@ MARKET_TERMS = (
 def is_market_question(message: str) -> bool:
     text = message.lower()
     return any(term in text for term in MARKET_TERMS) or any(
-        bool(re.search(rf"\\b{re.escape(commodity)}\\b", text)) for commodity in COMMODITY_ALIASES
+        bool(re.search(rf"\b{re.escape(commodity)}\b", text)) for commodity in COMMODITY_ALIASES
     )
 
 
