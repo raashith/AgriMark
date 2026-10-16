@@ -81,6 +81,7 @@ class AgriAiRepository {
         commodity: commodity?['code'] ?? '',
         state: state?['code'] ?? '',
         district: district?['code'] ?? '',
+        mandi: mandi?['code'] ?? '',
         limit: 8,
       );
       if (records.isEmpty) {
