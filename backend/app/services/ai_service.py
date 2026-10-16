@@ -56,7 +56,7 @@ def detect_language_code(text: str) -> str:
         ("mr-IN", ("majhya", "mala", "aahe", "sheti", "sanga")),
     ]
     for code, markers in transliteration_markers:
-        if any(re.search(rf"\\b{re.escape(marker)}\\b", lowered) for marker in markers):
+        if any(re.search(rf"\b{re.escape(marker)}\b", lowered) for marker in markers):
             return code
     return "en-IN"
 
