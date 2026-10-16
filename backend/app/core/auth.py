@@ -118,11 +118,15 @@ def _authenticate_supabase(token: str) -> AuthenticatedUser:
     )
 
 
-def get_current_user(
+def get_optional_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
-) -> AuthenticatedUser:
+) -> AuthenticatedUser | None:
+    """Return a validated user when a bearer token is present; allow public chat otherwise."""
+    if not credentials or credentials.scheme.lower() != "bearer":
+        return None
+
     settings = get_settings()
-    if settings.demo_mode and credentials and credentials.scheme.lower() == "bearer" and credentials.credentials == "agrimark-demo-token":
+    if settings.demo_mode and credentials.credentials == "agrimark-demo-token":
         return AuthenticatedUser(
             id=UUID("00000000-0000-0000-0000-000000000001"),
             role="farmer",
@@ -130,16 +134,19 @@ def get_current_user(
             phone="+919000000000",
         )
 
-    if not credentials or credentials.scheme.lower() != "bearer":
+    token = credentials.credentials
+    firebase_user = _authenticate_firebase(token)
+    if firebase_user:
+        return firebase_user
+    return _authenticate_supabase(token)
+
+
+def get_current_user(
+    user: AuthenticatedUser | None = Depends(get_optional_current_user),
+) -> AuthenticatedUser:
+    if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
         )
-
-    token = credentials.credentials
-
-    firebase_user = _authenticate_firebase(token)
-    if firebase_user:
-        return firebase_user
-
-    return _authenticate_supabase(token)
+    return user
