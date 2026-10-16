@@ -1,257 +1,258 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, CalendarDays, LineChart, MapPin, RefreshCw, ShieldCheck, TrendingUp } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { CalendarDays, MapPin, RefreshCw, ShieldCheck, TrendingUp } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 
+const MARKET_SUPABASE_URL =
+  process.env.NEXT_PUBLIC_MARKET_SUPABASE_URL || 'https://tsdjtlmrvbspyzgwmccg.supabase.co';
+const MARKET_SUPABASE_KEY =
+  process.env.NEXT_PUBLIC_MARKET_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_YvBVc_mQXS5606qGvJqZ1g_kg9ot7TF';
+
+const marketSupabase = createClient(MARKET_SUPABASE_URL, MARKET_SUPABASE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+});
+
+type Option = { code: string; name: string };
 type Row = {
+  id: number;
   commodity_code: string;
-  commodity_name: string | null;
   mandi_code: string | null;
-  mandi_name: string | null;
   state_code: string | null;
   district_code: string | null;
-  observed_at: string;
+  observation_date: string;
   modal_price: number;
   min_price: number;
   max_price: number;
-  arrival_quantity_mt: number;
+  source: string;
+};
+type DisplayRow = Row & {
+  commodity_name: string;
+  mandi_name: string;
+  state_name: string;
+  district_name: string;
 };
 
-type Forecast = {
-  target_date: string;
-  predicted_value: number;
-  lower_bound_95: number;
-  upper_bound_95: number;
-};
+const PAGE_SIZE = 100;
+const INDIAN = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 });
 
 export default function MarketPricesPage() {
-  const [rows, setRows] = useState<Row[]>([]);
-  const [selectedCommodity, setSelectedCommodity] = useState('all');
-  const [selectedMandi, setSelectedMandi] = useState('all');
+  const [rows, setRows] = useState<DisplayRow[]>([]);
+  const [commodities, setCommodities] = useState<Option[]>([]);
+  const [states, setStates] = useState<Option[]>([]);
+  const [districts, setDistricts] = useState<Option[]>([]);
+  const [mandis, setMandis] = useState<Option[]>([]);
+  const [selectedCommodity, setSelectedCommodity] = useState('');
+  const [selectedState, setSelectedState] = useState('');
+  const [selectedDistrict, setSelectedDistrict] = useState('');
+  const [selectedMandi, setSelectedMandi] = useState('');
   const [loading, setLoading] = useState(true);
-  const [forecast, setForecast] = useState<Forecast[]>([]);
-  const [forecastStatus, setForecastStatus] = useState('Waiting for historical observations');
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState('');
 
-  async function load() {
-    setLoading(true);
-    const { data } = await supabase
-      .from('national_market_price_observations')
-      .select('commodity_code,commodity_name,mandi_code,mandi_name,state_code,district_code,observed_at,modal_price,min_price,max_price,arrival_quantity_mt')
-      .eq('price_signal_type', 'OBSERVED_MANDI')
-      .order('observed_at', { ascending: true })
-      .limit(2000);
-    setRows((data || []) as Row[]);
-    setLoading(false);
-  }
+  const labelMap = useMemo(() => {
+    const toMap = (opts: Option[]) => new Map(opts.map((item) => [item.code, item.name]));
+    return {
+      commodity: toMap(commodities),
+      state: toMap(states),
+      district: toMap(districts),
+      mandi: toMap(mandis),
+    };
+  }, [commodities, districts, mandis, states]);
 
-  useEffect(() => {
-    load();
+  const loadOptions = useCallback(async () => {
+    const [commodityRes, stateRes, districtRes, mandiRes] = await Promise.all([
+      marketSupabase.from('national_commodities').select('code,name').order('name').limit(2000),
+      marketSupabase.from('national_states').select('state_code,state_name').order('state_name').limit(1000),
+      marketSupabase.from('national_districts').select('district_code,district_name,state_code').order('district_name').limit(2000),
+      marketSupabase.from('national_mandis').select('mandi_code,mandi_name,state_code,district_code').order('mandi_name').limit(2000),
+    ]);
+    const firstError = commodityRes.error || stateRes.error || districtRes.error || mandiRes.error;
+    if (firstError) throw firstError;
+    setCommodities((commodityRes.data || []).map((row: any) => ({ code: row.code, name: row.name })));
+    setStates((stateRes.data || []).map((row: any) => ({ code: row.state_code, name: row.state_name })));
+    setDistricts((districtRes.data || []).map((row: any) => ({ code: row.district_code, name: row.district_name })));
+    setMandis((mandiRes.data || []).map((row: any) => ({ code: row.mandi_code, name: row.mandi_name })));
   }, []);
 
-  const commodities = useMemo(
-    () => Array.from(new Map(rows.map((r) => [r.commodity_code, r.commodity_name || r.commodity_code])).entries()),
-    [rows],
-  );
-
-  const mandis = useMemo(
-    () => Array.from(
-      new Map(
-        rows
-          .filter((r) => selectedCommodity === 'all' || r.commodity_code === selectedCommodity)
-          .map((r) => [r.mandi_code || '', r.mandi_name || r.mandi_code || 'Unknown mandi']),
-      ).entries(),
-    ),
-    [rows, selectedCommodity],
-  );
-
-  const filtered = useMemo(
-    () => rows.filter(
-      (r) =>
-        (selectedCommodity === 'all' || r.commodity_code === selectedCommodity) &&
-        (selectedMandi === 'all' || r.mandi_code === selectedMandi),
-    ),
-    [rows, selectedCommodity, selectedMandi],
-  );
-
-  const latest = filtered.at(-1);
-  const previous = filtered.length > 1 ? filtered.at(-2) : undefined;
-  const priceDiff = latest && previous ? latest.modal_price - previous.modal_price : null;
-  const priceDiffPct = latest && previous && previous.modal_price !== 0
-    ? Number(((priceDiff! / previous.modal_price) * 100).toFixed(2))
-    : null;
-
-  async function loadForecast() {
-    const params = new URLSearchParams();
-    if (selectedCommodity !== 'all') params.set('commodity', selectedCommodity);
-    if (selectedMandi !== 'all') params.set('mandi', selectedMandi);
-    params.set('days', '7');
-    setForecastStatus('Calculating forecast…');
-    const response = await fetch('/api/v1/mandi/forecast?' + params.toString(), { cache: 'no-store' });
-    const payload = await response.json();
-    if (!payload.ok) {
-      setForecast([]);
-      setForecastStatus(payload.error || 'Forecast unavailable');
-      return;
+  const loadPrices = useCallback(async (reset: boolean) => {
+    if (reset) {
+      setLoading(true);
+      setError('');
+    } else {
+      setLoadingMore(true);
     }
-    setForecast(payload.forecast || []);
-    setForecastStatus(
-      payload.observed_count >= 3
-        ? '7-day transparent time-series projection from observed modal prices'
-        : 'Need at least 3 observed price points for a projection',
-    );
-  }
+    try {
+      let query = marketSupabase
+        .from('national_market_price_observations')
+        .select('id,observation_date,state_code,district_code,mandi_code,commodity_code,min_price,max_price,modal_price,source')
+        .order('observation_date', { ascending: false })
+        .order('id', { ascending: false })
+        .range(reset ? 0 : rows.length, (reset ? 0 : rows.length) + PAGE_SIZE - 1);
+      if (selectedCommodity) query = query.eq('commodity_code', selectedCommodity);
+      if (selectedState) query = query.eq('state_code', selectedState);
+      if (selectedDistrict) query = query.eq('district_code', selectedDistrict);
+      if (selectedMandi) query = query.eq('mandi_code', selectedMandi);
+      const { data, error: queryError } = await query;
+      if (queryError) throw queryError;
+      const rawRows = (data || []) as Row[];
+      const label = (map: Map<string, string>, code: string | null, fallback: string) =>
+        code ? map.get(code) || code : fallback;
+      const displayRows = rawRows.map((row) => ({
+        ...row,
+        commodity_name: label(labelMap.commodity, row.commodity_code, 'Commodity'),
+        mandi_name: label(labelMap.mandi, row.mandi_code, 'Mandi not supplied'),
+        district_name: label(labelMap.district, row.district_code, ''),
+        state_name: label(labelMap.state, row.state_code, ''),
+      }));
+      setRows((previous) => reset ? displayRows : [...previous, ...displayRows]);
+      setHasMore(rawRows.length === PAGE_SIZE);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to load official market prices.');
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [labelMap, rows.length, selectedCommodity, selectedDistrict, selectedMandi, selectedState]);
 
   useEffect(() => {
-    loadForecast();
-  }, [selectedCommodity, selectedMandi, rows.length]);
+    let cancelled = false;
+    async function init() {
+      try {
+        await loadOptions();
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load market filters.');
+      }
+    }
+    void init();
+    return () => { cancelled = true; };
+  }, [loadOptions]);
 
-  const chart = forecast.length
-    ? forecast.map((f) => Math.round(f.predicted_value))
-    : filtered.slice(-7).map((r) => Math.round(r.modal_price));
+  useEffect(() => {
+    if (!commodities.length && !states.length) return;
+    void loadPrices(true);
+  }, [selectedCommodity, selectedState, selectedDistrict, selectedMandi, labelMap]); // reload when filters/labels change
 
-  const chartMax = Math.max(...chart, 1);
-  const chartMin = Math.min(...chart, 0);
+  const latest = rows[0];
+  const previous = rows.length > 1 ? rows[1] : undefined;
+  const change = latest && previous ? Number(latest.modal_price) - Number(previous.modal_price) : null;
+  const changePct = change !== null && previous && Number(previous.modal_price) !== 0
+    ? (change / Number(previous.modal_price)) * 100
+    : null;
+
+  const visibleDistricts = useMemo(
+    () => districts.filter((item) => !selectedState || rows.some((r) => r.state_code === selectedState && r.district_code === item.code) || item.code === selectedDistrict),
+    [districts, rows, selectedDistrict, selectedState],
+  );
+  const visibleMandis = useMemo(
+    () => mandis.filter((item) => !selectedState || rows.some((r) => r.state_code === selectedState && r.mandi_code === item.code) || item.code === selectedMandi),
+    [mandis, rows, selectedMandi, selectedState],
+  );
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-[#1e2d26] bg-[#121a16] p-6 md:p-8 shadow-xl">
+      <section className="rounded-3xl border border-[#1e2d26] bg-[#121a16] p-6 shadow-xl md:p-8">
         <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-800/60 bg-emerald-950/80 px-3 py-1 text-xs font-mono font-bold text-emerald-400">
-          <TrendingUp className="h-4 w-4" /> Live Mandi Intelligence
+          <TrendingUp className="h-4 w-4" /> Official Market Intelligence
         </div>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-2xl font-extrabold text-white md:text-4xl">Commodity Prices & Mandi Forecast</h1>
+            <h1 className="text-2xl font-extrabold text-white md:text-4xl">National Commodity Prices</h1>
             <p className="mt-2 max-w-3xl text-sm text-gray-300">
-              Agmarknet observations, day-over-day price movement, arrivals and a clearly labelled short-horizon projection.
+              Imported AGMARKNET observations. Compare minimum, modal and maximum prices by crop and market.
+              Historical observed prices are not forecasts or guaranteed buying prices.
             </p>
           </div>
-          <button onClick={load} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#2a3b32] bg-[#0a0f0d] px-4 text-sm font-bold text-white">
+          <button onClick={() => void loadPrices(true)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#2a3b32] bg-[#0a0f0d] px-4 text-sm font-bold text-white">
             <RefreshCw className="h-4 w-4" /> Refresh
           </button>
         </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <select value={selectedCommodity} onChange={(e) => { setSelectedCommodity(e.target.value); setSelectedMandi('all'); }} className="min-h-11 rounded-xl border border-[#2a3b32] bg-[#0a0f0d] px-3 text-white">
-          <option value="all">All commodities</option>
-          {commodities.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
-        </select>
-        <select value={selectedMandi} onChange={(e) => setSelectedMandi(e.target.value)} className="min-h-11 rounded-xl border border-[#2a3b32] bg-[#0a0f0d] px-3 text-white">
-          <option value="all">All mandis</option>
-          {mandis.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
-        </select>
-        <div className="flex items-center gap-2 rounded-xl border border-[#2a3b32] bg-[#0a0f0d] px-3 text-sm text-gray-300">
-          <ShieldCheck className="h-4 w-4 text-emerald-400" />
-          Source: Agmarknet / DMI
-        </div>
-      </div>
+      <section className="grid grid-cols-1 gap-3 rounded-2xl border border-[#1e2d26] bg-[#121a16] p-4 md:grid-cols-4">
+        <Select label="Commodity" value={selectedCommodity} options={commodities} onChange={setSelectedCommodity} />
+        <Select label="State" value={selectedState} options={states} onChange={(value) => { setSelectedState(value); setSelectedDistrict(''); setSelectedMandi(''); }} />
+        <Select label="District" value={selectedDistrict} options={visibleDistricts} onChange={setSelectedDistrict} />
+        <Select label="Mandi" value={selectedMandi} options={visibleMandis} onChange={setSelectedMandi} />
+      </section>
+
+      {error && <div role="alert" className="rounded-xl border border-rose-800/60 bg-rose-950/30 p-4 text-sm text-rose-100">Market data error: {error}</div>}
 
       {loading ? (
-        <div className="rounded-3xl border border-[#1e2d26] bg-[#121a16] p-8 text-gray-300">Loading mandi observations…</div>
-      ) : filtered.length === 0 ? (
+        <div className="rounded-3xl border border-[#1e2d26] bg-[#121a16] p-8 text-gray-300">Loading verified mandi observations…</div>
+      ) : rows.length === 0 ? (
         <div className="rounded-3xl border border-amber-800/40 bg-amber-950/20 p-8 text-amber-100">
-          No real Agmarknet observations are stored for this selection yet. The forecasting UI stays empty rather than inventing data.
+          No observations match this selection. Change the filters or refresh.
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5">
-              <span className="text-xs uppercase text-gray-400">Latest modal</span>
-              <div className="mt-2 text-3xl font-black text-emerald-400">₹{latest?.modal_price.toLocaleString('en-IN')}</div>
-              <div className="mt-1 text-xs text-gray-400">per quintal</div>
-            </div>
-            <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5">
-              <span className="text-xs uppercase text-gray-400">Change vs previous</span>
-              <div className={'mt-2 flex items-center gap-1 text-2xl font-black ' + ((priceDiff ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
-                {(priceDiff ?? 0) >= 0 ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />}
-                ₹{Math.abs(priceDiff ?? 0).toLocaleString('en-IN')}
-              </div>
-              <div className="mt-1 text-xs text-gray-400">{priceDiffPct == null ? 'No comparable observation' : priceDiffPct + '%'}</div>
-            </div>
-            <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5">
-              <span className="text-xs uppercase text-gray-400">Latest arrivals</span>
-              <div className="mt-2 text-3xl font-black text-white">{(latest?.arrival_quantity_mt || 0).toLocaleString('en-IN')}</div>
-              <div className="mt-1 text-xs text-gray-400">metric tonnes</div>
-            </div>
-            <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5">
-              <span className="text-xs uppercase text-gray-400">Observed points</span>
-              <div className="mt-2 text-3xl font-black text-white">{filtered.length}</div>
-              <div className="mt-1 text-xs text-gray-400">records in current selection</div>
-            </div>
-          </div>
+          <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <Metric title="Latest modal price" value={latest ? '₹' + INDIAN.format(Number(latest.modal_price)) : '—'} detail="per quintal" />
+            <Metric title="Change vs previous row" value={change === null ? '—' : (change >= 0 ? '+' : '−') + '₹' + INDIAN.format(Math.abs(change))} detail={changePct === null ? 'No comparable previous row' : `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}% from previous row`} />
+            <Metric title="Records loaded" value={INDIAN.format(rows.length)} detail={hasMore ? 'More records available below' : 'All matching rows loaded'} />
+            <Metric title="Data provenance" value="AGMARKNET" detail={latest?.source || 'Imported government market data'} />
+          </section>
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-            <div className="rounded-3xl border border-[#1e2d26] bg-[#121a16] p-6">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-extrabold text-white">{latest?.commodity_name || 'Commodity'}</h2>
-                  <p className="mt-1 flex items-center gap-2 text-sm text-emerald-400">
-                    <MapPin className="h-4 w-4" /> {latest?.mandi_name || 'All selected mandis'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <CalendarDays className="h-4 w-4" /> {latest?.observed_at?.slice(0, 10)}
-                </div>
+          <section className="overflow-hidden rounded-3xl border border-[#1e2d26] bg-[#121a16]">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#26372f] p-5">
+              <div>
+                <h2 className="text-lg font-extrabold text-white">Market observations</h2>
+                <p className="mt-1 text-xs text-gray-400"><ShieldCheck className="mr-1 inline h-3.5 w-3.5 text-emerald-400" /> Source: AGMARKNET • Prices in INR per quintal</p>
               </div>
-
-              <div className="mt-6 overflow-x-auto">
-                <div className="min-w-[680px]">
-                  <div className="mb-3 flex items-center justify-between text-xs text-gray-400">
-                    <span>{forecast.length ? '7-day forecast' : 'Recent modal prices'}</span>
-                    <span>{forecastStatus}</span>
-                  </div>
-                  <svg viewBox="0 0 900 280" className="h-72 w-full">
-                    <line x1="35" y1="245" x2="870" y2="245" stroke="currentColor" className="text-[#2a3b32]" />
-                    <line x1="35" y1="35" x2="35" y2="245" stroke="currentColor" className="text-[#2a3b32]" />
-                    {chart.length > 1 && (
-                      <polyline
-                        fill="none"
-                        stroke="currentColor"
-                        className="text-emerald-400"
-                        strokeWidth="4"
-                        points={chart.map((v, i) => {
-                          const x = 50 + (i / (chart.length - 1)) * 800;
-                          const y = 225 - ((v - chartMin) / Math.max(chartMax - chartMin, 1)) * 180;
-                          return x + ',' + y;
-                        }).join(' ')}
-                      />
-                    )}
-                    {chart.map((v, i) => {
-                      const x = 50 + (i / Math.max(chart.length - 1, 1)) * 800;
-                      const y = 225 - ((v - chartMin) / Math.max(chartMax - chartMin, 1)) * 180;
-                      return <circle key={i} cx={x} cy={y} r="6" fill="currentColor" className="text-emerald-400" />;
-                    })}
-                  </svg>
-                </div>
-              </div>
+              {latest && <p className="flex items-center gap-2 text-xs text-gray-400"><CalendarDays className="h-4 w-4" /> Latest row: {latest.observation_date}</p>}
             </div>
-
-            <div className="rounded-3xl border border-[#1e2d26] bg-[#121a16] p-6">
-              <div className="flex items-center gap-2 text-emerald-400">
-                <LineChart className="h-5 w-5" />
-                <span className="text-xs font-mono uppercase font-bold">Mandi Forecast</span>
-              </div>
-              <h3 className="mt-2 text-xl font-extrabold text-white">Next 7 Days</h3>
-              <p className="mt-2 text-xs leading-5 text-gray-400">
-                Projection uses observed modal-price history only. The interface does not present synthetic history as real observations.
-              </p>
-              <div className="mt-5 space-y-2">
-                {forecast.map((f) => (
-                  <div key={f.target_date} className="flex items-center justify-between rounded-xl border border-[#26372f] bg-[#0a0f0d] px-3 py-2">
-                    <span className="font-mono text-xs text-gray-400">{f.target_date}</span>
-                    <div className="text-right">
-                      <div className="font-bold text-white">₹{f.predicted_value.toLocaleString('en-IN')}</div>
-                      <div className="text-[10px] text-gray-500">95%: ₹{f.lower_bound_95.toLocaleString('en-IN')}–₹{f.upper_bound_95.toLocaleString('en-IN')}</div>
-                    </div>
-                  </div>
-                ))}
-                {!forecast.length && <div className="rounded-xl border border-dashed border-[#2a3b32] p-4 text-sm text-gray-400">{forecastStatus}</div>}
-              </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-[850px] w-full text-left text-sm">
+                <thead className="bg-black/20 text-xs uppercase tracking-wider text-gray-400">
+                  <tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">Commodity</th><th className="px-4 py-3">Mandi / District</th><th className="px-4 py-3 text-right">Minimum</th><th className="px-4 py-3 text-right">Modal</th><th className="px-4 py-3 text-right">Maximum</th></tr>
+                </thead>
+                <tbody className="divide-y divide-[#26372f] text-gray-200">
+                  {rows.map((row) => (
+                    <tr key={row.id} className="hover:bg-emerald-950/10">
+                      <td className="whitespace-nowrap px-4 py-3 text-gray-400">{row.observation_date}</td>
+                      <td className="px-4 py-3"><div className="font-semibold">{row.commodity_name}</div><div className="text-[10px] text-gray-500">{row.source}</div></td>
+                      <td className="px-4 py-3"><div className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-emerald-400" />{row.mandi_name}</div><div className="text-xs text-gray-500">{[row.district_name, row.state_name].filter(Boolean).join(' • ')}</div></td>
+                      <td className="px-4 py-3 text-right">₹{INDIAN.format(Number(row.min_price))}</td>
+                      <td className="px-4 py-3 text-right font-black text-emerald-300">₹{INDIAN.format(Number(row.modal_price))}</td>
+                      <td className="px-4 py-3 text-right">₹{INDIAN.format(Number(row.max_price))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
+          </section>
+          {hasMore && (
+            <div className="flex justify-center">
+              <button disabled={loadingMore} onClick={() => void loadPrices(false)} className="rounded-xl border border-emerald-800 bg-emerald-950/30 px-5 py-3 text-sm font-bold text-emerald-100 disabled:opacity-50">
+                {loadingMore ? 'Loading…' : `Load next ${PAGE_SIZE} records`}
+              </button>
+            </div>
+          )}
         </>
       )}
+    </div>
+  );
+}
+
+function Select({ label, value, options, onChange }: { label: string; value: string; options: Option[]; onChange: (value: string) => void }) {
+  return (
+    <label className="block text-sm text-gray-300">
+      <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">{label}</span>
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="min-h-11 w-full rounded-xl border border-[#2a3b32] bg-[#0a0f0d] px-3 text-white">
+        <option value="">All {label.toLowerCase()}s</option>
+        {options.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function Metric({ title, value, detail }: { title: string; value: string; detail: string }) {
+  return (
+    <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5">
+      <span className="text-xs uppercase tracking-wider text-gray-400">{title}</span>
+      <div className="mt-2 break-words text-2xl font-black text-emerald-300">{value}</div>
+      <div className="mt-1 text-xs text-gray-400">{detail}</div>
     </div>
   );
 }
