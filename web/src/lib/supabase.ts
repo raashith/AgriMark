@@ -1,14 +1,21 @@
 import { createBrowserClient } from '@supabase/ssr';
 
-const EXPECTED_SUPABASE_HOST = 'xrcqzpnstdbbtafhcwbb.supabase.co';
-const EXPECTED_SUPABASE_URL = `https://${EXPECTED_SUPABASE_HOST}`;
+// Production AgriMark project. NEXT_PUBLIC_SUPABASE_URL remains configurable for
+// local development and Preview environments; never put a service-role key here.
+const DEFAULT_SUPABASE_URL = 'https://tsdjtlmrvbspyzgwmccg.supabase.co';
 
 function getValidSupabaseUrl(): string {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (url && typeof url === 'string' && url.trim() === EXPECTED_SUPABASE_URL) {
-    return EXPECTED_SUPABASE_URL;
+  const configured = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  if (!configured) return DEFAULT_SUPABASE_URL;
+  try {
+    const parsed = new URL(configured);
+    if (parsed.protocol === 'https:' && parsed.hostname.endsWith('.supabase.co')) {
+      return parsed.origin;
+    }
+  } catch {
+    // Use the known production URL when the deployment value is malformed.
   }
-  return EXPECTED_SUPABASE_URL;
+  return DEFAULT_SUPABASE_URL;
 }
 
 export function detectKeyType(key: string): string {
