@@ -73,6 +73,7 @@ def _match_option(
     code_column: str,
     name_column: str,
     aliases: Mapping[str, str] | None = None,
+    allow_code_suffix: bool = False,
 ) -> dict[str, Any] | None:
     if aliases:
         matched_aliases = [
@@ -87,6 +88,7 @@ def _match_option(
                     row for row in options
                     if str(row.get(code_column, "")).strip().lower() == code.strip().lower()
                     or str(row.get(name_column, "")).strip().lower() == code.strip().lower()
+                    or (allow_code_suffix and str(row.get(code_column, "")).strip().lower().endswith("-" + code.strip().lower()))
                 ),
                 None,
             )
@@ -125,9 +127,30 @@ def build_market_context(
         commodity = _match_option(
             dimensions["commodities"], text, "code", "name", commodity_aliases
         )
-        state = _match_option(dimensions["states"], text, "state_code", "state_name", state_codes)
+        state = _match_option(
+            dimensions["states"], text, "state_code", "state_name",
+            state_codes, allow_code_suffix=True,
+        )
         district = _match_option(dimensions["districts"], text, "district_code", "district_name")
         mandi = _match_option(dimensions["mandis"], text, "mandi_code", "mandi_name")
+
+        mentioned_commodity = bool(
+            commodity_aliases and any(_contains_term(text, alias) for alias in commodity_aliases)
+        )
+        if mentioned_commodity and commodity is None:
+            return (
+                "AGMARKNET OFFICIAL MARKET CONTEXT\\n"
+                "No stored official observation could be matched to the requested commodity. "
+                "Do not substitute another crop's price or invent a value."
+            )
+
+        mentioned_state = bool(state_codes and any(_contains_term(text, name) for name in state_codes))
+        if mentioned_state and state is None:
+            return (
+                "AGMARKNET OFFICIAL MARKET CONTEXT\\n"
+                "No stored state code could be matched to the requested location. "
+                "Ask the farmer to select or clarify the state; do not invent a price."
+            )
 
         params: dict[str, str] = {
             "select": "id,observation_date,state_code,district_code,mandi_code,commodity_code,variety,grade,min_price,max_price,modal_price,source",
