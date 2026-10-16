@@ -239,6 +239,8 @@ class _MarketPricesScreenState extends State<MarketPricesScreen> {
     required List<Map<String, String>> options,
     required ValueChanged<String> onChanged,
   }) {
+    final availableCodes = options.map((option) => option['code']).toSet();
+    final validValue = value.isEmpty || availableCodes.contains(value) ? value : '';
     final items = <DropdownMenuItem<String>>[
       DropdownMenuItem(value: '', child: Text('All $label')),
       ...options.map((option) => DropdownMenuItem(
@@ -252,7 +254,7 @@ class _MarketPricesScreenState extends State<MarketPricesScreen> {
       uniqueItems[item.value!] = item;
     }
     return DropdownButtonFormField<String>(
-      value: uniqueItems.containsKey(value) ? value : '',
+      value: uniqueItems.containsKey(validValue) ? validValue : '',
       isExpanded: true,
       decoration: InputDecoration(
         labelText: label,
