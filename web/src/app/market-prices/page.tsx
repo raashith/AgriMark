@@ -160,23 +160,39 @@ export default function MarketPricesPage() {
     }
   }, [dateFrom, dateTo, labelMap, rows.length, selectedCommodity, selectedDistrict, selectedMandi, selectedState]);
 
+  const [count, setCount] = useState<number | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     async function init() {
-      try {
-        await loadOptions();
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load market filters.');
-      }
+      try { await loadOptions(); }
+      catch (e) { if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load market filters.'); }
     }
     void init();
-    const forecast = useMemo(() => calculateForecast(rows), [rows]);
+    return () => { cancelled = true; };
+  }, [loadOptions]);
+
+  useEffect(() => { void loadPrices(true); }, [selectedCommodity, selectedState, selectedDistrict, selectedMandi, dateFrom, dateTo, labelMap]); 
+
+  useEffect(() => {
+    let cancelled = false;
+    marketSupabase.from('national_market_price_observations').select('id', { count: 'exact', head: true })
+      .then(({ count: total, error: countError }) => {
+        if (!cancelled && !countError) setCount(total ?? null);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const latest = rows[0];
+  const forecast = useMemo(() => calculateForecast(rows), [rows]);
   const current = latest ? Number(latest.modal_price) : 0;
   const change = forecast?.changePct ?? 0;
   const minPrice = rows.length ? Math.min(...rows.map(r=>Number(r.min_price)).filter(Number.isFinite)) : 0;
   const maxPrice = rows.length ? Math.max(...rows.map(r=>Number(r.max_price)).filter(Number.isFinite)) : 0;
   const mandiCount = new Set(rows.map(r=>r.mandi_code).filter(Boolean)).size;
   const arrivalsTotal = rows.reduce((sum,r)=>sum+(Number((r as any).arrivals)||0),0);
+  const visibleDistricts = districts.filter(item => !selectedState || item.state_code === selectedState);
+  const visibleMandis = mandis.filter(item => (!selectedState || item.state_code === selectedState) && (!selectedDistrict || item.district_code === selectedDistrict));
 
   return (
     <main className="min-h-screen space-y-4 bg-[#06100c] px-4 py-5 text-white md:px-7 lg:px-10">
@@ -187,7 +203,7 @@ export default function MarketPricesPage() {
           <p className="mt-2 text-sm text-slate-300 md:text-base">Official Agmarknet observations with transparent statistical trend analysis.</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="rounded-xl border border-emerald-900 bg-[#0a1711] p-3 text-xs"><div className="flex items-center gap-2 font-bold text-slate-200"><ShieldCheck className="h-4 w-4 text-emerald-400"/> Source: Agmarknet / DMI</div><div className="mt-1 text-slate-400">{INDIAN.format(count ?? rows.length)} stored observations</div></div>
+          <div className="rounded-xl border border-emerald-900 bg-[#0a1711] p-3 text-xs"><div className="flex items-center gap-2 font-bold text-slate-200"><ShieldCheck className="h-4 w-4 text-emerald-400"/> Source: Agmarknet / DMI</div><div className="mt-1 text-slate-400">{count===null?'Verified observations':INDIAN.format(count)+' stored observations'}</div></div>
           <button onClick={() => void loadPrices(true)} className="inline-flex h-12 items-center gap-2 rounded-xl border border-emerald-900 bg-[#101b15] px-4 text-sm font-bold hover:border-emerald-500"><RefreshCw className="h-4 w-4"/> Refresh</button>
         </div>
       </section>
@@ -199,15 +215,14 @@ export default function MarketPricesPage() {
         <Select label="Mandi" value={selectedMandi} options={visibleMandis} onChange={setSelectedMandi}/>
         <label className="block text-sm text-gray-300"><span className="mb-2 block text-xs font-bold">Date from</span><input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} className="min-h-11 w-full rounded-xl border border-[#2a3b32] bg-[#15241f] px-3 text-white"/></label>
         <label className="block text-sm text-gray-300"><span className="mb-2 block text-xs font-bold">Date to</span><input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} className="min-h-11 w-full rounded-xl border border-[#2a3b32] bg-[#15241f] px-3 text-white"/></label>
-        <button onClick={() => void loadPrices(true)} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 text-sm font-extrabold text-[#032016] hover:bg-emerald-400 lg:col-span-6"><MapPin className="h-4 w-4"/> View Prices</button>
       </section>
+      <div className="flex justify-end"><button onClick={()=>void loadPrices(true)} className="inline-flex h-11 items-center gap-2 rounded-xl bg-emerald-500 px-5 text-sm font-extrabold text-[#032016] hover:bg-emerald-400"><MapPin className="h-4 w-4"/>View Prices</button></div>
 
       {error && <div role="alert" className="rounded-xl border border-rose-800 bg-rose-950/40 p-4 text-sm text-rose-100">Unable to load market data: {error}. Check the market project's publishable key and read policies.</div>}
       {loading && <div className="rounded-xl border border-emerald-950 bg-[#0b1912] p-4 text-sm text-slate-300">Loading verified AGMARKNET observations…</div>}
+      {!loading && !error && rows.length===0 && <div className="rounded-xl border border-amber-900/70 bg-[#171209] p-6 text-amber-100">No observations match this selection. Try a broader date range or clear a filter.</div>}
 
-      {!loading && !error && rows.length === 0 && <div className="rounded-xl border border-amber-900/70 bg-[#171209] p-6 text-amber-100">No observations match this selection. Try a broader date range or clear a filter.</div>}
-
-      {!loading && !error && rows.length > 0 && <>
+      {!loading && !error && rows.length>0 && <>
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.6fr_1fr]">
           <div className="rounded-2xl border border-[#12392b] bg-gradient-to-br from-[#0b2118] to-[#07130e] p-4 md:p-5">
             <div className="mb-4 flex items-start gap-3"><div className="rounded-xl bg-emerald-950 p-3 text-emerald-400"><TrendingUp className="h-6 w-6"/></div><div><h2 className="text-lg font-extrabold">Price Trend &amp; Forecast</h2><p className="text-xs text-slate-400">Observed AGMARKNET prices with a 7-day statistical estimate</p></div></div>
@@ -219,7 +234,7 @@ export default function MarketPricesPage() {
               <div className="rounded-xl border border-amber-900/40 bg-white/[0.04] p-3"><div className="text-xs text-slate-300">Expected price</div><div className="mt-2 text-2xl font-black text-amber-300">₹{INDIAN.format(forecast.expected)}<span className="ml-1 text-xs font-normal text-slate-300">/Qtl</span></div><div className={`mt-2 flex items-center gap-1 text-xs font-bold ${change>=0?'text-emerald-400':'text-rose-400'}`}>{change>=0?<TrendingUp className="h-4 w-4"/>:<TrendingDown className="h-4 w-4"/>}{change>=0?'+':''}{change.toFixed(1)}% vs latest observed</div></div>
               <div className="rounded-xl border border-amber-900/40 bg-white/[0.04] p-3"><div className="text-xs text-slate-300">Lower estimate</div><div className="mt-2 text-2xl font-black text-white">₹{INDIAN.format(forecast.min)}<span className="ml-1 text-xs font-normal text-slate-300">/Qtl</span></div><div className="mt-2 text-xs text-rose-300">Approximate range</div></div>
               <div className="rounded-xl border border-amber-900/40 bg-white/[0.04] p-3"><div className="text-xs text-slate-300">Upper estimate</div><div className="mt-2 text-2xl font-black text-white">₹{INDIAN.format(forecast.max)}<span className="ml-1 text-xs font-normal text-slate-300">/Qtl</span></div><div className="mt-2 text-xs text-emerald-300">Approximate range</div></div>
-            </div><div className="mt-4 rounded-xl border border-amber-800/60 bg-amber-950/40 p-4"><div className="mb-2 flex items-center gap-2 font-bold text-amber-300"><Lightbulb className="h-5 w-5"/> AI-ready trend insight</div><p className="text-sm leading-6 text-slate-200">{forecast.insight}</p><p className="mt-2 text-xs text-slate-400">Estimate confidence indicator: {forecast.confidence}% (heuristic, not a calibrated probability).</p></div></> : <div className="rounded-xl border border-amber-900/40 bg-white/[0.04] p-5 text-sm text-amber-100">There are not enough unique dated observations to estimate a trend. Broaden the date range or remove some filters.</div>}
+            </div><div className="mt-4 rounded-xl border border-amber-800/60 bg-amber-950/40 p-4"><div className="mb-2 flex items-center gap-2 font-bold text-amber-300"><Lightbulb className="h-5 w-5"/> Trend insight</div><p className="text-sm leading-6 text-slate-200">{forecast.insight} This estimate is not a guaranteed selling price.</p><p className="mt-2 text-xs text-slate-400">Heuristic confidence indicator: {forecast.confidence}% (not a calibrated probability).</p></div></> : <div className="rounded-xl border border-amber-900/40 bg-white/[0.04] p-5 text-sm text-amber-100">Not enough unique dated observations for a trend estimate. Broaden the date range or remove some filters.</div>}
           </div>
         </section>
 
@@ -234,7 +249,7 @@ export default function MarketPricesPage() {
         <section className="overflow-hidden rounded-2xl border border-[#17372b] bg-[#091711]">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1b352b] p-4 md:p-5"><div><h2 className="text-lg font-extrabold">Recent Market Prices</h2><p className="mt-1 text-xs text-slate-400">Latest official observations for the selected filters • INR per quintal</p></div><span className="inline-flex items-center gap-2 rounded-lg bg-[#13271e] px-3 py-2 text-xs font-bold text-emerald-300"><ShieldCheck className="h-4 w-4"/> AGMARKNET records</span></div>
           <div className="overflow-x-auto"><table className="min-w-[950px] w-full text-left text-xs"><thead className="bg-[#102219] text-slate-300"><tr>{['Date','State','District','Mandi','Commodity','Min price (₹/Qtl)','Modal price (₹/Qtl)','Max price (₹/Qtl)','Source'].map(h=><th key={h} className="whitespace-nowrap px-4 py-3 font-bold">{h}</th>)}</tr></thead><tbody className="divide-y divide-[#1a3025] text-slate-200">{rows.map(row=><tr key={row.id} className="hover:bg-emerald-950/30"><td className="whitespace-nowrap px-4 py-3 text-slate-400">{row.observation_date}</td><td className="px-4 py-3">{row.state_name||'—'}</td><td className="px-4 py-3">{row.district_name||'—'}</td><td className="px-4 py-3 font-semibold">{row.mandi_name}</td><td className="px-4 py-3">{row.commodity_name}</td><td className="px-4 py-3">₹{INDIAN.format(Number(row.min_price))}</td><td className="px-4 py-3 font-black text-emerald-300">₹{INDIAN.format(Number(row.modal_price))}</td><td className="px-4 py-3">₹{INDIAN.format(Number(row.max_price))}</td><td className="px-4 py-3 text-slate-400">{row.source||'AGMARKNET'}</td></tr>)}</tbody></table></div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#1b352b] p-4"><span className="text-xs text-slate-400">Showing {rows.length} records{count!==null?' • '+INDIAN.format(count)+' observations in database':''}</span>{hasMore&&<button disabled={loadingMore} onClick={()=>void loadPrices(false)} className="rounded-lg border border-emerald-800 bg-emerald-950/50 px-4 py-2 text-sm font-bold text-emerald-200 disabled:opacity-50">{loadingMore?'Loading…':`Load more records`}</button>}</div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#1b352b] p-4"><span className="text-xs text-slate-400">Showing {rows.length} records{count!==null?' • '+INDIAN.format(count)+' observations in database':''}</span>{hasMore&&<button disabled={loadingMore} onClick={()=>void loadPrices(false)} className="rounded-lg border border-emerald-800 bg-emerald-950/50 px-4 py-2 text-sm font-bold text-emerald-200 disabled:opacity-50">{loadingMore?'Loading…':'Load more records'}</button>}</div>
         </section>
       </>}
     </main>
