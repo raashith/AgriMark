@@ -311,16 +311,16 @@ export default function AiAssistantPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 py-4">
+    <div className="agriai-page max-w-6xl mx-auto space-y-5 px-3 sm:px-5 py-5 md:py-8">
       {/* Header */}
-      <div className="bg-[#121a16] border border-[#1e2d26] p-6 rounded-3xl space-y-3 shadow-xl">
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#10251b] via-[#101a15] to-[#0a100d] border border-emerald-900/70 p-5 sm:p-7 md:p-8 rounded-[28px] space-y-5 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-950/80 border border-emerald-800/60 rounded-full text-xs font-mono font-bold text-emerald-400">
+          <div className="inline-flex items-center gap-2 px-3.5 py-2 bg-emerald-950/80 border border-emerald-700/60 rounded-full text-xs sm:text-sm font-semibold text-emerald-300">
             <Bot className="w-4 h-4 text-emerald-400" /> AgriAI Multilingual Voice Assistant
           </div>
 
           {/* Language Selector */}
-          <div className="flex items-center gap-2 bg-[#0a0f0d] border border-[#1e2d26] px-3 py-1.5 rounded-xl text-xs text-gray-300">
+          <div className="flex items-center gap-2 bg-black/25 border border-emerald-900/70 px-3.5 py-2.5 rounded-2xl text-sm text-gray-200">
             <Globe className="w-4 h-4 text-emerald-400 shrink-0" />
             <span className="text-[11px] font-medium">Language:</span>
             <select
@@ -338,12 +338,19 @@ export default function AiAssistantPage() {
           </div>
         </div>
 
-        <h1 className="text-2xl md:text-3xl font-extrabold text-white">
-          AgriMark Voice & Text Decision Support
-        </h1>
-        <p className="text-xs text-gray-300">
-          Powered by Sarvam Saaras v3 STT & Bulbul v3 TTS. Speak in Tamil, Hindi, Telugu, or English for real-time voice advisories.
-        </p>
+        <div className="max-w-3xl space-y-3">
+          <h1 className="text-3xl sm:text-4xl md:text-[2.65rem] font-extrabold tracking-tight leading-tight text-white">
+            Your farming questions, <span className="text-emerald-400">answered.</span>
+          </h1>
+          <p className="max-w-2xl text-sm sm:text-base leading-7 text-slate-300">
+            Ask about crops, weather, pests, irrigation, and market prices. Type or speak naturally in your language.
+          </p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            {['Crop guidance', 'Weather & irrigation', 'Mandi insights'].map((item) => (
+              <span key={item} className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs sm:text-sm text-slate-300">{item}</span>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Error Banner */}
@@ -363,7 +370,7 @@ export default function AiAssistantPage() {
       )}
 
       {/* Chat Box */}
-      <div className="bg-[#121a16] border border-[#1e2d26] rounded-3xl p-6 shadow-2xl flex flex-col h-[550px]">
+      <div className="bg-[#0e1712] border border-emerald-950/80 rounded-[28px] p-3 sm:p-5 md:p-6 shadow-[0_24px_80px_rgba(0,0,0,0.25)] flex flex-col h-[min(70vh,780px)] min-h-[540px]">
         {/* Messages Scroll Area */}
         <div className="flex-1 overflow-y-auto space-y-4 pr-2">
           {messages.map((msg) => (
@@ -382,13 +389,13 @@ export default function AiAssistantPage() {
               </div>
 
               <div
-                className={`max-w-xl p-4 rounded-2xl text-xs leading-relaxed space-y-2 ${
+                className={`max-w-[92%] sm:max-w-[82%] md:max-w-[76%] p-4 sm:p-5 rounded-2xl text-sm sm:text-[15px] leading-7 space-y-3 ${
                   msg.sender === 'user'
                     ? 'bg-emerald-600 text-white font-medium rounded-tr-none'
                     : 'bg-[#0a0f0d] border border-[#1e2d26] text-gray-200 rounded-tl-none'
                 }`}
               >
-                <p>{msg.text}</p>
+                <p className="whitespace-pre-wrap break-words">{msg.text}</p>
 
                 {/* Optional Voice Playback Button */}
                 {msg.audioUrl && (
@@ -418,7 +425,7 @@ export default function AiAssistantPage() {
               <div className="w-9 h-9 rounded-2xl bg-emerald-950 border border-emerald-700 text-emerald-400 flex items-center justify-center">
                 <Bot className="w-4 h-4 animate-bounce" />
               </div>
-              <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl text-xs text-emerald-400 font-mono animate-pulse">
+              <div className="p-4 bg-[#0a0f0d] border border-emerald-900/70 rounded-2xl text-sm text-emerald-300 animate-pulse">
                 Sarvam AI Voice Engine is processing speech and synthesizing response...
               </div>
             </div>
@@ -460,8 +467,8 @@ export default function AiAssistantPage() {
             value={input}
             disabled={loading || recording}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask AgriAI or tap the microphone to speak..."
-            className="flex-1 px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-xs focus:border-emerald-500 focus:outline-none"
+            placeholder="Ask a farming question… or tap Voice to speak"
+            className="flex-1 min-w-0 px-4 sm:px-5 py-4 bg-[#080e0b] border border-emerald-950 rounded-2xl text-white text-sm sm:text-base placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 focus:outline-none transition"
           />
 
           {/* Voice Record Button */}
@@ -480,7 +487,7 @@ export default function AiAssistantPage() {
               type="button"
               onClick={startVoiceRecording}
               disabled={loading || recording}
-              className="px-4 py-3 bg-emerald-950 border border-emerald-700 hover:bg-emerald-900 text-emerald-400 font-bold rounded-xl shadow-lg transition flex items-center gap-1.5"
+              className="px-4 sm:px-5 py-4 bg-emerald-950/80 border border-emerald-700 hover:bg-emerald-900 text-emerald-300 font-bold rounded-2xl shadow-lg transition flex items-center gap-2"
               title="Speak Question"
             >
               <Mic className="w-4 h-4" />
@@ -491,7 +498,7 @@ export default function AiAssistantPage() {
           <button
             type="submit"
             disabled={loading || recording || !input.trim()}
-            className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition flex items-center gap-1.5"
+            className="px-4 sm:px-5 py-4 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-900/50 text-white font-bold rounded-2xl shadow-lg transition flex items-center gap-1.5"
           >
             <Send className="w-4 h-4" />
           </button>
