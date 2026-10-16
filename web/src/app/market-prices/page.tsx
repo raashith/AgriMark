@@ -5,7 +5,7 @@ import { CalendarDays, MapPin, RefreshCw, ShieldCheck, TrendingUp } from 'lucide
 import { marketSupabase } from '@/lib/market-supabase';
 
 
-type Option = { code: string; name: string };
+type Option = { code: string; name: string; state_code?: string; district_code?: string };
 type Row = {
   id: number;
   commodity_code: string;
@@ -38,6 +38,8 @@ export default function MarketPricesPage() {
   const [selectedState, setSelectedState] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('');
   const [selectedMandi, setSelectedMandi] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -64,8 +66,8 @@ export default function MarketPricesPage() {
     if (firstError) throw firstError;
     setCommodities((commodityRes.data || []).map((row: any) => ({ code: row.code, name: row.name })));
     setStates((stateRes.data || []).map((row: any) => ({ code: row.state_code, name: row.state_name })));
-    setDistricts((districtRes.data || []).map((row: any) => ({ code: row.district_code, name: row.district_name })));
-    setMandis((mandiRes.data || []).map((row: any) => ({ code: row.mandi_code, name: row.mandi_name })));
+    setDistricts((districtRes.data || []).map((row: any) => ({ code: row.district_code, name: row.district_name, state_code: row.state_code })));
+    setMandis((mandiRes.data || []).map((row: any) => ({ code: row.mandi_code, name: row.mandi_name, state_code: row.state_code, district_code: row.district_code })));
   }, []);
 
   const loadPrices = useCallback(async (reset: boolean) => {
@@ -86,6 +88,8 @@ export default function MarketPricesPage() {
       if (selectedState) query = query.eq('state_code', selectedState);
       if (selectedDistrict) query = query.eq('district_code', selectedDistrict);
       if (selectedMandi) query = query.eq('mandi_code', selectedMandi);
+      if (dateFrom) query = query.gte('observation_date', dateFrom);
+      if (dateTo) query = query.lte('observation_date', dateTo);
       const { data, error: queryError } = await query;
       if (queryError) throw queryError;
       const rawRows = (data || []) as Row[];
@@ -106,7 +110,7 @@ export default function MarketPricesPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [labelMap, rows.length, selectedCommodity, selectedDistrict, selectedMandi, selectedState]);
+  }, [dateFrom, dateTo, labelMap, rows.length, selectedCommodity, selectedDistrict, selectedMandi, selectedState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,22 +128,20 @@ export default function MarketPricesPage() {
   useEffect(() => {
     if (!commodities.length && !states.length) return;
     void loadPrices(true);
-  }, [selectedCommodity, selectedState, selectedDistrict, selectedMandi, labelMap]); // reload when filters/labels change
+  }, [selectedCommodity, selectedState, selectedDistrict, selectedMandi, dateFrom, dateTo, labelMap]); // reload when filters/labels change
 
   const latest = rows[0];
-  const previous = rows.length > 1 ? rows[1] : undefined;
-  const change = latest && previous ? Number(latest.modal_price) - Number(previous.modal_price) : null;
-  const changePct = change !== null && previous && Number(previous.modal_price) !== 0
-    ? (change / Number(previous.modal_price)) * 100
-    : null;
+  // Avoid presenting a cross-commodity price difference as market movement.
 
   const visibleDistricts = useMemo(
-    () => districts.filter((item) => !selectedState || rows.some((r) => r.state_code === selectedState && r.district_code === item.code) || item.code === selectedDistrict),
-    [districts, rows, selectedDistrict, selectedState],
+    () => districts.filter((item) => !selectedState || item.state_code === selectedState),
+    [districts, selectedState],
   );
   const visibleMandis = useMemo(
-    () => mandis.filter((item) => !selectedState || rows.some((r) => r.state_code === selectedState && r.mandi_code === item.code) || item.code === selectedMandi),
-    [mandis, rows, selectedMandi, selectedState],
+    () => mandis.filter((item) =>
+      (!selectedState || item.state_code === selectedState) &&
+      (!selectedDistrict || item.district_code === selectedDistrict)),
+    [mandis, selectedDistrict, selectedState],
   );
 
   return (
@@ -162,11 +164,13 @@ export default function MarketPricesPage() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-3 rounded-2xl border border-[#1e2d26] bg-[#121a16] p-4 md:grid-cols-4">
+      <section className="grid grid-cols-1 gap-3 rounded-2xl border border-[#1e2d26] bg-[#121a16] p-4 md:grid-cols-3 lg:grid-cols-6">
         <Select label="Commodity" value={selectedCommodity} options={commodities} onChange={setSelectedCommodity} />
         <Select label="State" value={selectedState} options={states} onChange={(value) => { setSelectedState(value); setSelectedDistrict(''); setSelectedMandi(''); }} />
         <Select label="District" value={selectedDistrict} options={visibleDistricts} onChange={setSelectedDistrict} />
         <Select label="Mandi" value={selectedMandi} options={visibleMandis} onChange={setSelectedMandi} />
+        <DateFilter label="Date from" value={dateFrom} onChange={setDateFrom} />
+        <DateFilter label="Date to" value={dateTo} onChange={setDateTo} />
       </section>
 
       {error && <div role="alert" className="rounded-xl border border-rose-800/60 bg-rose-950/30 p-4 text-sm text-rose-100">Market data error: {error}</div>}
@@ -179,9 +183,8 @@ export default function MarketPricesPage() {
         </div>
       ) : (
         <>
-          <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <Metric title="Latest modal price" value={latest ? '₹' + INDIAN.format(Number(latest.modal_price)) : '—'} detail="per quintal" />
-            <Metric title="Change vs previous row" value={change === null ? '—' : (change >= 0 ? '+' : '−') + '₹' + INDIAN.format(Math.abs(change))} detail={changePct === null ? 'No comparable previous row' : `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}% from previous row`} />
+          <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <Metric title="Latest modal price" value={latest ? '₹' + INDIAN.format(Number(latest.modal_price)) : '—'} detail="per quintal (selected record)" />
             <Metric title="Records loaded" value={INDIAN.format(rows.length)} detail={hasMore ? 'More records available below' : 'All matching rows loaded'} />
             <Metric title="Data provenance" value="AGMARKNET" detail={latest?.source || 'Imported government market data'} />
           </section>
@@ -235,6 +238,15 @@ function Select({ label, value, options, onChange }: { label: string; value: str
         <option value="">All {label.toLowerCase()}s</option>
         {options.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
       </select>
+    </label>
+  );
+}
+
+function DateFilter({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="block text-sm text-gray-300">
+      <span className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">{label}</span>
+      <input type="date" value={value} onChange={(event) => onChange(event.target.value)} className="min-h-11 w-full rounded-xl border border-[#2a3b32] bg-[#0a0f0d] px-3 text-white" />
     </label>
   );
 }
