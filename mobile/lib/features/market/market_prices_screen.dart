@@ -229,7 +229,6 @@ class _MarketScreenState extends State<MarketScreen> {
     required List<String> options,
     required ValueChanged<String> onChanged,
   }) {
-    final choices = ['', ...options.where((e) => e.isNotEmpty && e != value)];
     final items = <DropdownMenuItem<String>>[
       DropdownMenuItem(value: '', child: Text('All $label')),
       ...options.where((e) => e.isNotEmpty).map(
