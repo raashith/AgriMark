@@ -29,6 +29,12 @@ def detect_language_code(text: str) -> str:
         ("pa-IN", 0x0A00, 0x0A7F),
         ("od-IN", 0x0B00, 0x0B7F),
     ]
+    # Devanagari is shared by Hindi and Marathi, so prefer common Marathi markers
+    # when present rather than treating every Devanagari message as Hindi.
+    lowered = text.lower()
+    if any(term in lowered for term in ("माझ्या", "माझे", "मला", "आहे", "शेतात", "काय करावे")):
+        return "mr-IN"
+
     counts = {code: 0 for code, _, _ in script_ranges}
     for char in text:
         point = ord(char)
@@ -39,6 +45,19 @@ def detect_language_code(text: str) -> str:
     detected = max(counts, key=counts.get)
     if counts[detected] >= 2:
         return detected
+
+    # Support common romanized phrases when users type an Indian language using Latin letters.
+    transliteration_markers = [
+        ("ta-IN", ("vanakkam", "epdi", "eppadi", "venum", "sollunga", "enakku", "tamil", "vivasayam")),
+        ("hi-IN", ("namaste", "kaise", "kya", "chahiye", "kheti", "fasal", "batao", "kisan")),
+        ("te-IN", ("namaskaram", "cheppandi", "kavali", "ela unnaru", "raithu", "pantalu")),
+        ("ml-IN", ("engane", "venam", "parayamo", "krishi", "namaskaram")),
+        ("kn-IN", ("namaskara", "hege", "beku", "heli", "krushi")),
+        ("mr-IN", ("majhya", "mala", "aahe", "sheti", "sanga")),
+    ]
+    for code, markers in transliteration_markers:
+        if any(marker in lowered for marker in markers):
+            return code
     return "en-IN"
 
 
