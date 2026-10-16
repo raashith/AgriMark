@@ -218,7 +218,7 @@ export default function MarketPricesPage() {
       </section>
       <div className="flex justify-end"><button onClick={()=>void loadPrices(true)} className="inline-flex h-11 items-center gap-2 rounded-xl bg-emerald-500 px-5 text-sm font-extrabold text-[#032016] hover:bg-emerald-400"><MapPin className="h-4 w-4"/>View Prices</button></div>
 
-      {error && <div role="alert" className="rounded-xl border border-rose-800 bg-rose-950/40 p-4 text-sm text-rose-100">Unable to load market data: {error}. Check the market project's publishable key and read policies.</div>}
+      {error && <div role="alert" className="rounded-xl border border-rose-800 bg-rose-950/40 p-4 text-sm text-rose-100">Unable to load market data: {error}. Check the market publishable key and read policies.</div>}
       {loading && <div className="rounded-xl border border-emerald-950 bg-[#0b1912] p-4 text-sm text-slate-300">Loading verified AGMARKNET observations…</div>}
       {!loading && !error && rows.length===0 && <div className="rounded-xl border border-amber-900/70 bg-[#171209] p-6 text-amber-100">No observations match this selection. Try a broader date range or clear a filter.</div>}
 
