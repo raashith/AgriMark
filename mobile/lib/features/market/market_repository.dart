@@ -56,8 +56,8 @@ class MarketRepository {
     int offset = 0,
   }) async {
     final query = <String, String>{
-      'select': 'observation_date,state_code,district_code,mandi_code,commodity_code,variety,grade,min_price,max_price,modal_price,source',
-      'order': 'observation_date.desc',
+      'select': 'id,observation_date,state_code,district_code,mandi_code,commodity_code,variety,grade,min_price,max_price,modal_price,source',
+      'order': 'observation_date.desc,id.desc',
       'limit': '$limit',
       'offset': '$offset',
     };
