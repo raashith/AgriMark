@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
 from ...core.database import get_supabase
 from ...services.ai_service import AIService
@@ -138,12 +139,12 @@ def get_market_context(message: str) -> str:
 
 
 @router.post("/chat", response_model=AIChatResponse)
-def chat(request: AIChatRequest) -> AIChatResponse:
+async def chat(request: AIChatRequest) -> AIChatResponse:
     prompt = request.message
 
     if is_market_question(request.message):
         try:
-            market_context = get_market_context(request.message)
+            market_context = await run_in_threadpool(get_market_context, request.message)
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -178,10 +179,10 @@ def chat(request: AIChatRequest) -> AIChatResponse:
         )
 
     try:
-        answer = AIService().answer(prompt)
+        answer = await run_in_threadpool(AIService().answer, prompt)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail="AI provider request failed") from exc
 
-    return AIChatResponse(answer=answer, model="gpt-5-mini", status="ok")
+    return AIChatResponse(answer=answer, model=AIService.model, status="ok")
