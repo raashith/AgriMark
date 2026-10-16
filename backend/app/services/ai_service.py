@@ -14,7 +14,12 @@ class AIService:
     def __init__(self) -> None:
         settings = get_settings()
         api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY")
-        self._client = OpenAI(api_key=api_key) if api_key else None
+        # Bound upstream wait time so a stalled provider cannot tie up a worker indefinitely.
+        self._client = (
+            OpenAI(api_key=api_key, timeout=25.0, max_retries=1)
+            if api_key
+            else None
+        )
 
     @property
     def configured(self) -> bool:
@@ -28,7 +33,11 @@ class AIService:
             raise RuntimeError("AI provider is not configured.")
 
         try:
-            response = self._client.responses.create(model=self.model, input=prompt)
+            response = self._client.responses.create(
+                model=self.model,
+                input=prompt,
+                max_output_tokens=700,
+            )
             text = response.output_text.strip() if response.output_text else ""
             if not text:
                 raise RuntimeError("AI provider returned an empty response.")
