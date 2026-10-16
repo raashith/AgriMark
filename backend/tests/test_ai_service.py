@@ -92,3 +92,5 @@ def test_detect_language_from_indian_scripts():
     assert ai_service.detect_language_code("नमस्ते किसान") == "hi-IN"
     assert ai_service.detect_language_code("హలో రైతు") == "te-IN"
     assert ai_service.detect_language_code("Hello farmer") == "en-IN"
+    assert ai_service.detect_language_code("Vanakkam, enakku paddy vilai sollunga") == "ta-IN"
+    assert ai_service.detect_language_code("माझ्या शेतात काय करावे") == "mr-IN"
