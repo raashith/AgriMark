@@ -7,14 +7,14 @@ import '../../core/widgets/loading_view.dart';
 import 'market_repository.dart';
 import 'sell_produce_screen.dart';
 
-class MarketScreen extends StatefulWidget {
-  const MarketScreen({super.key});
+class MarketPricesScreen extends StatefulWidget {
+  const MarketPricesScreen({super.key});
 
   @override
-  State<MarketScreen> createState() => _MarketScreenState();
+  State<MarketPricesScreen> createState() => _MarketPricesScreenState();
 }
 
-class _MarketScreenState extends State<MarketScreen> {
+class _MarketPricesScreenState extends State<MarketPricesScreen> {
   final _marketRepo = MarketRepository();
   bool _isLoading = true;
   String? _error;
@@ -23,6 +23,7 @@ class _MarketScreenState extends State<MarketScreen> {
   List<Map<String, String>> _commodities = [];
   List<Map<String, String>> _states = [];
   List<Map<String, String>> _districts = [];
+  List<Map<String, String>> _mandis = [];
   String _commodity = '';
   String _state = '';
   String _district = '';
@@ -56,6 +57,7 @@ class _MarketScreenState extends State<MarketScreen> {
         _commodities = _asOptions(filters['commodities']);
         _states = _asOptions(filters['states']);
         _districts = _asOptions(filters['districts']);
+        _mandis = _asOptions(filters['mandis']);
         _isLoading = false;
       });
     } catch (e) {
@@ -226,14 +228,15 @@ class _MarketScreenState extends State<MarketScreen> {
   Widget _dropdown({
     required String label,
     required String value,
-    required List<String> options,
+    required List<Map<String, String>> options,
     required ValueChanged<String> onChanged,
   }) {
     final items = <DropdownMenuItem<String>>[
       DropdownMenuItem(value: '', child: Text('All $label')),
-      ...options.where((e) => e.isNotEmpty).map(
-            (e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis)),
-          ),
+      ...options.map((option) => DropdownMenuItem(
+            value: option['code']!,
+            child: Text(option['name']!, overflow: TextOverflow.ellipsis),
+          )),
     ];
     // Keep the selected value valid even when new filter data arrives.
     final uniqueItems = <String, DropdownMenuItem<String>>{};
@@ -257,10 +260,17 @@ class _MarketScreenState extends State<MarketScreen> {
 
   Widget _priceCard(dynamic raw) {
     final row = Map<String, dynamic>.from(raw as Map);
-    final commodity = (row['commodity_name'] ?? row['commodity_code'] ?? 'Commodity').toString();
-    final mandi = (row['mandi_name'] ?? row['mandi_code'] ?? 'Unknown mandi').toString();
-    final district = (row['district_name'] ?? '').toString();
-    final state = (row['state_name'] ?? '').toString();
+    String labelFor(List<Map<String, String>> options, dynamic code, {String fallback = ''}) {
+      final key = code?.toString() ?? '';
+      for (final option in options) {
+        if (option['code'] == key) return option['name'] ?? key;
+      }
+      return key.isNotEmpty ? key : fallback;
+    }
+    final commodity = labelFor(_commodities, row['commodity_code'], fallback: 'Commodity');
+    final mandi = labelFor(_mandis, row['mandi_code'], fallback: 'Unknown mandi');
+    final district = labelFor(_districts, row['district_code']);
+    final state = labelFor(_states, row['state_code']);
     final date = (row['observation_date'] ?? '').toString();
     final min = _number(row['min_price']);
     final max = _number(row['max_price']);
