@@ -59,11 +59,11 @@ async def voice_assistant(
     try:
         app_context = get_app_context(transcript, user)
         prompt = (
-            f"Question: {transcript}\\n\\n"
-            f"AgriMark app reference context:\\n{app_context}"
+            f"Question: {transcript}\n\n"
+            f"AgriMark app reference context:\n{app_context}"
         )
         if is_market_question(transcript):
-            prompt += f"\\n\\nVerified AGMARKNET reference data:\\n{get_market_context(transcript)}"
+            prompt += f"\n\nVerified AGMARKNET reference data:\n{get_market_context(transcript)}"
         answer_text = AIService().answer(prompt, language_code=detected_lang)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
