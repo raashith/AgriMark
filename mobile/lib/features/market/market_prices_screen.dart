@@ -41,7 +41,7 @@ class _MarketPricesScreenState extends State<MarketPricesScreen> {
     });
     try {
       final values = await Future.wait([
-        _marketRepo.searchListings(),
+        _marketRepo.searchListings().catchError((_) => <dynamic>[]),
         _marketRepo.fetchNationalMarketPrices(
           commodity: _commodity,
           state: _state,
