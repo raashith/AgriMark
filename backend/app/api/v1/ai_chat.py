@@ -11,6 +11,7 @@ from ...core.auth import AuthenticatedUser, get_optional_current_user
 from ...core.config import get_settings
 from ...core.database import get_supabase, get_supabase_public
 from ...services.ai_service import AIService, detect_language_code
+from ...services.market_data import build_market_context
 from ...services.weather_service import WeatherService
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -80,67 +81,12 @@ def extract_market_filters(message: str) -> tuple[str | None, str | None]:
 
 
 def get_market_context(message: str) -> str:
-    commodity, state = extract_market_filters(message)
-
-    try:
-        query = (
-            get_supabase()
-            .table("national_market_price_observations")
-            .select(
-                "commodity_code,variant_code,mandi_code,district_code,state_code,"
-                "min_price,max_price,modal_price,observed_at,source,geography,unit"
-            )
-            .eq("price_signal_type", "OBSERVED_MANDI")
-            .order("observed_at", desc=True)
-            .limit(40)
-        )
-        if commodity:
-            query = query.eq("commodity_code", commodity)
-        if state:
-            query = query.eq("state_code", state)
-
-        rows = query.execute().data or []
-    except Exception as exc:
-        raise RuntimeError("AGMARKNET market database is temporarily unavailable.") from exc
-
-    if not rows:
-        return (
-            "AGMARKNET DATABASE STATUS: connected, but no matching official observations "
-            "have been ingested yet for this query. Do not invent a price. "
-            "Tell the user that official observations are not available for the requested filters."
-        )
-
-    now = datetime.now(timezone.utc)
-    lines = [
-        "AGMARKNET OFFICIAL MARKET CONTEXT",
-        "Source: Government of India AGMARKNET via data.gov.in.",
-        "Unit: INR per quintal.",
-        "These are observed administrative market reports, not predictions or guaranteed live quotes.",
-    ]
-    if commodity:
-        lines.append(f"Commodity filter: {commodity}")
-    if state:
-        lines.append(f"State filter: {state}")
-
-    for row in rows:
-        observed = row.get("observed_at") or ""
-        lines.append(
-            f"- commodity={row.get('commodity_code')}; variant={row.get('variant_code')}; "
-            f"mandi={row.get('mandi_code')}; geography={row.get('geography')}; "
-            f"modal=₹{row.get('modal_price')}; min=₹{row.get('min_price')}; "
-            f"max=₹{row.get('max_price')}; observed_at={observed}; source={row.get('source')}"
-        )
-
-    latest = rows[0].get("observed_at")
-    if latest:
-        try:
-            age_days = (now - datetime.fromisoformat(latest.replace("Z", "+00:00"))).total_seconds() / 86400
-            lines.append(f"Freshness: newest stored observation is approximately {max(age_days, 0):.1f} days old.")
-        except ValueError:
-            pass
-
-    return "\n".join(lines)
-
+    """Fetch official stored market observations from the selected production data project."""
+    return build_market_context(
+        message,
+        commodity_aliases=COMMODITY_ALIASES,
+        state_codes=STATE_CODES,
+    )
 
 @router.post("/chat", response_model=AIChatResponse)
 def chat(
