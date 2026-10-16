@@ -2,16 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarDays, MapPin, RefreshCw, ShieldCheck, TrendingUp } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
+import { marketSupabase } from '@/lib/market-supabase';
 
-const MARKET_SUPABASE_URL =
-  process.env.NEXT_PUBLIC_MARKET_SUPABASE_URL || 'https://tsdjtlmrvbspyzgwmccg.supabase.co';
-const MARKET_SUPABASE_KEY =
-  process.env.NEXT_PUBLIC_MARKET_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_YvBVc_mQXS5606qGvJqZ1g_kg9ot7TF';
-
-const marketSupabase = createClient(MARKET_SUPABASE_URL, MARKET_SUPABASE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-});
 
 type Option = { code: string; name: string };
 type Row = {
