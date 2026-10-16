@@ -51,16 +51,20 @@ class MarketRepository {
     String commodity = '',
     String state = '',
     String district = '',
+    String mandi = '',
     int limit = 100,
+    int offset = 0,
   }) async {
     final query = <String, String>{
       'select': 'observation_date,state_code,district_code,mandi_code,commodity_code,variety,grade,min_price,max_price,modal_price,source',
       'order': 'observation_date.desc',
       'limit': '$limit',
+      'offset': '$offset',
     };
     if (commodity.isNotEmpty) query['commodity_code'] = 'eq.$commodity';
     if (state.isNotEmpty) query['state_code'] = 'eq.$state';
     if (district.isNotEmpty) query['district_code'] = 'eq.$district';
+    if (mandi.isNotEmpty) query['mandi_code'] = 'eq.$mandi';
 
     final uri = Uri.parse('$_supabaseUrl/rest/v1/national_market_price_observations')
         .replace(queryParameters: query);
