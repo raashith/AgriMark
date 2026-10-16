@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../features/agri_ai/agri_ai_screen.dart';
 import '../../features/farm/farm_screen.dart';
 import '../../features/home/home_screen.dart';
-import '../../features/market/market_screen.dart';
+import '../../features/market/market_prices_screen.dart';
 import '../../features/onboarding/auth_repository.dart';
 import '../../features/onboarding/login_screen.dart';
 import '../../features/orders/orders_screen.dart';
@@ -41,7 +41,7 @@ class _MainNavigationContainerState extends State<MainNavigationContainer> {
         onAskAiWithPrompt: _askAiWithPrompt,
       ),
       const FarmScreen(),
-      const MarketScreen(),
+      const MarketPricesScreen(),
       const OrdersScreen(),
       AgriAiScreen(key: ValueKey(_pendingAiPrompt), initialPrompt: _pendingAiPrompt),
     ];
