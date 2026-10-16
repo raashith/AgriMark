@@ -184,4 +184,4 @@ def chat(request: AIChatRequest) -> AIChatResponse:
     except Exception as exc:
         raise HTTPException(status_code=502, detail="AI provider request failed") from exc
 
-    return AIChatResponse(answer=answer, model="gpt-5-mini", status="ok")
+    return AIChatResponse(answer=answer, model=AIService.model, status="ok")

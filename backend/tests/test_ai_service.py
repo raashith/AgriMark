@@ -7,9 +7,9 @@ def test_missing_key_reports_render_configuration_step(monkeypatch):
     monkeypatch.setattr(
         ai_service,
         "get_settings",
-        lambda: SimpleNamespace(openai_api_key=None),
+        lambda: SimpleNamespace(sarvam_api_key=None),
     )
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("SARVAM_API_KEY", raising=False)
 
     service = ai_service.AIService()
 
@@ -17,52 +17,60 @@ def test_missing_key_reports_render_configuration_step(monkeypatch):
     try:
         service.answer("hi")
     except RuntimeError as exc:
-        assert "OPENAI_API_KEY" in str(exc)
+        assert "SARVAM_API_KEY" in str(exc)
         assert "Render" in str(exc)
     else:
-        raise AssertionError("Expected missing API key to fail clearly")
+        raise AssertionError("Expected missing Sarvam API key to fail clearly")
 
 
-def test_answer_uses_configured_model_and_returns_text(monkeypatch):
+def test_answer_uses_sarvam_conversation_model_and_returns_text(monkeypatch):
     monkeypatch.setattr(
         ai_service,
         "get_settings",
-        lambda: SimpleNamespace(openai_api_key="test-key"),
+        lambda: SimpleNamespace(sarvam_api_key="test-key"),
     )
     captured = {}
 
-    class FakeResponses:
-        def create(self, **kwargs):
+    class FakeCompletions:
+        def completions(self, **kwargs):
             captured.update(kwargs)
-            return SimpleNamespace(output_text="Namaste! How can I help with your farm?")
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            content="Vanakkam! How can I help with your farm?"
+                        )
+                    )
+                ]
+            )
 
     class FakeClient:
         def __init__(self, **kwargs):
             captured["client_options"] = kwargs
-            self.responses = FakeResponses()
+            self.chat = SimpleNamespace(completions=FakeCompletions().completions)
 
-    monkeypatch.setattr(ai_service, "OpenAI", FakeClient)
+    monkeypatch.setattr(ai_service, "SarvamAI", FakeClient)
     service = ai_service.AIService()
 
-    assert service.answer("hi").startswith("Namaste!")
-    assert captured["model"] == "gpt-5-mini"
-    assert captured["input"] == "hi"
-    assert captured["client_options"]["timeout"] == 25.0
-    assert captured["client_options"]["max_retries"] == 1
+    assert service.answer("hi").startswith("Vanakkam!")
+    assert captured["model"] == "sarvam-105b-conversations"
+    assert captured["messages"][-1] == {"role": "user", "content": "hi"}
+    assert captured["client_options"] == {"api_subscription_key": "test-key"}
+    assert captured["reasoning_effort"] is None
 
 
 def test_empty_prompt_is_rejected(monkeypatch):
     monkeypatch.setattr(
         ai_service,
         "get_settings",
-        lambda: SimpleNamespace(openai_api_key="test-key"),
+        lambda: SimpleNamespace(sarvam_api_key="test-key"),
     )
 
     class FakeClient:
         def __init__(self, **_kwargs):
-            self.responses = None
+            self.chat = None
 
-    monkeypatch.setattr(ai_service, "OpenAI", FakeClient)
+    monkeypatch.setattr(ai_service, "SarvamAI", FakeClient)
     service = ai_service.AIService()
 
     try:
