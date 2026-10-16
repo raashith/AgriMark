@@ -280,7 +280,7 @@ export default function AiAssistantPage() {
     setLoading(true);
 
     try {
-      const res = await api.askAgriAI(q, 'Thanjavur, Tamil Nadu Delta Region');
+      const res = await api.askAgriAI(q, 'Thanjavur, Tamil Nadu Delta Region', selectedLanguage);
       const answerText = res.answer;
 
       const aiMsg: ChatMessage = {
