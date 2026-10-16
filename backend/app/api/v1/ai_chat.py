@@ -61,9 +61,9 @@ MARKET_TERMS = (
 
 def is_market_question(message: str) -> bool:
     text = message.lower()
-    return any(term in text for term in MARKET_TERMS) or any(
-        bool(re.search(rf"\b{re.escape(commodity)}\b", text)) for commodity in COMMODITY_ALIASES
-    )
+    # A crop name alone is not a market-price request; only fetch market data when
+    # the user asks about prices, buying/selling, mandi, arrivals, or market conditions.
+    return any(term in text for term in MARKET_TERMS)
 
 
 def extract_market_filters(message: str) -> tuple[str | None, str | None]:
