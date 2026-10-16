@@ -74,8 +74,10 @@ class AIService:
             )
 
         try:
-            selected_language = (language_code or detect_language_code(prompt)).strip()
-            language_name = LANGUAGE_NAMES.get(selected_language, "the same language used in the user's question")
+            selected_language = (language_code or "auto").strip()
+            if selected_language not in LANGUAGE_NAMES:
+                selected_language = detect_language_code(prompt)
+            language_name = LANGUAGE_NAMES[selected_language]
             response = self._client.chat.completions(
                 model=self.model,
                 messages=[
