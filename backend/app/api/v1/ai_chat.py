@@ -3,11 +3,12 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from ...core.database import get_supabase
-from ...services.ai_service import AIService
+from ...core.auth import AuthenticatedUser, get_optional_current_user
+from ...core.database import get_supabase, get_supabase_public
+from ...services.ai_service import AIService, detect_language_code
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -15,6 +16,7 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 class AIChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     context: str | None = Field(default=None, max_length=12000)
+    language_code: str = Field(default="auto", max_length=10)
 
 
 class AIChatResponse(BaseModel):
@@ -138,8 +140,18 @@ def get_market_context(message: str) -> str:
 
 
 @router.post("/chat", response_model=AIChatResponse)
-def chat(request: AIChatRequest) -> AIChatResponse:
+def chat(
+    request: AIChatRequest,
+    user: AuthenticatedUser | None = Depends(get_optional_current_user),
+) -> AIChatResponse:
     prompt = request.message
+    selected_language = request.language_code
+    language_code = (
+        detect_language_code(request.message)
+        if selected_language == "auto"
+        else selected_language
+    )
+    app_context = get_app_context(request.message, user)
 
     if is_market_question(request.message):
         try:
@@ -161,13 +173,95 @@ def chat(request: AIChatRequest) -> AIChatResponse:
         )
     else:
         # No extra role prompt here: AIService supplies the system behavior.
-        prompt = request.message.strip()
+        prompt = (
+            f"Question: {request.message.strip()}\\n\\n"
+            f"AgriMark app reference context:\\n{app_context}"
+        )
 
     try:
-        answer = AIService().answer(prompt)
+        answer = AIService().answer(prompt, language_code=language_code)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail="AI provider request failed") from exc
 
     return AIChatResponse(answer=answer, model=AIService.model, status="ok")
+
+APP_CAPABILITIES = (
+    "AgriMark app guide: profile and onboarding; farms; crop catalogue and cultivation "
+    "planning; harvest batches, produce lots and traceability; marketplace listings; "
+    "buyer requests for quotation (RFQs); seller offers; orders; logistics/tracking; "
+    "AGMARKNET mandi observations; weather (requires a valid location); and AI voice/text. "
+    "Explain navigation and workflows, and distinguish advice from actions. The assistant "
+    "must never claim a write/action succeeded unless a backend action confirms it."
+)
+
+
+def get_app_context(message: str, user: AuthenticatedUser | None) -> str:
+    """Build bounded, read-only context from public data and the authenticated user's own records."""
+    text = message.lower()
+    parts = [APP_CAPABILITIES]
+    private_intent = any(term in text for term in (
+        "my farm", "my farms", "my crop", "my crops", "my cultivation", "my harvest",
+        "my produce", "my listing", "my order", "my orders", "my profile", "my account",
+        "என் பண்ணை", "என் பயிர்", "என்னுடைய", "నా పొలం", "मेरे खेत", "माझे शेत",
+    ))
+    if user and (private_intent or any(term in text for term in (
+        "farm", "crop", "cultivation", "harvest", "produce", "listing", "order", "profile",
+        "பண்ணை", "பயிர்", "விவசாயம்", "खेती", "फसल", "పంట", "കൃഷി", "ಬೆಳೆ",
+    ))):
+        try:
+            db = get_supabase()
+            farms = db.table("farms").select("id,name,village,district,state,area_acres").eq(
+                "owner_id", str(user.id)
+            ).order("created_at", desc=True).limit(10).execute().data or []
+            if farms:
+                safe_farms = [
+                    {key: row.get(key) for key in ("id", "name", "village", "district", "state", "area_acres")}
+                    for row in farms
+                ]
+                parts.append("Authenticated user's own farms: " + str(safe_farms))
+                farm_ids = [str(row["id"]) for row in farms if row.get("id")]
+                if farm_ids:
+                    cultivations = db.table("cultivations").select(
+                        "id,farm_id,crop_id,season,sowing_date,expected_harvest_date,area_acres,status"
+                    ).in_("farm_id", farm_ids).order("created_at", desc=True).limit(20).execute().data or []
+                    if cultivations:
+                        parts.append("Authenticated user's cultivation plans: " + str(cultivations))
+                    harvests = db.table("harvest_batches").select(
+                        "id,farm_id,cultivation_id,harvested_at,quantity,unit,grade,trace_code"
+                    ).in_("farm_id", farm_ids).order("harvested_at", desc=True).limit(10).execute().data or []
+                    if harvests:
+                        parts.append("Authenticated user's recent harvests: " + str(harvests))
+            lots = db.table("produce_lots").select(
+                "id,crop_id,cultivation_id,quantity,unit,quality_grade,available_quantity,harvested_at,status,is_listed"
+            ).eq("owner_id", str(user.id)).order("created_at", desc=True).limit(10).execute().data or []
+            if lots:
+                parts.append("Authenticated user's produce lots: " + str(lots))
+            if any(term in text for term in ("order", "orders", "purchase", "delivery", "ஆர்டர்", "आदेश")):
+                orders = db.table("marketplace_orders").select("*").or_(
+                    f"buyer_id.eq.{user.id},seller_id.eq.{user.id}"
+                ).order("created_at", desc=True).limit(10).execute().data or []
+                safe_orders = [
+                    {key: row.get(key) for key in (
+                        "id", "status", "quantity", "unit", "total_amount", "created_at",
+                        "buyer_id", "seller_id", "listing_id"
+                    ) if key in row}
+                    for row in orders
+                ]
+                if safe_orders:
+                    parts.append("Authenticated user's own orders: " + str(safe_orders))
+        except Exception:
+            # Context enrichment is best-effort; it must not break basic chat or expose internals.
+            parts.append("Personal app records could not be loaded for this request. Do not guess them.")
+    if any(term in text for term in ("marketplace", "listing", "sell", "buy", "buyer", "விற்க", "வாங்க", "बाजार")):
+        try:
+            listings = get_supabase_public().table("listings").select(
+                "id,title,price_per_unit,currency,status,created_at"
+            ).eq("status", "active").order("created_at", desc=True).limit(8).execute().data or []
+            if listings:
+                parts.append("Recent public active marketplace listings: " + str(listings))
+        except Exception:
+            parts.append("Public marketplace listings are temporarily unavailable; do not invent listing details.")
+    return "\\n".join(parts)
+
