@@ -26,7 +26,7 @@ class AIChatResponse(BaseModel):
 
 
 STATE_CODES = {
-    "tamil nadu": "TN", "maharashtra": "MH", "karnataka": "KA",
+    "tamil nadu": "TN", "தமிழ்நாடு": "TN", "தமிழ் நாடு": "TN", "maharashtra": "MH", "karnataka": "KA",
     "andhra pradesh": "AP", "telangana": "TS", "kerala": "KL",
     "uttar pradesh": "UP", "punjab": "PB", "haryana": "HR",
     "madhya pradesh": "MP", "gujarat": "GJ", "west bengal": "WB",
@@ -36,9 +36,9 @@ STATE_CODES = {
 }
 
 COMMODITY_ALIASES = {
-    "paddy": "PADDY", "rice": "RICE", "wheat": "WHEAT", "maize": "MAIZE",
+    "paddy": "PADDY", "நெல்": "PADDY", "धान": "PADDY", "వరి": "PADDY", "rice": "RICE", "அரிசி": "RICE", "चावल": "RICE", "బియ్యం": "RICE", "wheat": "WHEAT", "கோதுமை": "WHEAT", "गेहूं": "WHEAT", "maize": "MAIZE",
     "corn": "CORN", "bajra": "BAJRA", "jowar": "JOWAR", "ragi": "RAGI",
-    "onion": "ONION", "potato": "POTATO", "tomato": "TOMATO",
+    "onion": "ONION", "வெங்காயம்": "ONION", "potato": "POTATO", "tomato": "TOMATO", "தக்காளி": "TOMATO", "टमाटर": "TOMATO",
     "garlic": "GARLIC", "brinjal": "BRINJAL", "okra": "BHINDI",
     "bhindi": "BHINDI", "soybean": "SOYBEAN", "soyabean": "SOYABEAN",
     "groundnut": "GROUNDNUT", "peanut": "PEANUT", "mustard": "MUSTARD",
@@ -52,14 +52,14 @@ COMMODITY_ALIASES = {
 MARKET_TERMS = (
     "mandi", "market price", "market rate", "price", "bhav", "modal",
     "minimum price", "maximum price", "selling price", "sell", "buy",
-    "commodity price", "agmarknet", "arrival",
+    "commodity price", "agmarknet", "arrival", "விலை", "சந்தை", "மண்டி", "ధర", "మార్కెట్", "भाव", "मंडी", "कीमत", "ಬೆಲೆ", "ಮಾರುಕಟ್ಟೆ", "വില", "വിപണി", "দাম", "বাজার", "કિંમત", "બજાર",
 )
 
 
 def is_market_question(message: str) -> bool:
     text = message.lower()
     return any(term in text for term in MARKET_TERMS) or any(
-        f" {commodity} " in f" {text} " for commodity in COMMODITY_ALIASES
+        bool(re.search(rf"\\b{re.escape(commodity)}\\b", text)) for commodity in COMMODITY_ALIASES
     )
 
 
