@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import datetime, timezone
 
@@ -7,8 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ...core.auth import AuthenticatedUser, get_optional_current_user
+from ...core.config import get_settings
 from ...core.database import get_supabase, get_supabase_public
 from ...services.ai_service import AIService, detect_language_code
+from ...services.weather_service import WeatherService
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -253,9 +256,86 @@ def get_app_context(message: str, user: AuthenticatedUser | None) -> str:
                 ]
                 if safe_orders:
                     parts.append("Authenticated user's own orders: " + str(safe_orders))
+            if any(term in text for term in ("rfq", "request for quotation", "quote", "offer", "விலைப்புள்ளி", "प्रस्ताव")):
+                offers = db.table("marketplace_offers").select("*").eq(
+                    "seller_id", str(user.id)
+                ).order("created_at", desc=True).limit(10).execute().data or []
+                safe_offers = [
+                    {key: row.get(key) for key in ("id", "rfq_id", "quantity", "unit_price", "status", "created_at") if key in row}
+                    for row in offers
+                ]
+                if safe_offers:
+                    parts.append("Authenticated user's own seller offers: " + str(safe_offers))
+                buyer_profiles = db.table("buyer_profiles").select("id").eq(
+                    "user_id", str(user.id)
+                ).limit(1).execute().data or []
+                if buyer_profiles:
+                    rfqs = db.table("buyer_rfqs").select("*").eq(
+                        "buyer_id", buyer_profiles[0]["id"]
+                    ).order("created_at", desc=True).limit(10).execute().data or []
+                    safe_rfqs = [
+                        {key: row.get(key) for key in ("id", "quantity", "unit", "target_price", "delivery_district", "delivery_state", "deadline", "status", "created_at") if key in row}
+                        for row in rfqs
+                    ]
+                    if safe_rfqs:
+                        parts.append("Authenticated user's own buyer requests for quotation: " + str(safe_rfqs))
         except Exception:
             # Context enrichment is best-effort; it must not break basic chat or expose internals.
             parts.append("Personal app records could not be loaded for this request. Do not guess them.")
+    weather_requested = any(term in text for term in (
+        "weather", "forecast", "rain", "rainfall", "temperature", "humidity",
+        "வானிலை", "மழை", "வெப்பநிலை", "मौसम", "बारिश", "पूर्वानुमान", "వాతావరణం",
+        "వర్షం", "కాలావస్థ", "മഴ", "കാലാവസ്ഥ", "ಹವಾಮಾನ", "ಮಳೆ",
+    ))
+    if weather_requested:
+        if not user:
+            parts.append("Live weather needs a signed-in user's saved farm coordinates or location permission. No location was supplied; do not guess weather.")
+        else:
+            try:
+                db = get_supabase()
+                farms_with_location = db.table("farms").select(
+                    "latitude,longitude"
+                ).eq("owner_id", str(user.id)).order("created_at", desc=True).limit(10).execute().data or []
+                coordinates = next(
+                    ((row.get("latitude"), row.get("longitude")) for row in farms_with_location
+                     if row.get("latitude") is not None and row.get("longitude") is not None),
+                    None,
+                )
+                if not coordinates:
+                    location_rows = db.table("location_telemetry").select(
+                        "latitude,longitude"
+                    ).eq("user_id", str(user.id)).order("captured_at", desc=True).limit(1).execute().data or []
+                    if location_rows:
+                        coordinates = (location_rows[0].get("latitude"), location_rows[0].get("longitude"))
+                if not coordinates or coordinates[0] is None or coordinates[1] is None:
+                    parts.append("No saved farm or recent location coordinates are available for live weather. Ask the user to select a location or enable location sharing.")
+                else:
+                    weather_service = WeatherService(get_settings().openweather_api_key)
+                    if any(term in text for term in ("forecast", "நாளை", "வரும் நாட்கள்", "पूर्वानुमान", "వాతావరణ సూచన")):
+                        forecast = asyncio.run(weather_service.forecast(coordinates[0], coordinates[1], days=3))
+                        compact_items = [
+                            {
+                                "time": item.get("dt_txt"),
+                                "temperature_c": (item.get("main") or {}).get("temp"),
+                                "humidity_pct": (item.get("main") or {}).get("humidity"),
+                                "condition": ((item.get("weather") or [{}])[0]).get("description"),
+                                "rain_mm": (item.get("rain") or {}).get("3h", 0),
+                            }
+                            for item in (forecast.get("items") or [])[:12]
+                        ]
+                        parts.append("Verified OpenWeather forecast (next 3 days, from the user's saved location): " + str(compact_items))
+                    else:
+                        current = asyncio.run(weather_service.current(coordinates[0], coordinates[1]))
+                        safe_weather = {
+                            key: current.get(key) for key in (
+                                "location_name", "country", "condition", "description", "temperature_c",
+                                "feels_like_c", "humidity_pct", "wind_speed_mps", "rain_1h_mm", "observed_at"
+                            )
+                        }
+                        parts.append("Verified current OpenWeather data (from the user's saved location): " + str(safe_weather))
+            except Exception:
+                parts.append("Live weather could not be loaded for this request. Do not guess current conditions.")
+
     if any(term in text for term in ("marketplace", "listing", "sell", "buy", "buyer", "விற்க", "வாங்க", "बाजार")):
         try:
             listings = get_supabase_public().table("listings").select(
