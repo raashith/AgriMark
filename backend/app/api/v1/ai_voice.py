@@ -1,3 +1,4 @@
+import asyncio
 import urllib.parse
 import logging
 from typing import Optional
@@ -57,14 +58,15 @@ async def voice_assistant(
         raise HTTPException(status_code=500, detail="Failed to process speech input.") from exc
 
     try:
-        app_context = get_app_context(transcript, user)
+        app_context = await asyncio.to_thread(get_app_context, transcript, user)
         prompt = (
             f"Question: {transcript}\n\n"
             f"AgriMark app reference context:\n{app_context}"
         )
         if is_market_question(transcript):
-            prompt += f"\n\nVerified AGMARKNET reference data:\n{get_market_context(transcript)}"
-        answer_text = AIService().answer(prompt, language_code=detected_lang)
+            market_context = await asyncio.to_thread(get_market_context, transcript)
+            prompt += f"\n\nVerified AGMARKNET reference data:\n{market_context}"
+        answer_text = await asyncio.to_thread(AIService().answer, prompt, detected_lang)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
