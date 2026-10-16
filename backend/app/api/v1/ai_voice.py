@@ -1,11 +1,14 @@
+import asyncio
 import urllib.parse
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Response
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Response
 
+from ...core.auth import AuthenticatedUser, get_optional_current_user
 from ...services.ai_service import AIService
 from ...services.sarvam_voice import SarvamVoiceService
+from .ai_chat import get_app_context, get_market_context, is_market_question
 
 logger = logging.getLogger("ai_voice")
 
@@ -22,6 +25,7 @@ ALLOWED_AUDIO_TYPES = {
 async def voice_assistant(
     file: UploadFile = File(...),
     language_code: str = Form("unknown"),
+    user: AuthenticatedUser | None = Depends(get_optional_current_user),
 ) -> Response:
     content_type = (file.content_type or "").split(";")[0].strip().lower()
 
@@ -54,7 +58,15 @@ async def voice_assistant(
         raise HTTPException(status_code=500, detail="Failed to process speech input.") from exc
 
     try:
-        answer_text = AIService().answer(transcript)
+        app_context = await asyncio.to_thread(get_app_context, transcript, user)
+        prompt = (
+            f"Question: {transcript}\n\n"
+            f"AgriMark app reference context:\n{app_context}"
+        )
+        if is_market_question(transcript):
+            market_context = await asyncio.to_thread(get_market_context, transcript)
+            prompt += f"\n\nVerified AGMARKNET reference data:\n{market_context}"
+        answer_text = await asyncio.to_thread(AIService().answer, prompt, detected_lang)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
