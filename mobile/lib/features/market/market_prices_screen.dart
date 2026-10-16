@@ -17,7 +17,10 @@ class MarketPricesScreen extends StatefulWidget {
 class _MarketPricesScreenState extends State<MarketPricesScreen> {
   final _marketRepo = MarketRepository();
   bool _isLoading = true;
+  bool _isLoadingMorePrices = false;
+  bool _hasMorePrices = true;
   String? _error;
+  String? _loadMoreError;
   List<dynamic> _listings = [];
   List<dynamic> _prices = [];
   List<Map<String, String>> _commodities = [];
@@ -27,6 +30,7 @@ class _MarketPricesScreenState extends State<MarketPricesScreen> {
   String _commodity = '';
   String _state = '';
   String _district = '';
+  String _mandi = '';
 
   @override
   void initState() {
@@ -46,6 +50,9 @@ class _MarketPricesScreenState extends State<MarketPricesScreen> {
           commodity: _commodity,
           state: _state,
           district: _district,
+          mandi: _mandi,
+          limit: 100,
+          offset: 0,
         ),
         _marketRepo.fetchNationalMarketFilters(),
       ]);
@@ -54,6 +61,8 @@ class _MarketPricesScreenState extends State<MarketPricesScreen> {
       setState(() {
         _listings = values[0] as List<dynamic>;
         _prices = values[1] as List<dynamic>;
+        _hasMorePrices = _prices.length == 100;
+        _loadMoreError = null;
         _commodities = _asOptions(filters['commodities']);
         _states = _asOptions(filters['states']);
         _districts = _asOptions(filters['districts']);
@@ -66,6 +75,34 @@ class _MarketPricesScreenState extends State<MarketPricesScreen> {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadMorePrices() async {
+    if (_isLoadingMorePrices || !_hasMorePrices) return;
+    setState(() {
+      _isLoadingMorePrices = true;
+      _loadMoreError = null;
+    });
+    try {
+      final next = await _marketRepo.fetchNationalMarketPrices(
+        commodity: _commodity,
+        state: _state,
+        district: _district,
+        mandi: _mandi,
+        limit: 100,
+        offset: _prices.length,
+      );
+      if (!mounted) return;
+      setState(() {
+        _prices = [..._prices, ...next];
+        _hasMorePrices = next.length == 100;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadMoreError = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoadingMorePrices = false);
     }
   }
 
@@ -159,6 +196,22 @@ class _MarketPricesScreenState extends State<MarketPricesScreen> {
                         )
                       else
                         ..._prices.map(_priceCard),
+                      if (_loadMoreError != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(_loadMoreError!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+                        ),
+                      if (_prices.isNotEmpty && _hasMorePrices)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: OutlinedButton.icon(
+                            onPressed: _isLoadingMorePrices ? null : _loadMorePrices,
+                            icon: _isLoadingMorePrices
+                                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                : const Icon(Icons.expand_more),
+                            label: Text(_isLoadingMorePrices ? 'Loading more records...' : 'Load more mandi prices'),
+                          ),
+                        ),
                       const SizedBox(height: 18),
                       const Text(
                         'Your farmer listings',
@@ -214,6 +267,7 @@ class _MarketPricesScreenState extends State<MarketPricesScreen> {
               setState(() {
                 _state = value;
                 _district = '';
+                _mandi = '';
               });
               _loadAll();
             },
@@ -224,7 +278,20 @@ class _MarketPricesScreenState extends State<MarketPricesScreen> {
             value: _district,
             options: currentDistricts,
             onChanged: (value) {
-              setState(() => _district = value);
+              setState(() {
+                _district = value;
+                _mandi = '';
+              });
+              _loadAll();
+            },
+          ),
+          const SizedBox(height: 8),
+          _dropdown(
+            label: 'Mandi',
+            value: _mandi,
+            options: _mandis,
+            onChanged: (value) {
+              setState(() => _mandi = value);
               _loadAll();
             },
           ),
