@@ -48,10 +48,10 @@ def detect_language_code(text: str) -> str:
 
     # Support common romanized phrases when users type an Indian language using Latin letters.
     transliteration_markers = [
-        ("ta-IN", ("vanakkam", "epdi", "eppadi", "venum", "sollunga", "enakku", "tamil", "vivasayam")),
+        ("ta-IN", ("vanakkam", "epdi", "eppadi", "venum", "sollunga", "enakku", "vivasayam")),
         ("hi-IN", ("namaste", "kaise", "kya", "chahiye", "kheti", "fasal", "batao", "kisan")),
         ("te-IN", ("namaskaram", "cheppandi", "kavali", "ela unnaru", "raithu", "pantalu")),
-        ("ml-IN", ("engane", "venam", "parayamo", "krishi", "namaskaram")),
+        ("ml-IN", ("engane", "venam", "parayamo", "krishi")),
         ("kn-IN", ("namaskara", "hege", "beku", "heli", "krushi")),
         ("mr-IN", ("majhya", "mala", "aahe", "sheti", "sanga")),
     ]
