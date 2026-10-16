@@ -79,13 +79,14 @@ class MarketRepository {
   }
 
   Future<Map<String, dynamic>> fetchNationalMarketFilters() async {
-    Future<List<dynamic>> fetchDistinct(String column) async {
-      final uri = Uri.parse('$_supabaseUrl/rest/v1/national_market_price_observations')
-          .replace(queryParameters: {
-        'select': column,
-        'order': '$column.asc',
-        'limit': '1000',
-      });
+    Future<List<dynamic>> fetchDimension(String table, String codeColumn, String nameColumn) async {
+      final uri = Uri.parse('$_supabaseUrl/rest/v1/$table').replace(
+        queryParameters: {
+          'select': '$codeColumn,$nameColumn',
+          'order': '$nameColumn.asc',
+          'limit': '2000',
+        },
+      );
       final response = await _publicClient.get(uri, headers: {
         'apikey': _publishableKey,
         'Authorization': 'Bearer $_publishableKey',
@@ -100,20 +101,28 @@ class MarketRepository {
     }
 
     final values = await Future.wait([
-      fetchDistinct('commodity_code'),
-      fetchDistinct('state_code'),
-      fetchDistinct('district_code'),
+      fetchDimension('national_commodities', 'code', 'name'),
+      fetchDimension('national_states', 'state_code', 'state_name'),
+      fetchDimension('national_districts', 'district_code', 'district_name'),
     ]);
-    String unique(dynamic row, String field) => (row is Map ? row[field] : null)?.toString() ?? '';
-    List<String> normalize(List<dynamic> rows, String field) {
-      final result = rows.map((e) => unique(e, field)).where((e) => e.isNotEmpty).toSet().toList();
-      result.sort();
+
+    List<Map<String, String>> normalize(List<dynamic> rows, String codeColumn, String nameColumn) {
+      final byCode = <String, Map<String, String>>{};
+      for (final row in rows) {
+        if (row is! Map) continue;
+        final code = row[codeColumn]?.toString() ?? '';
+        final name = row[nameColumn]?.toString() ?? '';
+        if (code.isNotEmpty) byCode[code] = {'code': code, 'name': name.isNotEmpty ? name : code};
+      }
+      final result = byCode.values.toList();
+      result.sort((a, b) => a['name']!.compareTo(b['name']!));
       return result;
     }
+
     return {
-      'commodities': normalize(values[0], 'commodity_code'),
-      'states': normalize(values[1], 'state_code'),
-      'districts': normalize(values[2], 'district_code'),
+      'commodities': normalize(values[0], 'code', 'name'),
+      'states': normalize(values[1], 'state_code', 'state_name'),
+      'districts': normalize(values[2], 'district_code', 'district_name'),
     };
   }
 
