@@ -20,9 +20,9 @@ class _MarketScreenState extends State<MarketScreen> {
   String? _error;
   List<dynamic> _listings = [];
   List<dynamic> _prices = [];
-  List<String> _commodities = [];
-  List<String> _states = [];
-  List<String> _districts = [];
+  List<Map<String, String>> _commodities = [];
+  List<Map<String, String>> _states = [];
+  List<Map<String, String>> _districts = [];
   String _commodity = '';
   String _state = '';
   String _district = '';
@@ -53,9 +53,9 @@ class _MarketScreenState extends State<MarketScreen> {
       setState(() {
         _listings = values[0] as List<dynamic>;
         _prices = values[1] as List<dynamic>;
-        _commodities = List<String>.from(filters['commodities'] ?? const []);
-        _states = List<String>.from(filters['states'] ?? const []);
-        _districts = List<String>.from(filters['districts'] ?? const []);
+        _commodities = _asOptions(filters['commodities']);
+        _states = _asOptions(filters['states']);
+        _districts = _asOptions(filters['districts']);
         _isLoading = false;
       });
     } catch (e) {
