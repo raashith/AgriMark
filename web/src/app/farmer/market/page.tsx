@@ -9,11 +9,11 @@ import {
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/lib/auth';
 import { dataService } from '@/lib/data-service';
-import { supabase } from '@/lib/supabase';
+import { marketSupabase } from '@/lib/market-supabase';
 
 type MarketRow = {
-  commodity_name: string | null;
-  mandi_name: string | null;
+  commodity_name: string;
+  mandi_name: string;
   observed_at: string;
   modal_price: number;
   min_price: number;
@@ -41,18 +41,41 @@ export default function FarmerMarketPage() {
         dataService.getProduceLots(userId),
       ]);
 
-      const { data } = await supabase
-        .from('national_market_price_observations')
-        .select('commodity_name,mandi_name,observed_at,modal_price,min_price,max_price')
-        .eq('price_signal_type', 'OBSERVED_MANDI')
-        .order('observed_at', { ascending: false })
-        .limit(24);
+      const [priceRes, commodityRes, stateRes, districtRes, mandiRes] = await Promise.all([
+        marketSupabase
+          .from('national_market_price_observations')
+          .select('id,observation_date,commodity_code,mandi_code,state_code,district_code,modal_price,min_price,max_price')
+          .order('observation_date', { ascending: false })
+          .order('id', { ascending: false })
+          .limit(24),
+        marketSupabase.from('national_commodities').select('code,name').limit(2000),
+        marketSupabase.from('national_states').select('state_code,state_name').limit(1000),
+        marketSupabase.from('national_districts').select('district_code,district_name').limit(2000),
+        marketSupabase.from('national_mandis').select('mandi_code,mandi_name').limit(2000),
+      ]);
+      const data = priceRes.data || [];
+      const commodityLabels = new Map((commodityRes.data || []).map((r: any) => [r.code, r.name]));
+      const stateLabels = new Map((stateRes.data || []).map((r: any) => [r.state_code, r.state_name]));
+      const districtLabels = new Map((districtRes.data || []).map((r: any) => [r.district_code, r.district_name]));
+      const mandiLabels = new Map((mandiRes.data || []).map((r: any) => [r.mandi_code, r.mandi_name]));
+      const observedRows: MarketRow[] = data.map((row: any) => ({
+        commodity_name: commodityLabels.get(row.commodity_code) || row.commodity_code || 'Commodity',
+        mandi_name: [
+          mandiLabels.get(row.mandi_code) || row.mandi_code || 'Mandi',
+          districtLabels.get(row.district_code),
+          stateLabels.get(row.state_code),
+        ].filter(Boolean).join(' • '),
+        observed_at: row.observation_date,
+        modal_price: Number(row.modal_price),
+        min_price: Number(row.min_price),
+        max_price: Number(row.max_price),
+      }));
 
       if (!mounted) return;
       setListings(myListings || []);
       setMarketListings(marketListingsData || []);
       setLots(myLots || []);
-      setMarketRows((data || []) as MarketRow[]);
+      setMarketRows(observedRows);
       setLoading(false);
     }
 
