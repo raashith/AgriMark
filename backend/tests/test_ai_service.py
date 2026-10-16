@@ -1,4 +1,3 @@
-import logging
 from types import SimpleNamespace
 
 from backend.app.services import ai_service
