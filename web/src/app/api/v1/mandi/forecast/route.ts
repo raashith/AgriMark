@@ -8,11 +8,13 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const requestedCommodityCode = searchParams.get('commodity_code');
-    const commodityCode = requestedCommodityCode ? requestedCommodityCode.toUpperCase() : 'com-paddy-common-e045104e';
+    const requestedCommodityCode = searchParams.get('commodity_code') || searchParams.get('commodity');
+    // Commodity codes are case-sensitive values from national_commodities.
+    const commodityCode = requestedCommodityCode?.trim() || 'com-paddy-common-e045104e';
+    const mandiCode = searchParams.get('mandi_code') || searchParams.get('mandi') || undefined;
     const stateCode = searchParams.get('state_code') || undefined;
     const districtCode = searchParams.get('district_code') || undefined;
-    const horizonDays = Math.min(30, Math.max(1, parseInt(searchParams.get('horizon_days') || '7', 10)));
+    const horizonDays = Math.min(30, Math.max(1, parseInt(searchParams.get('horizon_days') || searchParams.get('days') || '7', 10)));
     const baseDate = searchParams.get('base_date') || new Date().toISOString().split('T')[0];
 
     const cookieStore = cookies();
@@ -34,8 +36,10 @@ export async function GET(request: Request) {
 
     if (stateCode) query = query.eq('state_code', stateCode);
     if (districtCode) query = query.eq('district_code', districtCode);
+    if (mandiCode) query = query.eq('mandi_code', mandiCode);
 
-    const { data: historyData } = await query;
+    const { data: historyData, error: historyError } = await query;
+    if (historyError) throw historyError;
 
     const observations: PriceObservationInput[] = (historyData || []).map((row) => ({
       commodity_code: row.commodity_code,
@@ -108,14 +112,19 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-      success: true,
+      ok: true,
       timestamp: new Date().toISOString(),
-      forecast: forecastResult,
+      commodity_code: commodityCode,
+      mandi_code: mandiCode || null,
+      forecast: forecastResult.predictions,
+      observed_count: forecastResult.historical_data_points,
+      model_name: forecastResult.model_name,
+      model_version: forecastResult.model_version,
       materialized_run_id: runData?.id || null,
     });
   } catch (err: any) {
     return NextResponse.json(
-      { error: err?.message || 'Server forecast error' },
+      { ok: false, error: err?.message || 'Server forecast error' },
       { status: 500 }
     );
   }
