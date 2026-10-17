@@ -298,6 +298,9 @@ export interface FarmerDocument {
   issuing_authority?: string;
   issue_date?: string;
   expiry_date?: string;
+  document_date?: string | null;
+  description?: string | null;
+  tags?: string[];
   verification_status: 'unverified' | 'pending' | 'verified' | 'rejected';
   file_url?: string;
   file_path?: string | null;
