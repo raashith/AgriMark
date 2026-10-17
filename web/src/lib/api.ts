@@ -4,8 +4,8 @@ const DEFAULT_API_BASE_URL = 'https://agrimark-api.onrender.com/api/v1';
 const configuredApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 const API_BASE_URL = (() => {
   if (!configuredApiUrl || configuredApiUrl.includes('supabase.co')) return DEFAULT_API_BASE_URL;
-  const base = configuredApiUrl.replace(/\\/+$/, '').replace(/\\/api\\/v1$/i, '');
-  return `${base}/api/v1`;
+  const normalized = configuredApiUrl.replace(/\/+$/, '');
+  return /\/api\/v1$/i.test(normalized) ? normalized : `${normalized}/api/v1`;
 })();
 
 export class ApiError extends Error {
