@@ -130,7 +130,9 @@ drop policy if exists "Service role full access to firebase_identities" on publi
 create policy "Service role full access to firebase_identities" on public.firebase_identities
 for all to service_role using (true) with check (true);
 
-grant select on public.crops, public.harvest_batches, public.produce_lots to anon, authenticated;
+grant select on public.crops to anon, authenticated;
+grant select (id, cultivation_id, harvested_at, quantity, unit, grade, trace_code) on public.harvest_batches to anon, authenticated;
+grant select (id, cultivation_id, crop_id, quantity, unit, quality_grade, available_quantity, harvested_at, status, is_listed) on public.produce_lots to anon, authenticated;
 grant select, insert, update, delete on public.profiles, public.farms, public.cultivations, public.harvest_batches, public.produce_lots to authenticated;
 grant all on public.profiles, public.crops, public.farms, public.cultivations, public.harvest_batches, public.produce_lots, public.firebase_identities to service_role;
 
@@ -186,7 +188,7 @@ begin
     insert into public.firebase_identities(firebase_uid, profile_id, email)
     values(p_firebase_uid, v_profile_id, p_email)
     on conflict(firebase_uid) do update
-      set email = coalesce(excluded.email, public.firebase_identities.email)
+      set email = coalesce(excluded.email, firebase_identities.email)
       returning profile_id into v_profile_id;
   else
     update public.profiles p
