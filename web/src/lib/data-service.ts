@@ -20,6 +20,7 @@ import {
   AiInteraction,
 } from '@/types';
 import { supabase } from './supabase';
+import type { FarmerCultivationRecord } from '@/types';
 
 export const dataService = {
   // Profiles
@@ -385,22 +386,73 @@ export const dataService = {
     } catch {}
   },
 
-  async getDocuments(userId?: string): Promise<FarmerDocument[]> {
-    try {
-      let query = supabase.from('farmer_documents').select('*');
-      if (userId) query = query.eq('user_id', userId);
-      const { data, error } = await query;
-      if (!error && data) return data as FarmerDocument[];
-    } catch {}
-    return [];
+  async getCultivationRecords(farmerId: string): Promise<FarmerCultivationRecord[]> {
+    const { data, error } = await supabase
+      .from('farmer_cultivation_records')
+      .select('*, crops(name, category), farms(name, village, district)')
+      .eq('farmer_id', farmerId)
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row: any) => ({
+      ...row,
+      crop_name: row.crops?.name ?? 'Unknown crop',
+      crop_category: row.crops?.category ?? undefined,
+      farm_name: row.farms?.name ?? 'Farm',
+      farm_village: row.farms?.village ?? undefined,
+      farm_district: row.farms?.district ?? undefined,
+    })) as FarmerCultivationRecord[];
   },
 
-  async createDocument(doc: Partial<FarmerDocument>): Promise<FarmerDocument | null> {
-    try {
-      const { data, error } = await supabase.from('farmer_documents').insert(doc).select('*').single();
-      if (!error && data) return data as FarmerDocument;
-    } catch {}
-    return null;
+  async createCultivationRecord(record: Partial<FarmerCultivationRecord>): Promise<FarmerCultivationRecord> {
+    const payload = {
+      farmer_id: record.farmer_id,
+      farm_id: record.farm_id,
+      crop_id: record.crop_id,
+      variety: record.variety?.trim() || null,
+      season: record.season || null,
+      sowing_date: record.sowing_date || null,
+      expected_harvest_date: record.expected_harvest_date || null,
+      area_acres: record.area_acres ?? null,
+      expected_yield_kg: record.expected_yield_kg ?? null,
+      status: record.status || 'planned',
+      notes: record.notes?.trim() || null,
+    };
+    const { data, error } = await supabase.from('farmer_cultivation_records').insert(payload).select('*').single();
+    if (error) throw new Error(error.message);
+    return data as FarmerCultivationRecord;
+  },
+
+  async getDocuments(userId: string): Promise<FarmerDocument[]> {
+    const { data, error } = await supabase.from('farmer_documents').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []) as FarmerDocument[];
+  },
+
+  async createDocument(doc: Partial<FarmerDocument>): Promise<FarmerDocument> {
+    const { data, error } = await supabase.from('farmer_documents').insert(doc).select('*').single();
+    if (error) throw new Error(error.message);
+    return data as FarmerDocument;
+  },
+
+  async uploadPrivateFarmerDocument(userId: string, file: File): Promise<{ path: string; name: string; mimeType: string; size: number }> {
+    if (!file || file.size <= 0) throw new Error('Choose a document file first.');
+    if (file.size > 10 * 1024 * 1024) throw new Error('The file must be smaller than 10 MB.');
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) throw new Error('Upload a PDF, JPG, PNG, or WEBP file.');
+    const safeName = file.name.normalize('NFKC').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-120) || 'document';
+    const path = `${userId}/${crypto.randomUUID()}-${safeName}`;
+    const { error } = await supabase.storage.from('farmer-documents').upload(path, file, {
+      contentType: file.type,
+      upsert: false,
+    });
+    if (error) throw new Error(`File upload failed: ${error.message}`);
+    return { path, name: file.name, mimeType: file.type, size: file.size };
+  },
+
+  async getPrivateFarmerDocumentUrl(path: string): Promise<string> {
+    const { data, error } = await supabase.storage.from('farmer-documents').createSignedUrl(path, 60);
+    if (error || !data?.signedUrl) throw new Error(error?.message || 'Unable to open private document.');
+    return data.signedUrl;
   },
 
   // Cold Storage & Logistics
