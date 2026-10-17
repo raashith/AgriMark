@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ...core.auth import AuthenticatedUser, get_current_user
-from ...core.database import get_supabase, get_supabase_public
+from ...core.database import get_supabase
 from ...schemas.domain import (
     CropCatalogResponse,
     CropResponse,
@@ -43,7 +43,7 @@ def list_crops(search: str | None = Query(default=None, max_length=100)) -> Crop
     The active AgriMark Supabase project stores market commodities in
     national_commodities; it does not contain the legacy public.crops table.
     """
-    query = get_supabase_public().table("national_commodities").select("code,name").order("name")
+    query = get_supabase().table("national_commodities").select("code,name").order("name")
     if search:
         query = query.ilike("name", f"%{search}%")
     result = query.execute()
@@ -140,7 +140,7 @@ def list_cultivations(
 def list_public_harvest_batches() -> list[dict]:
     """Read-only public harvest data. Never exposes farm ownership details."""
     result = (
-        get_supabase_public()
+        get_supabase()
         .table("harvest_batches")
         .select("id,cultivation_id,harvested_at,quantity,unit,grade,trace_code")
         .order("harvested_at", desc=True)
@@ -164,7 +164,7 @@ def list_public_harvest_batches() -> list[dict]:
 def list_public_produce_lots() -> list[dict]:
     """Read-only public stock data. Farm owner IDs are intentionally excluded."""
     result = (
-        get_supabase_public()
+        get_supabase()
         .table("produce_lots")
         .select("id,cultivation_id,crop_id,quantity,unit,quality_grade,available_quantity,harvested_at,status,is_listed,crops(name)")
         .order("created_at", desc=True)
