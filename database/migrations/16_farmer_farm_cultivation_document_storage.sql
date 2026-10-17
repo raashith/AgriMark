@@ -5,6 +5,7 @@ ALTER TABLE public.farmer_cultivation_records
   ADD COLUMN IF NOT EXISTS seed_variety TEXT,
   ADD COLUMN IF NOT EXISTS organic_practice BOOLEAN NOT NULL DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS budget_inr NUMERIC(14,2),
+  ADD COLUMN IF NOT EXISTS agronomy_notes TEXT,
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 ALTER TABLE public.farmer_documents
