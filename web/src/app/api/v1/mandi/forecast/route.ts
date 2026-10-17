@@ -92,19 +92,26 @@ export async function GET(request: Request) {
     // Five distinct daily points are a minimum readiness gate; more history is
     // needed for dependable validation and seasonal modelling.
     if (observations.length < 5) {
+      // Transparent reference baseline while official history is insufficient.
+      // This is not a trained forecast: it repeats the last real observed price.
+      const last = observations[observations.length - 1];
+      const baseline = Number(last.modal_price);
+      const lower = Math.min(Number(last.min_price) || baseline, baseline);
+      const upper = Math.max(Number(last.max_price) || baseline, baseline);
+      const start = new Date(baseDate + 'T00:00:00.000Z');
+      const baselinePoints = Array.from({ length: horizonDays }, (_, index) => {
+        const target = new Date(start);
+        target.setUTCDate(target.getUTCDate() + index + 1);
+        return { target_date: target.toISOString().slice(0, 10), forecast_horizon_days: index + 1, predicted_value: baseline, lower_bound_95: lower, upper_bound_95: upper, data_type: 'BASELINE_NOT_TRAINED' };
+      });
       return NextResponse.json({
-        ok: true,
-        training_status: 'INSUFFICIENT_HISTORY',
-        message: 'At least five distinct observed dates are required before fitting a price trend. Ingest more official AGMARKNET history.',
-        commodity_code: commodityCode,
-        mandi_code: mandiCode || null,
-        forecast: [],
-        observed_count: observations.length,
+        ok: true, training_status: 'BASELINE_ONLY',
+        message: 'Reference baseline from the latest observed modal price, not a trained prediction. At least five distinct dates are required to fit a trend.',
+        commodity_code: commodityCode, mandi_code: mandiCode || null,
+        forecast: baselinePoints, observed_count: observations.length,
         source_row_count: historyData.length,
         history_dates: observations.map((item) => item.observed_at),
-        model_name: null,
-        model_version: null,
-        materialized_run_id: null,
+        model_name: null, model_version: null, materialized_run_id: null,
       });
     }
 
