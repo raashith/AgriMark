@@ -46,7 +46,14 @@ def list_crops(search: str | None = Query(default=None, max_length=100)) -> Crop
     query = get_supabase().table("national_commodities").select("code,name").order("name")
     if search:
         query = query.ilike("name", f"%{search}%")
-    result = query.execute()
+    try:
+        result = query.execute()
+    except Exception as exc:
+        # The new public-market-only deployment may not have the server-side
+        # Supabase service credential configured yet; don't turn this into a 500.
+        if "API key" in str(exc) or "credential" in str(exc).lower():
+            raise HTTPException(status_code=503, detail="Crop catalog service is not configured") from exc
+        raise
     return CropCatalogResponse(
         items=[
             CropResponse(id=row["code"], name=row["name"], category=None)
