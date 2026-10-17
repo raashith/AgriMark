@@ -71,7 +71,6 @@ export default function DocumentsPage() {
         doc_number: docNumber.trim(),
         issuing_authority: authority.trim() || 'Revenue Department',
         file_path: uploadedPath,
-        file_url: uploadedPath,
         file_name: selectedFile.name,
         file_mime_type: selectedFile.type,
         file_size_bytes: selectedFile.size,
