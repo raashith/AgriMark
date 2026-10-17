@@ -101,10 +101,8 @@ class ListingResponse(ListingCreate):
     location: str | None = None
 
 
-
 class CropCatalogResponse(BaseModel):
     items: list[CropResponse]
-
 
 
 class FarmerCultivationCreate(BaseModel):
