@@ -42,7 +42,17 @@ def list_crops(search: str | None = Query(default=None, max_length=100)) -> Crop
     if search:
         query = query.ilike("name", f"%{search}%")
     result = query.execute()
-    return CropCatalogResponse(items=[CropResponse(**row) for row in (result.data or [])])
+    rows = result.data or []
+    if rows:
+        return CropCatalogResponse(items=[CropResponse(**row) for row in rows])
+
+    catalog = get_supabase().table("crop_catalog").select("id,crop_name,crop_category").eq("is_active", True).order("crop_name").execute()
+    return CropCatalogResponse(
+        items=[
+            CropResponse(id=row["id"], name=row["crop_name"], category=row.get("crop_category"))
+            for row in (catalog.data or [])
+        ]
+    )
 
 
 @router.post("/profiles", response_model=ProfileResponse, status_code=201)
