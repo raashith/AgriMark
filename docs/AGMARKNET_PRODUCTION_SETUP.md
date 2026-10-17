@@ -34,18 +34,15 @@ Each run ingests one page of the historical feed until the stored checkpoint rea
 
 Checkpoint state is stored in `national_agmarknet_ingestion_state`, so a restarted cron job resumes instead of starting over.
 
-## AgriAI grounding
+## AgriAI grounding and app context
 
-Market questions sent to `POST /api/v1/ai/chat` are detected and enriched from `national_market_price_observations`. AgriAI receives:
+Market questions sent to `POST /api/v1/ai/chat` are enriched from the live `national_market_price_observations` schema. The query uses the deployed table's actual columns (`observation_date`, `variety`, `arrival_quantity`, `source`) and resolves user-facing crop/state/mandi names from the reference tables.
 
-- commodity and variety
-- mandi/district/state
-- minimum, modal and maximum prices
-- observation timestamp
-- official source
-- freshness of the newest stored observation
+AgriAI receives a bounded, newest-first sample of matching official observations plus the matching record count, date coverage, freshness, and observed modal-price range. It can compare recorded mandi prices and explain observed differences. It must not treat different mandis on the same date as a time series or claim a trained forecast when distinct dates are insufficient.
 
-If matching official data is absent, AgriAI is instructed to say so instead of inventing a price.
+AgriAI also receives app capability context and, when the user is authenticated and asks relevant questions, read-only context for that user's own farms, cultivation plans, harvests, produce lots, orders, offers/RFQs, and relevant public marketplace listings. Context retrieval is scoped and bounded; the assistant does not receive unrestricted access to all users' private data and cannot directly mutate database records. Any transaction or high-impact change must go through the authorized application workflow and be confirmed by the backend.
+
+If matching official data is absent or the database query fails, AgriAI must say so instead of inventing a price. Service-role credentials remain backend-only.
 
 ## Scheduling
 
