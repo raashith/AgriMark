@@ -8,7 +8,8 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const commodityCode = (searchParams.get('commodity_code') || 'RICE_PADDY').toUpperCase();
+    const requestedCommodityCode = searchParams.get('commodity_code');
+    const commodityCode = requestedCommodityCode ? requestedCommodityCode.toUpperCase() : 'com-paddy-common-e045104e';
     const stateCode = searchParams.get('state_code') || undefined;
     const districtCode = searchParams.get('district_code') || undefined;
     const horizonDays = Math.min(30, Math.max(1, parseInt(searchParams.get('horizon_days') || '7', 10)));
