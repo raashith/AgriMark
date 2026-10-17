@@ -116,7 +116,11 @@ export default function MarketPricesPage() {
   );
 
   const latest = filtered.at(-1);
-  const previous = filtered.length > 1 ? filtered.at(-2) : undefined;
+  // Compare only the same commodity at the same mandi on an earlier date.
+  // Rows from different mandis on one day are not day-over-day price movement.
+  const previous = latest
+    ? filtered.filter((r) => r.commodity_code === latest.commodity_code && r.mandi_code === latest.mandi_code && r.observed_at < latest.observed_at).at(-1)
+    : undefined;
   const priceDiff = latest && previous ? latest.modal_price - previous.modal_price : null;
   const priceDiffPct = latest && previous && previous.modal_price !== 0
     ? Number(((priceDiff! / previous.modal_price) * 100).toFixed(2))
@@ -158,9 +162,12 @@ export default function MarketPricesPage() {
     loadForecast();
   }, [selectedCommodity, selectedMandi, rows.length]);
 
+  const latestCommodityRows = latest
+    ? filtered.filter((r) => r.commodity_code === latest.commodity_code && (selectedMandi === 'all' || r.mandi_code === selectedMandi))
+    : [];
   const chart = forecast.length
     ? forecast.map((f) => Math.round(f.predicted_value))
-    : filtered.slice(-7).map((r) => Math.round(r.modal_price));
+    : latestCommodityRows.slice(-7).map((r) => Math.round(r.modal_price));
 
   const chartMax = Math.max(...chart, 1);
   const chartMin = Math.min(...chart, 0);
@@ -223,7 +230,7 @@ export default function MarketPricesPage() {
             </div>
             <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5">
               <span className="text-xs uppercase text-gray-400">Latest arrivals</span>
-              <div className="mt-2 text-3xl font-black text-white">{(latest?.arrival_quantity_mt ?? 0).toLocaleString('en-IN')}</div>
+              <div className="mt-2 text-3xl font-black text-white">{latest?.arrival_quantity_mt == null ? 'N/A' : latest.arrival_quantity_mt.toLocaleString('en-IN')}</div>
               <div className="mt-1 text-xs text-gray-400">metric tonnes</div>
             </div>
             <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5">
