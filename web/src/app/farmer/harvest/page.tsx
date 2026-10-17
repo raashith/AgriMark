@@ -73,13 +73,14 @@ export default function HarvestPage() {
       setHarvestHistory(harvestRes.length ? harvestRes : (DEMO_MODE ? DEMO_HARVESTS : []));
       setCropOptions(cropRes.items?.length ? cropRes.items : (DEMO_MODE ? DEMO_CROPS : []));
 
-      const failedResources = [
+      const requests: Array<[string, PromiseSettledResult<unknown>]> = [
         ['farms', farmResult],
         ['public produce lots', lotResult],
         ['public harvest batches', harvestResult],
         ['crop catalog', cropResult],
-      ]
-        .filter((entry) => entry[1].status === 'rejected')
+      ];
+      const failedResources = requests
+        .filter(([, result]) => result.status === 'rejected')
         .map(([name, result]) => {
           const reason = (result as PromiseRejectedResult).reason;
           return `${name}: ${reason instanceof Error ? reason.message : 'request failed'}`;
