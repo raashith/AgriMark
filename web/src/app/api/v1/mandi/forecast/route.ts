@@ -45,7 +45,7 @@ export async function GET(request: Request) {
     // one robust daily median so cross-mandi differences are never mistaken for
     // a time trend. With one observation date, the engine can only produce a
     // transparent flat baseline, not a learned trend.
-    const byDate = new Map<string, Array<{ row: (typeof historyData extends (infer T)[] | null ? T : never); price: number; min: number; max: number }>>();
+    const byDate = new Map<string, Array<{ row: any; price: number; min: number; max: number }>>();
     for (const row of historyData || []) {
       const date = String(row.observation_date).slice(0, 10);
       const price = Number(row.modal_price);
@@ -72,6 +72,13 @@ export async function GET(request: Request) {
         max_price: median(bucket.map((item) => item.max)),
         observed_at: date,
       }));
+
+    if (observations.length === 0) {
+      return NextResponse.json(
+        { ok: false, error: 'No real AGMARKNET observations were found for this commodity/mandi selection. Choose a commodity or mandi with stored records.' },
+        { status: 404 },
+      );
+    }
 
     // Generate leakage-safe time-series forecast
     const forecastResult = MandiForecastEngine.generatePriceForecast(
