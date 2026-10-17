@@ -60,32 +60,86 @@ export const dataService = {
 
   // Crop Catalog & Cultivations
   async getCropCatalog(): Promise<CropCatalogItem[]> {
-    try {
-      const { data, error } = await supabase.from('crop_catalog').select('*').order('name');
-      if (error) throw error;
-      return (data ?? []) as CropCatalogItem[];
-    } catch {
-      return [];
-    }
+    // The canonical catalog is public.crops. Do not query a parallel crop_catalog table.
+    const { data, error } = await supabase
+      .from('crops')
+      .select('id,name,category,created_at')
+      .order('name');
+    if (error) throw new Error(`Could not load the crop catalog: ${error.message}`);
+    return (data ?? []).map((crop) => ({
+      id: crop.id,
+      name: crop.name,
+      category: crop.category || 'Cereals',
+      typical_duration_days: 120,
+      season: 'Kharif',
+    })) as CropCatalogItem[];
   },
 
   async getCultivations(farmId?: string, ownerId?: string): Promise<Cultivation[]> {
-    try {
-      let query = supabase.from('cultivations').select('*');
-      if (farmId) query = query.eq('farm_id', farmId);
-      if (ownerId) query = query.eq('farmer_id', ownerId);
-      const { data, error } = await query;
-      if (!error && data) return data as Cultivation[];
-    } catch {}
-    return [];
+    if (!ownerId) return [];
+    let query = supabase
+      .from('farmer_cultivation_records')
+      .select('*,crops(id,name,category)')
+      .eq('farmer_id', ownerId)
+      .order('created_at', { ascending: false });
+    if (farmId) query = query.eq('farm_id', farmId);
+    const { data, error } = await query;
+    if (error) throw new Error(`Could not load cultivation records: ${error.message}`);
+    return (data ?? []).map((row) => ({
+      id: row.id,
+      farm_id: row.farm_id,
+      farmer_id: row.farmer_id,
+      crop_id: row.crop_id,
+      crop_name: row.crops?.name || 'Unknown crop',
+      variety: row.variety || '',
+      season: row.season || 'Kharif',
+      sowing_date: row.sowing_date,
+      expected_harvest_date: row.expected_harvest_date,
+      area_acres: Number(row.area_acres || 0),
+      expected_yield_kg: row.expected_yield_kg == null ? null : Number(row.expected_yield_kg),
+      status: row.status || 'planned',
+      created_at: row.created_at,
+    })) as Cultivation[];
   },
 
-  async createCultivation(cult: Partial<Cultivation>): Promise<Cultivation | null> {
-    try {
-      const { data, error } = await supabase.from('cultivations').insert(cult).select('*').single();
-      if (!error && data) return data as Cultivation;
-    } catch {}
-    return null;
+  async createCultivation(cult: Partial<Cultivation> & { farmer_id: string }): Promise<Cultivation> {
+    if (!cult.farm_id || !cult.crop_id) {
+      throw new Error('Select a farm and crop before saving cultivation.');
+    }
+    const payload = {
+      farmer_id: cult.farmer_id,
+      farm_id: cult.farm_id,
+      crop_id: cult.crop_id,
+      variety: cult.variety?.trim() || null,
+      season: cult.season || 'Kharif',
+      sowing_date: cult.sowing_date || null,
+      expected_harvest_date: cult.expected_harvest_date || null,
+      area_acres: cult.area_acres ?? null,
+      expected_yield_kg: cult.expected_yield_kg ?? null,
+      status: cult.status || 'planned',
+      notes: cult.agronomy_notes || null,
+    };
+    const { data, error } = await supabase
+      .from('farmer_cultivation_records')
+      .insert(payload)
+      .select('*,crops(id,name,category)')
+      .single();
+    if (error) throw new Error(`Could not save cultivation: ${error.message}`);
+    return {
+      id: data.id,
+      farm_id: data.farm_id,
+      farmer_id: data.farmer_id,
+      crop_id: data.crop_id,
+      crop_name: data.crops?.name || 'Unknown crop',
+      variety: data.variety || '',
+      season: data.season || 'Kharif',
+      sowing_date: data.sowing_date,
+      expected_harvest_date: data.expected_harvest_date,
+      area_acres: Number(data.area_acres || 0),
+      expected_yield_kg: data.expected_yield_kg == null ? null : Number(data.expected_yield_kg),
+      status: data.status || 'planned',
+      created_at: data.created_at,
+    } as Cultivation;
   },
 
   // Field Observations
