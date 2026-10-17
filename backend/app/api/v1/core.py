@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ...core.auth import AuthenticatedUser, get_current_user
-from ...core.database import get_supabase, get_supabase_public
+from ...core.database import get_supabase
 from ...schemas.domain import (
     CropCatalogResponse,
     CropResponse,
@@ -38,11 +38,21 @@ def _owned_profile(user: AuthenticatedUser, profile_id: UUID) -> None:
 
 @router.get("/crops", response_model=CropCatalogResponse)
 def list_crops(search: str | None = Query(default=None, max_length=100)) -> CropCatalogResponse:
-    query = get_supabase_public().table("crops").select("id,name,category").order("name")
+    """Serve the canonical national commodity catalog with legacy crop-shaped fields.
+
+    The active AgriMark Supabase project stores market commodities in
+    national_commodities; it does not contain the legacy public.crops table.
+    """
+    query = get_supabase().table("national_commodities").select("code,name").order("name")
     if search:
         query = query.ilike("name", f"%{search}%")
     result = query.execute()
-    return CropCatalogResponse(items=[CropResponse(**row) for row in (result.data or [])])
+    return CropCatalogResponse(
+        items=[
+            CropResponse(id=row["code"], name=row["name"], category=None)
+            for row in (result.data or [])
+        ]
+    )
 
 
 @router.post("/profiles", response_model=ProfileResponse, status_code=201)
@@ -129,14 +139,22 @@ def list_cultivations(
 @router.get("/public/harvest-batches")
 def list_public_harvest_batches() -> list[dict]:
     """Read-only public harvest data. Never exposes farm ownership details."""
-    result = (
-        get_supabase_public()
-        .table("harvest_batches")
-        .select("id,cultivation_id,harvested_at,quantity,unit,grade,trace_code")
-        .order("harvested_at", desc=True)
-        .limit(200)
-        .execute()
-    )
+    # This Supabase project currently provisions market tables only. Treat missing
+    # optional harvest tables as an empty catalog rather than crashing the page.
+    try:
+        result = (
+            get_supabase()
+            .table("harvest_batches")
+            .select("id,cultivation_id,harvested_at,quantity,unit,grade,trace_code")
+            .order("harvested_at", desc=True)
+            .limit(200)
+            .execute()
+        )
+    except Exception as exc:
+        # Until the harvest schema is provisioned, fail soft and show an empty state.
+        if "PGRST205" in str(exc) or "does not exist" in str(exc).lower():
+            return []
+        raise
     return [
         {
             "id": row["id"],
@@ -153,20 +171,23 @@ def list_public_harvest_batches() -> list[dict]:
 @router.get("/public/produce-lots")
 def list_public_produce_lots() -> list[dict]:
     """Read-only public stock data. Farm owner IDs are intentionally excluded."""
-    result = (
-        get_supabase_public()
-        .table("produce_lots")
-        .select("id,cultivation_id,crop_id,quantity,unit,quality_grade,available_quantity,harvested_at,status,is_listed,crops(name)")
-        .order("created_at", desc=True)
-        .limit(200)
-        .execute()
-    )
+    try:
+        result = (
+            get_supabase()
+            .table("produce_lots")
+            .select("id,cultivation_id,crop_id,quantity,unit,quality_grade,available_quantity,harvested_at,status,is_listed")
+            .order("created_at", desc=True)
+            .limit(200)
+            .execute()
+        )
+    except Exception as exc:
+        if "PGRST205" in str(exc) or "does not exist" in str(exc).lower():
+            return []
+        raise
     items = []
     for row in (result.data or []):
-        crop = row.get("crops")
         item = dict(row)
-        item.pop("crops", None)
-        item["crop_name"] = crop.get("name") if isinstance(crop, dict) else None
+        item["crop_name"] = None
         items.append(item)
     return items
 
