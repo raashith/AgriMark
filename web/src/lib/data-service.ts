@@ -46,12 +46,12 @@ export const dataService = {
     return api.getFarms(ownerId);
   },
 
-  async createFarm(farm: Partial<Farm>): Promise<Farm | null> {
-    try {
-      const { data, error } = await supabase.from('farms').insert(farm).select('*').single();
-      if (!error && data) return data as Farm;
-    } catch {}
-    return null;
+  async createFarm(farm: Partial<Farm> & { owner_id: string }): Promise<Farm> {
+    if (!farm.owner_id) throw new Error('Sign in before registering a farm.');
+    const { owner_id, ...payload } = farm;
+    const created = await api.createFarm(owner_id, payload);
+    if (!created?.id) throw new Error('AgriMark did not confirm the farm was saved.');
+    return created;
   },
 
   // Crop Catalog & Cultivations
