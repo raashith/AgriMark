@@ -56,16 +56,35 @@ export default function HarvestPage() {
     setLoading(true);
     setErrorDetails('');
     try {
-      const [farmRes, lotRes, harvestRes, cropRes] = await Promise.all([
+      const [farmResult, lotResult, harvestResult, cropResult] = await Promise.allSettled([
         id ? api.getFarms(id) : Promise.resolve([] as Farm[]),
         api.getPublicProduceLots(),
         api.getPublicHarvestBatches(),
         api.getCrops(),
       ]);
+
+      const farmRes = farmResult.status === 'fulfilled' ? farmResult.value : [];
+      const lotRes = lotResult.status === 'fulfilled' ? lotResult.value : [];
+      const harvestRes = harvestResult.status === 'fulfilled' ? harvestResult.value : [];
+      const cropRes = cropResult.status === 'fulfilled' ? cropResult.value : { items: [] };
+
       setFarms(farmRes.length ? farmRes : (DEMO_MODE ? [DEMO_FARM] : []));
       setLots(lotRes.length ? lotRes : (DEMO_MODE ? DEMO_LOTS : []));
       setHarvestHistory(harvestRes.length ? harvestRes : (DEMO_MODE ? DEMO_HARVESTS : []));
       setCropOptions(cropRes.items?.length ? cropRes.items : (DEMO_MODE ? DEMO_CROPS : []));
+
+      const failedResources = [
+        ['farms', farmResult],
+        ['public produce lots', lotResult],
+        ['public harvest batches', harvestResult],
+        ['crop catalog', cropResult],
+      ]
+        .filter((entry) => entry[1].status === 'rejected')
+        .map(([name, result]) => {
+          const reason = (result as PromiseRejectedResult).reason;
+          return `${name}: ${reason instanceof Error ? reason.message : 'request failed'}`;
+        });
+      setErrorDetails(failedResources.length ? `Some harvest data could not be loaded. ${failedResources.join(' | ')}` : '');
 
       if (!farmId && farmRes[0]?.id) setFarmId(farmRes[0].id);
       if (!cropId && cropRes.items?.[0]?.id) setCropId(cropRes.items[0].id);
@@ -235,7 +254,7 @@ export default function HarvestPage() {
             <div>
               <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Crop</label>
               <select required value={cropId} onChange={(event) => setCropId(event.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#294136] rounded-xl text-white">
-                <option value="">{cropOptions.length ? 'Choose a crop' : 'Loading crop catalog…'}</option>
+                <option value="">{cropOptions.length ? 'Choose a crop' : loading ? 'Loading crop catalog…' : 'Crop catalog unavailable'}</option>
                 {cropOptions.map((crop) => <option key={crop.id} value={crop.id}>{crop.name}</option>)}
               </select>
               {selectedCrop?.category && <p className="text-xs text-gray-500 mt-1">{selectedCrop.category}</p>}
