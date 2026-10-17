@@ -15,8 +15,8 @@ export async function GET(request: Request) {
     const baseDate = searchParams.get('base_date') || new Date().toISOString().split('T')[0];
 
     const cookieStore = cookies();
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xrcqzpnstdbbtafhcwbb.supabase.co';
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://tsdjtlmrvbspyzgwmccg.supabase.co';
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: { get(name: string) { return cookieStore.get(name)?.value; } },
@@ -25,11 +25,10 @@ export async function GET(request: Request) {
     // Fetch historical observed mandi prices strictly prior to or on baseDate
     let query = supabase
       .from('national_market_price_observations')
-      .select('commodity_code, state_code, district_code, mandi_code, modal_price, min_price, max_price, observed_at')
+      .select('commodity_code, state_code, district_code, mandi_code, modal_price, min_price, max_price, observation_date')
       .eq('commodity_code', commodityCode)
-      .eq('price_signal_type', 'OBSERVED_MANDI')
-      .lte('observed_at', `${baseDate}T23:59:59.999Z`)
-      .order('observed_at', { ascending: true })
+      .lte('observation_date', baseDate)
+      .order('observation_date', { ascending: true })
       .limit(100);
 
     if (stateCode) query = query.eq('state_code', stateCode);
@@ -45,7 +44,7 @@ export async function GET(request: Request) {
       modal_price: Number(row.modal_price),
       min_price: Number(row.min_price),
       max_price: Number(row.max_price),
-      observed_at: row.observed_at,
+      observed_at: row.observation_date,
     }));
 
     // Generate leakage-safe time-series forecast
@@ -59,7 +58,7 @@ export async function GET(request: Request) {
     );
 
     // Materialize forecast execution into national_forecast_runs
-    const trainingStart = observations.length > 0 ? observations[0].observed_at.split('T')[0] : baseDate;
+    const trainingStart = observations.length > 0 ? String(observations[0].observed_at).split('T')[0] : baseDate;
     const trainingEnd = baseDate;
 
     const { data: runData } = await supabase
