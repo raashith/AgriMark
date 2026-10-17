@@ -29,8 +29,13 @@ create table if not exists public.farms (
   latitude double precision,
   longitude double precision,
   area_acres numeric(12,2) default 0 check (area_acres is null or area_acres >= 0),
+  soil_type text,
+  irrigation_source text,
   created_at timestamptz not null default now()
 );
+
+alter table public.farms add column if not exists soil_type text;
+alter table public.farms add column if not exists irrigation_source text;
 
 create table if not exists public.cultivations (
   id uuid primary key default gen_random_uuid(),
