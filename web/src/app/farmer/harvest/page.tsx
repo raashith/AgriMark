@@ -63,10 +63,12 @@ export default function HarvestPage() {
         api.getCrops(),
       ]);
 
-      const farmRes = farmResult.status === 'fulfilled' ? farmResult.value : [];
-      const lotRes = lotResult.status === 'fulfilled' ? lotResult.value : [];
-      const harvestRes = harvestResult.status === 'fulfilled' ? harvestResult.value : [];
-      const cropRes = cropResult.status === 'fulfilled' ? cropResult.value : { items: [] };
+      const farmRes = farmResult.status === 'fulfilled' && Array.isArray(farmResult.value) ? farmResult.value : [];
+      const lotRes = lotResult.status === 'fulfilled' && Array.isArray(lotResult.value) ? lotResult.value : [];
+      const harvestRes = harvestResult.status === 'fulfilled' && Array.isArray(harvestResult.value) ? harvestResult.value : [];
+      const cropRes = cropResult.status === 'fulfilled' && cropResult.value && Array.isArray(cropResult.value.items)
+        ? cropResult.value
+        : { items: [] };
 
       setFarms(farmRes.length ? farmRes : (DEMO_MODE ? [DEMO_FARM] : []));
       setLots(lotRes.length ? lotRes : (DEMO_MODE ? DEMO_LOTS : []));
