@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     app_name: str = "AgriMark API"
     environment: str = "production"
     demo_mode: bool = False
-    supabase_url: str = "https://xrcqzpnstdbbtafhcwbb.supabase.co"
+    supabase_url: str = "https://tsdjtlmrvbspyzgwmccg.supabase.co"
 
     supabase_service_role_key: str | None = None
     supabase_publishable_key: str | None = None
