@@ -151,6 +151,7 @@ def list_public_harvest_batches() -> list[dict]:
             .execute()
         )
     except Exception as exc:
+        # Until the harvest schema is provisioned, fail soft and show an empty state.
         if "PGRST205" in str(exc) or "does not exist" in str(exc).lower():
             return []
         raise
