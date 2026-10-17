@@ -95,6 +95,9 @@ export const dataService = {
       expected_yield_kg: cult.expected_yield_kg ?? null,
       status: cult.status || 'planned',
       notes: cult.agronomy_notes || null,
+      organic_practice: cult.organic_practice ?? false,
+      budget_inr: cult.budget_inr,
+      agronomy_notes: cult.agronomy_notes || null,
     });
     return {
       ...created,
@@ -419,6 +422,7 @@ export const dataService = {
       farm_id?: string | null;
       issue_date?: string;
       expiry_date?: string;
+      description?: string;
     },
   ): Promise<FarmerDocument> {
     const allowedTypes = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
