@@ -1,7 +1,10 @@
 import logging
-from uuid import UUID
+import re
+from datetime import date
+from pathlib import Path
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 
 from ...core.auth import AuthenticatedUser, get_current_user
 from ...core.database import get_supabase, get_supabase_public
@@ -12,6 +15,9 @@ from ...schemas.domain import (
     CultivationResponse,
     FarmCreate,
     FarmResponse,
+    FarmerCultivationCreate,
+    FarmerCultivationResponse,
+    FarmerDocumentResponse,
     HarvestBatchCreate,
     HarvestBatchResponse,
     ListingCreate,
@@ -155,6 +161,249 @@ def list_cultivations(
     result = query.execute()
     rows = [dict(row) for row in (result.data or [])]
     return [CultivationResponse(**{key: value for key, value in row.items() if key != "farms"}) for row in rows]
+
+
+
+@router.get("/farmer-cultivations", response_model=list[FarmerCultivationResponse])
+def list_farmer_cultivations(
+    farm_id: UUID | None = None,
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> list[FarmerCultivationResponse]:
+    query = (
+        get_supabase()
+        .table("farmer_cultivation_records")
+        .select("*,crops(name)")
+        .eq("farmer_id", str(user.id))
+        .order("created_at", desc=True)
+    )
+    if farm_id:
+        query = query.eq("farm_id", str(farm_id))
+    result = query.execute()
+    items = []
+    for raw_row in (result.data or []):
+        row = dict(raw_row)
+        crop = row.pop("crops", None)
+        row["crop_name"] = crop.get("name") if isinstance(crop, dict) else None
+        items.append(FarmerCultivationResponse(**row))
+    return items
+
+
+@router.post("/farmer-cultivations", response_model=FarmerCultivationResponse, status_code=201)
+def create_farmer_cultivation(
+    request: FarmerCultivationCreate,
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> FarmerCultivationResponse:
+    farm_result = (
+        get_supabase()
+        .table("farms")
+        .select("id")
+        .eq("id", str(request.farm_id))
+        .eq("owner_id", str(user.id))
+        .limit(1)
+        .execute()
+    )
+    if not farm_result.data:
+        raise HTTPException(status_code=403, detail="Select a farm that belongs to your account.")
+
+    crop_result = (
+        get_supabase()
+        .table("crops")
+        .select("id,name")
+        .eq("id", str(request.crop_id))
+        .limit(1)
+        .execute()
+    )
+    if not crop_result.data:
+        raise HTTPException(status_code=422, detail="Select a valid crop from the crop catalog.")
+
+    payload = request.model_dump(exclude_none=True, mode="json")
+    payload["farmer_id"] = str(user.id)
+    try:
+        result = (
+            get_supabase()
+            .table("farmer_cultivation_records")
+            .insert(payload)
+            .select("*,crops(name)")
+            .execute()
+        )
+        row = dict(_single(result))
+        crop = row.pop("crops", None)
+        row["crop_name"] = crop.get("name") if isinstance(crop, dict) else crop_result.data[0].get("name")
+        return FarmerCultivationResponse(**row)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Cultivation record creation failed for profile %s", user.id)
+        raise HTTPException(
+            status_code=503,
+            detail="AgriMark could not save the cultivation record. Please retry.",
+        ) from exc
+
+
+_ALLOWED_DOCUMENT_MIME_TYPES = {
+    "application/pdf": "pdf",
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+}
+_MAX_DOCUMENT_SIZE = 10 * 1024 * 1024
+_ALLOWED_DOCUMENT_TYPES = {
+    "Land Record (Patta/Chitta)",
+    "Aadhaar ID",
+    "Kisan Credit Card",
+    "Soil Test Report",
+    "Organic Certification",
+    "FPO Membership",
+    "Trade License",
+}
+
+
+def _valid_document_signature(content_type: str, content: bytes) -> bool:
+    if content_type == "application/pdf":
+        return content.startswith(b"%PDF-")
+    if content_type == "image/jpeg":
+        return content.startswith(b"\\xff\\xd8\\xff")
+    if content_type == "image/png":
+        return content.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+    if content_type == "image/webp":
+        return len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP"
+    return False
+
+
+@router.get("/documents", response_model=list[FarmerDocumentResponse])
+def list_farmer_documents(
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> list[FarmerDocumentResponse]:
+    result = (
+        get_supabase()
+        .table("farmer_documents")
+        .select("*")
+        .eq("user_id", str(user.id))
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return [FarmerDocumentResponse(**row) for row in (result.data or [])]
+
+
+@router.post("/documents", response_model=FarmerDocumentResponse, status_code=201)
+async def upload_farmer_document(
+    file: UploadFile = File(...),
+    doc_type: str = Form(...),
+    doc_number: str | None = Form(default=None),
+    issuing_authority: str | None = Form(default=None),
+    farm_id: UUID | None = Form(default=None),
+    issue_date: date | None = Form(default=None),
+    expiry_date: date | None = Form(default=None),
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> FarmerDocumentResponse:
+    if doc_type not in _ALLOWED_DOCUMENT_TYPES:
+        raise HTTPException(status_code=422, detail="Select a supported document type.")
+    content_type = (file.content_type or "").lower().strip()
+    if content_type not in _ALLOWED_DOCUMENT_MIME_TYPES:
+        raise HTTPException(status_code=415, detail="Upload a PDF, JPG, PNG, or WebP document.")
+    content = await file.read(_MAX_DOCUMENT_SIZE + 1)
+    if not content:
+        raise HTTPException(status_code=422, detail="The selected document is empty.")
+    if len(content) > _MAX_DOCUMENT_SIZE:
+        raise HTTPException(status_code=413, detail="Documents must be 10 MB or smaller.")
+    if not _valid_document_signature(content_type, content):
+        raise HTTPException(status_code=415, detail="The file contents do not match the selected document type.")
+
+    if farm_id:
+        farm = (
+            get_supabase()
+            .table("farms")
+            .select("id")
+            .eq("id", str(farm_id))
+            .eq("owner_id", str(user.id))
+            .limit(1)
+            .execute()
+        )
+        if not farm.data:
+            raise HTTPException(status_code=403, detail="Select a farm that belongs to your account.")
+
+    original_name = Path(file.filename or "document").name
+    display_name = original_name[:255] or "document"
+    safe_name = re.sub(r"[^a-zA-Z0-9._-]", "_", original_name).strip("._")[-120:] or "document"
+    object_path = f"{user.id}/{uuid4()}-{safe_name}"
+    storage = get_supabase().storage.from_("farmer-documents")
+
+    try:
+        storage.upload(
+            object_path,
+            content,
+            {
+                "content-type": content_type,
+                "cache-control": "3600",
+                "upsert": "false",
+            },
+        )
+    except Exception as exc:
+        logger.exception("Private document upload failed for profile %s", user.id)
+        raise HTTPException(status_code=503, detail="The private document store is unavailable. Please retry.") from exc
+
+    payload = {
+        "user_id": str(user.id),
+        "farm_id": str(farm_id) if farm_id else None,
+        "doc_type": doc_type,
+        "doc_number": (doc_number or "").strip() or None,
+        "issuing_authority": (issuing_authority or "").strip() or "Revenue Department",
+        "issue_date": issue_date.isoformat() if issue_date else None,
+        "expiry_date": expiry_date.isoformat() if expiry_date else None,
+        "verification_status": "unverified",
+        "file_path": object_path,
+        "file_name": display_name,
+        "file_mime_type": content_type,
+        "file_size_bytes": len(content),
+        "is_private": True,
+    }
+    try:
+        result = (
+            get_supabase()
+            .table("farmer_documents")
+            .insert(payload)
+            .select("*")
+            .execute()
+        )
+        return FarmerDocumentResponse(**_single(result))
+    except Exception as exc:
+        try:
+            storage.remove([object_path])
+        except Exception:
+            logger.warning("Uploaded document orphan cleanup failed for profile %s", user.id)
+        logger.exception("Document metadata save failed for profile %s", user.id)
+        raise HTTPException(
+            status_code=503,
+            detail="The document file was received, but its record could not be saved. Please retry.",
+        ) from exc
+
+
+@router.get("/documents/{document_id}/download-url")
+def create_farmer_document_download_url(
+    document_id: UUID,
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> dict[str, str]:
+    result = (
+        get_supabase()
+        .table("farmer_documents")
+        .select("id,file_path")
+        .eq("id", str(document_id))
+        .eq("user_id", str(user.id))
+        .limit(1)
+        .execute()
+    )
+    row = _single(result)
+    if not row.get("file_path"):
+        raise HTTPException(status_code=404, detail="No file is attached to this document record.")
+    try:
+        link = get_supabase().storage.from_("farmer-documents").create_signed_url(row["file_path"], 60)
+        url = link.get("signedURL") or link.get("signedUrl")
+        if not url:
+            raise ValueError("Storage did not return a signed URL")
+        return {"url": str(url)}
+    except Exception as exc:
+        logger.exception("Signed document link creation failed for profile %s", user.id)
+        raise HTTPException(status_code=503, detail="Unable to open this private document right now.") from exc
 
 
 @router.get("/public/harvest-batches")
