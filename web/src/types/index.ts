@@ -91,6 +91,27 @@ export interface Cultivation {
   created_at?: string;
 }
 
+export interface FarmerCultivationRecord {
+  id: string;
+  farmer_id: string;
+  farm_id: string;
+  crop_id: string;
+  crop_name?: string;
+  crop_category?: string;
+  farm_name?: string;
+  farm_village?: string;
+  farm_district?: string;
+  variety?: string | null;
+  season?: string | null;
+  sowing_date?: string | null;
+  expected_harvest_date?: string | null;
+  area_acres?: number | null;
+  expected_yield_kg?: number | null;
+  status: 'planned' | 'active' | 'harvested' | 'cancelled' | 'failed';
+  notes?: string | null;
+  created_at?: string;
+}
+
 export interface FieldObservation {
   id: string;
   cultivation_id: string;
@@ -299,7 +320,12 @@ export interface FarmerDocument {
   issue_date?: string;
   expiry_date?: string;
   verification_status: 'unverified' | 'pending' | 'verified' | 'rejected';
-  file_url: string;
+  file_url?: string | null;
+  file_path?: string | null;
+  file_name?: string | null;
+  file_mime_type?: string | null;
+  file_size_bytes?: number | null;
+  farm_id?: string | null;
   extracted_info?: string;
   is_private: boolean;
   created_at?: string;
