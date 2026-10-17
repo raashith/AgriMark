@@ -12,7 +12,9 @@ import { dataService } from '@/lib/data-service';
 import { supabase } from '@/lib/supabase';
 
 type MarketRow = {
+  commodity_code: string;
   commodity_name: string | null;
+  mandi_code: string | null;
   mandi_name: string | null;
   observed_at: string;
   modal_price: number;
@@ -41,18 +43,37 @@ export default function FarmerMarketPage() {
         dataService.getProduceLots(userId),
       ]);
 
-      const { data } = await supabase
+      const marketRowsResult = await supabase
         .from('national_market_price_observations')
-        .select('commodity_name,mandi_name,observed_at,modal_price,min_price,max_price')
-        .eq('price_signal_type', 'OBSERVED_MANDI')
-        .order('observed_at', { ascending: false })
-        .limit(24);
-
+        .select('id,commodity_code,mandi_code,observation_date,modal_price,min_price,max_price')
+        .order('observation_date', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(120);
+      if (marketRowsResult.error) console.error('[AgriMark farmer market] market data load failed', marketRowsResult.error);
+      const rawMarketRows = marketRowsResult.data || [];
+      const commodityCodes = Array.from(new Set(rawMarketRows.map((r: any) => r.commodity_code).filter(Boolean)));
+      const mandiCodes = Array.from(new Set(rawMarketRows.map((r: any) => r.mandi_code).filter(Boolean)));
+      const [commodityResult, mandiResult] = await Promise.all([
+        commodityCodes.length ? supabase.from('national_commodities').select('code,name').in('code', commodityCodes) : Promise.resolve({ data: [], error: null } as any),
+        mandiCodes.length ? supabase.from('national_mandis').select('mandi_code,mandi_name').in('mandi_code', mandiCodes) : Promise.resolve({ data: [], error: null } as any),
+      ]);
+      const commodityNames = new Map((commodityResult.data || []).map((r: any) => [r.code, r.name]));
+      const mandiNames = new Map((mandiResult.data || []).map((r: any) => [r.mandi_code, r.mandi_name]));
+      const mappedMarketRows: MarketRow[] = rawMarketRows.map((r: any) => ({
+        commodity_code: r.commodity_code,
+        commodity_name: (commodityNames.get(r.commodity_code) as string | undefined) || r.commodity_code,
+        mandi_code: r.mandi_code || null,
+        mandi_name: (mandiNames.get(r.mandi_code) as string | undefined) || r.mandi_code || 'Unknown mandi',
+        observed_at: r.observation_date,
+        modal_price: Number(r.modal_price),
+        min_price: Number(r.min_price ?? r.modal_price),
+        max_price: Number(r.max_price ?? r.modal_price),
+      }));
       if (!mounted) return;
       setListings(myListings || []);
       setMarketListings(marketListingsData || []);
       setLots(myLots || []);
-      setMarketRows((data || []) as MarketRow[]);
+      setMarketRows(mappedMarketRows);
       setLoading(false);
     }
 

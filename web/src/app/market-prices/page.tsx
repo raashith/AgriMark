@@ -15,7 +15,7 @@ type Row = {
   modal_price: number;
   min_price: number;
   max_price: number;
-  arrival_quantity_mt: number;
+  arrival_quantity_mt: number | null;
 };
 
 type Forecast = {
@@ -35,16 +35,57 @@ export default function MarketPricesPage() {
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase
-      .from('national_market_price_observations')
-      .select('commodity_code,commodity_name,mandi_code,mandi_name,state_code,district_code,observed_at,modal_price,min_price,max_price,arrival_quantity_mt')
-      .eq('price_signal_type', 'OBSERVED_MANDI')
-      .order('observed_at', { ascending: true })
-      .limit(2000);
-    setRows((data || []) as Row[]);
-    setLoading(false);
+    try {
+      // Supabase projects commonly cap responses at 1,000 rows. Fetch in
+      // stable pages so the complete imported AGMARKNET set is available.
+      const pageSize = 1000;
+      const pages = await Promise.all(
+        Array.from({ length: 12 }, (_, index) => {
+          const from = index * pageSize;
+          return supabase
+            .from('national_market_price_observations')
+            .select('id,commodity_code,mandi_code,state_code,district_code,observation_date,modal_price,min_price,max_price,arrival_quantity')
+            .order('observation_date', { ascending: false })
+            .order('id', { ascending: false })
+            .range(from, from + pageSize - 1);
+        }),
+      );
+      const pageError = pages.find((result) => result.error)?.error;
+      if (pageError) throw pageError;
+      const raw = pages.flatMap((result) => result.data || []);
+      const [commodityResult, mandiResult] = await Promise.all([
+        supabase.from('national_commodities').select('code,name').limit(2000),
+        supabase.from('national_mandis').select('mandi_code,mandi_name,district_code,state_code').limit(5000),
+      ]);
+      if (commodityResult.error) throw commodityResult.error;
+      if (mandiResult.error) throw mandiResult.error;
+      const commodityNames = new Map((commodityResult.data || []).map((r: any) => [r.code, r.name]));
+      const mandiByCode = new Map((mandiResult.data || []).map((r: any) => [r.mandi_code, r]));
+      const normalizedRows: Row[] = raw.map((r: any) => {
+        const mandi = mandiByCode.get(r.mandi_code) as any;
+        return {
+          commodity_code: r.commodity_code,
+          commodity_name: (commodityNames.get(r.commodity_code) as string | undefined) || r.commodity_code,
+          mandi_code: r.mandi_code || null,
+          mandi_name: mandi?.mandi_name || r.mandi_code || 'Unknown mandi',
+          state_code: r.state_code || mandi?.state_code || null,
+          district_code: r.district_code || mandi?.district_code || null,
+          observed_at: r.observation_date,
+          modal_price: Number(r.modal_price),
+          min_price: Number(r.min_price ?? r.modal_price),
+          max_price: Number(r.max_price ?? r.modal_price),
+          arrival_quantity_mt: r.arrival_quantity == null ? null : Number(r.arrival_quantity),
+        };
+      });
+      // Rows were fetched newest-first; chart calculations expect chronological order.
+      setRows(normalizedRows.reverse());
+    } catch (error) {
+      console.error('[AgriMark market prices] Could not load Supabase records', error);
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
   }
-
   useEffect(() => {
     load();
   }, []);
@@ -75,40 +116,58 @@ export default function MarketPricesPage() {
   );
 
   const latest = filtered.at(-1);
-  const previous = filtered.length > 1 ? filtered.at(-2) : undefined;
+  // Compare only the same commodity at the same mandi on an earlier date.
+  // Rows from different mandis on one day are not day-over-day price movement.
+  const previous = latest
+    ? filtered.filter((r) => r.commodity_code === latest.commodity_code && r.mandi_code === latest.mandi_code && r.observed_at < latest.observed_at).at(-1)
+    : undefined;
   const priceDiff = latest && previous ? latest.modal_price - previous.modal_price : null;
   const priceDiffPct = latest && previous && previous.modal_price !== 0
     ? Number(((priceDiff! / previous.modal_price) * 100).toFixed(2))
     : null;
 
   async function loadForecast() {
-    const params = new URLSearchParams();
-    if (selectedCommodity !== 'all') params.set('commodity', selectedCommodity);
-    if (selectedMandi !== 'all') params.set('mandi', selectedMandi);
-    params.set('days', '7');
-    setForecastStatus('Calculating forecast…');
-    const response = await fetch('/api/v1/mandi/forecast?' + params.toString(), { cache: 'no-store' });
-    const payload = await response.json();
-    if (!payload.ok) {
+    // Forecasts are commodity-specific; never label a single-commodity forecast
+    // as a forecast for the "All commodities" view.
+    if (selectedCommodity === 'all') {
       setForecast([]);
-      setForecastStatus(payload.error || 'Forecast unavailable');
+      setForecastStatus('Choose a commodity to forecast its observed mandi prices');
       return;
     }
-    setForecast(payload.forecast || []);
-    setForecastStatus(
-      payload.observed_count >= 3
-        ? '7-day transparent time-series projection from observed modal prices'
-        : 'Need at least 3 observed price points for a projection',
-    );
+    const params = new URLSearchParams({ commodity: selectedCommodity, days: '7' });
+    if (selectedMandi !== 'all') params.set('mandi', selectedMandi);
+    setForecastStatus('Calculating forecast…');
+    try {
+      const response = await fetch('/api/v1/mandi/forecast?' + params.toString(), { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        setForecast([]);
+        setForecastStatus(payload.error || 'Forecast unavailable');
+        return;
+      }
+      setForecast(payload.forecast || []);
+      setForecastStatus(
+        payload.observed_count >= 3
+          ? `7-day projection from ${payload.observed_count} distinct observed dates`
+          : `Only ${payload.observed_count} distinct observed date(s); showing a flat baseline from real prices, not a learned trend`,
+      );
+    } catch (error) {
+      console.error('[AgriMark forecast] request failed', error);
+      setForecast([]);
+      setForecastStatus('Forecast service is temporarily unavailable. Refresh and try again.');
+    }
   }
 
   useEffect(() => {
     loadForecast();
   }, [selectedCommodity, selectedMandi, rows.length]);
 
+  const latestCommodityRows = latest
+    ? filtered.filter((r) => r.commodity_code === latest.commodity_code && (selectedMandi === 'all' || r.mandi_code === selectedMandi))
+    : [];
   const chart = forecast.length
     ? forecast.map((f) => Math.round(f.predicted_value))
-    : filtered.slice(-7).map((r) => Math.round(r.modal_price));
+    : latestCommodityRows.slice(-7).map((r) => Math.round(r.modal_price));
 
   const chartMax = Math.max(...chart, 1);
   const chartMin = Math.min(...chart, 0);
@@ -117,7 +176,7 @@ export default function MarketPricesPage() {
     <div className="space-y-6">
       <div className="rounded-3xl border border-[#1e2d26] bg-[#121a16] p-6 md:p-8 shadow-xl">
         <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-800/60 bg-emerald-950/80 px-3 py-1 text-xs font-mono font-bold text-emerald-400">
-          <TrendingUp className="h-4 w-4" /> Live Mandi Intelligence
+          <TrendingUp className="h-4 w-4" /> AGMARKNET Mandi Intelligence
         </div>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -171,7 +230,7 @@ export default function MarketPricesPage() {
             </div>
             <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5">
               <span className="text-xs uppercase text-gray-400">Latest arrivals</span>
-              <div className="mt-2 text-3xl font-black text-white">{(latest?.arrival_quantity_mt || 0).toLocaleString('en-IN')}</div>
+              <div className="mt-2 text-3xl font-black text-white">{latest?.arrival_quantity_mt == null ? 'N/A' : latest.arrival_quantity_mt.toLocaleString('en-IN')}</div>
               <div className="mt-1 text-xs text-gray-400">metric tonnes</div>
             </div>
             <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5">

@@ -1,6 +1,6 @@
 import { createBrowserClient } from '@supabase/ssr';
 
-const EXPECTED_SUPABASE_HOST = 'xrcqzpnstdbbtafhcwbb.supabase.co';
+const EXPECTED_SUPABASE_HOST = 'tsdjtlmrvbspyzgwmccg.supabase.co';
 const EXPECTED_SUPABASE_URL = `https://${EXPECTED_SUPABASE_HOST}`;
 
 function getValidSupabaseUrl(): string {
