@@ -120,9 +120,19 @@ class FarmerCultivationCreate(BaseModel):
     notes: str | None = Field(default=None, max_length=4000)
 
 
-class FarmerCultivationResponse(FarmerCultivationCreate):
+class FarmerCultivationResponse(BaseModel):
     id: UUID
     farmer_id: UUID
+    farm_id: UUID
+    crop_id: UUID
+    variety: str | None = None
+    season: str | None = None
+    sowing_date: date | None = None
+    expected_harvest_date: date | None = None
+    area_acres: Decimal | None = None
+    expected_yield_kg: Decimal | None = None
+    status: str = "planned"
+    notes: str | None = None
     crop_name: str | None = None
     created_at: datetime | None = None
 
