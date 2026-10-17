@@ -15,7 +15,7 @@ type Row = {
   modal_price: number;
   min_price: number;
   max_price: number;
-  arrival_quantity_mt: number;
+  arrival_quantity_mt: number | null;
 };
 
 type Forecast = {
@@ -35,16 +35,48 @@ export default function MarketPricesPage() {
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase
-      .from('national_market_price_observations')
-      .select('commodity_code,commodity_name,mandi_code,mandi_name,state_code,district_code,observed_at,modal_price,min_price,max_price,arrival_quantity_mt')
-      .eq('price_signal_type', 'OBSERVED_MANDI')
-      .order('observed_at', { ascending: true })
-      .limit(2000);
-    setRows((data || []) as Row[]);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from('national_market_price_observations')
+        .select('id,commodity_code,mandi_code,state_code,district_code,observation_date,modal_price,min_price,max_price,arrival_quantity')
+        .order('observation_date', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(5000);
+      if (error) throw error;
+      const raw = data || [];
+      const commodityCodes = Array.from(new Set(raw.map((r: any) => r.commodity_code).filter(Boolean)));
+      const mandiCodes = Array.from(new Set(raw.map((r: any) => r.mandi_code).filter(Boolean)));
+      const [commodityResult, mandiResult] = await Promise.all([
+        commodityCodes.length ? supabase.from('national_commodities').select('code,name').in('code', commodityCodes) : Promise.resolve({ data: [], error: null } as any),
+        mandiCodes.length ? supabase.from('national_mandis').select('mandi_code,mandi_name,district_code,state_code').in('mandi_code', mandiCodes) : Promise.resolve({ data: [], error: null } as any),
+      ]);
+      if (commodityResult.error) throw commodityResult.error;
+      if (mandiResult.error) throw mandiResult.error;
+      const commodityNames = new Map((commodityResult.data || []).map((r: any) => [r.code, r.name]));
+      const mandiByCode = new Map((mandiResult.data || []).map((r: any) => [r.mandi_code, r]));
+      setRows(raw.map((r: any) => {
+        const mandi = mandiByCode.get(r.mandi_code) as any;
+        return {
+          commodity_code: r.commodity_code,
+          commodity_name: (commodityNames.get(r.commodity_code) as string | undefined) || r.commodity_code,
+          mandi_code: r.mandi_code || null,
+          mandi_name: mandi?.mandi_name || r.mandi_code || 'Unknown mandi',
+          state_code: r.state_code || mandi?.state_code || null,
+          district_code: r.district_code || mandi?.district_code || null,
+          observed_at: r.observation_date,
+          modal_price: Number(r.modal_price),
+          min_price: Number(r.min_price ?? r.modal_price),
+          max_price: Number(r.max_price ?? r.modal_price),
+          arrival_quantity_mt: r.arrival_quantity == null ? null : Number(r.arrival_quantity),
+        };
+      }));
+    } catch (error) {
+      console.error('[AgriMark market prices] Could not load Supabase records', error);
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
   }
-
   useEffect(() => {
     load();
   }, []);
@@ -117,7 +149,7 @@ export default function MarketPricesPage() {
     <div className="space-y-6">
       <div className="rounded-3xl border border-[#1e2d26] bg-[#121a16] p-6 md:p-8 shadow-xl">
         <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-800/60 bg-emerald-950/80 px-3 py-1 text-xs font-mono font-bold text-emerald-400">
-          <TrendingUp className="h-4 w-4" /> Live Mandi Intelligence
+          <TrendingUp className="h-4 w-4" /> AGMARKNET Mandi Intelligence
         </div>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -171,7 +203,7 @@ export default function MarketPricesPage() {
             </div>
             <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5">
               <span className="text-xs uppercase text-gray-400">Latest arrivals</span>
-              <div className="mt-2 text-3xl font-black text-white">{(latest?.arrival_quantity_mt || 0).toLocaleString('en-IN')}</div>
+              <div className="mt-2 text-3xl font-black text-white">{(latest?.arrival_quantity_mt ?? 0).toLocaleString('en-IN')}</div>
               <div className="mt-1 text-xs text-gray-400">metric tonnes</div>
             </div>
             <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5">
