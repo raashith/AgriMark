@@ -1,4 +1,4 @@
-import { UserProfile, Farm, Cultivation, ProduceLot, Listing, MarketplaceOrder, MarketPriceObservation } from '@/types';
+import { UserProfile, Farm, Cultivation, CropCatalogItem, FarmerCultivationRecord, FarmerDocument, ProduceLot, Listing, MarketplaceOrder, MarketPriceObservation } from '@/types';
 
 const DEFAULT_API_BASE_URL = 'https://agrimark-api.onrender.com/api/v1';
 const configuredApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
@@ -101,7 +101,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}, explicitT
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
-    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(options.body && !(typeof FormData !== 'undefined' && options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers as Record<string, string>),
   };
 
@@ -184,6 +184,22 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  getCropCatalog: () => request<{ items: CropCatalogItem[] }>('/core/crops').then((response) => response.items),
+  getFarmerCultivationRecords: () => request<FarmerCultivationRecord[]>('/core/cultivation-records'),
+  createFarmerCultivationRecord: (data: Partial<FarmerCultivationRecord>) =>
+    request<FarmerCultivationRecord>('/core/cultivation-records', { method: 'POST', body: JSON.stringify(data) }),
+  getFarmerDocuments: () => request<FarmerDocument[]>('/core/documents'),
+  uploadFarmerDocument: (data: { doc_type: string; doc_number?: string; issuing_authority?: string; farm_id?: string; file: File }) => {
+    const form = new FormData();
+    form.set('doc_type', data.doc_type);
+    if (data.doc_number) form.set('doc_number', data.doc_number);
+    if (data.issuing_authority) form.set('issuing_authority', data.issuing_authority);
+    if (data.farm_id) form.set('farm_id', data.farm_id);
+    form.set('file', data.file);
+    return request<FarmerDocument>('/core/documents/upload', { method: 'POST', body: form });
+  },
+  getFarmerDocumentUrl: (documentId: string) =>
+    request<{ url: string }>(`/core/documents/${documentId}/url`),
   getCultivations: (params?: { farm_id?: string; crop_id?: string }) => {
     const query = new URLSearchParams();
     if (params?.farm_id) query.set('farm_id', params.farm_id);
