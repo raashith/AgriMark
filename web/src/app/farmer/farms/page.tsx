@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Farm } from '@/types';
-import { dataService } from '@/lib/data-service';
+import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/components/ui/Toast';
 import { Modal } from '@/components/ui/Modal';
@@ -34,7 +34,7 @@ export default function FarmerFarmsPage() {
         return;
       }
       try {
-        const list = await dataService.getFarms(user.id);
+        const list = await api.getFarms(user.id);
         setFarms(list);
       } catch {
       } finally {
@@ -51,8 +51,7 @@ export default function FarmerFarmsPage() {
       return;
     }
     try {
-      const created = await dataService.createFarm({
-        owner_id: user.id,
+      const created = await api.createFarm(user.id, {
         name,
         village,
         district,
@@ -61,7 +60,7 @@ export default function FarmerFarmsPage() {
         soil_type: soilType,
         irrigation_source: irrigation,
       });
-      if (created) {
+      if (created?.id) {
         setFarms((prev) => [created, ...prev]);
         showSuccess('Farm Created Successfully!', `${name} added to your AgriMark profile.`);
         setIsModalOpen(false);
