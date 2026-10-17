@@ -24,6 +24,8 @@ class FarmCreate(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     area_acres: Decimal | None = Field(default=None, ge=0)
+    soil_type: str | None = None
+    irrigation_source: str | None = None
 
 
 class FarmResponse(FarmCreate):
