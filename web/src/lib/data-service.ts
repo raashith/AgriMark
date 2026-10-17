@@ -440,21 +440,53 @@ export const dataService = {
   },
 
   async getDocuments(userId?: string): Promise<FarmerDocument[]> {
-    try {
-      let query = supabase.from('farmer_documents').select('*');
-      if (userId) query = query.eq('user_id', userId);
-      const { data, error } = await query;
-      if (!error && data) return data as FarmerDocument[];
-    } catch {}
-    return [];
+    if (!userId) return [];
+    const { data, error } = await supabase
+      .from('farmer_documents')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(`Could not load documents: ${error.message}`);
+    return (data ?? []) as FarmerDocument[];
   },
 
-  async createDocument(doc: Partial<FarmerDocument>): Promise<FarmerDocument | null> {
-    try {
-      const { data, error } = await supabase.from('farmer_documents').insert(doc).select('*').single();
-      if (!error && data) return data as FarmerDocument;
-    } catch {}
-    return null;
+  async uploadFarmerDocument(userId: string, file: File): Promise<string> {
+    const allowedTypes = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
+    if (!allowedTypes.has(file.type)) {
+      throw new Error('Choose a PDF, JPG, PNG, or WebP document.');
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      throw new Error('Documents must be 10 MB or smaller.');
+    }
+    const safeName = file.name.normalize('NFKD').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120) || 'document';
+    const objectPath = `${userId}/${crypto.randomUUID()}-${safeName}`;
+    const { data, error } = await supabase.storage.from('farmer-documents').upload(objectPath, file, {
+      contentType: file.type,
+      cacheControl: '3600',
+      upsert: false,
+    });
+    if (error) throw new Error(`Could not upload document file: ${error.message}`);
+    return data.path;
+  },
+
+  async getFarmerDocumentDownloadUrl(objectPath: string): Promise<string> {
+    const { data, error } = await supabase.storage
+      .from('farmer-documents')
+      .createSignedUrl(objectPath, 60);
+    if (error || !data?.signedUrl) {
+      throw new Error(`Could not create a private document link: ${error?.message || 'No URL returned'}`);
+    }
+    return data.signedUrl;
+  },
+
+  async createDocument(doc: Partial<FarmerDocument>): Promise<FarmerDocument> {
+    const { data, error } = await supabase
+      .from('farmer_documents')
+      .insert(doc)
+      .select('*')
+      .single();
+    if (error) throw new Error(`Could not save document metadata: ${error.message}`);
+    return data as FarmerDocument;
   },
 
   // Cold Storage & Logistics
