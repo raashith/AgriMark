@@ -25,21 +25,29 @@ export async function GET(request: Request) {
       cookies: { get(name: string) { return cookieStore.get(name)?.value; } },
     });
 
-    // Fetch historical observed mandi prices strictly prior to or on baseDate
-    let query = supabase
-      .from('national_market_price_observations')
-      .select('commodity_code, state_code, district_code, mandi_code, modal_price, min_price, max_price, observation_date')
-      .eq('commodity_code', commodityCode)
-      .lte('observation_date', baseDate)
-      .order('observation_date', { ascending: true })
-      .limit(5000);
+    // Page through all eligible official observations. Supabase/PostgREST can
+    // cap responses below 5,000 rows; a single .limit(5000) silently truncates
+    // long-running commodity histories and can bias the fitted trend.
+    const PAGE_SIZE = 1000;
+    const historyData: any[] = [];
+    for (let offset = 0; offset < 100000; offset += PAGE_SIZE) {
+      let query = supabase
+        .from('national_market_price_observations')
+        .select('commodity_code, state_code, district_code, mandi_code, modal_price, min_price, max_price, observation_date')
+        .eq('commodity_code', commodityCode)
+        .lte('observation_date', baseDate)
+        .order('observation_date', { ascending: true })
+        .range(offset, offset + PAGE_SIZE - 1);
 
-    if (stateCode) query = query.eq('state_code', stateCode);
-    if (districtCode) query = query.eq('district_code', districtCode);
-    if (mandiCode) query = query.eq('mandi_code', mandiCode);
+      if (stateCode) query = query.eq('state_code', stateCode);
+      if (districtCode) query = query.eq('district_code', districtCode);
+      if (mandiCode) query = query.eq('mandi_code', mandiCode);
 
-    const { data: historyData, error: historyError } = await query;
-    if (historyError) throw historyError;
+      const { data: page, error: pageError } = await query;
+      if (pageError) throw pageError;
+      historyData.push(...(page || []));
+      if (!page || page.length < PAGE_SIZE) break;
+    }
 
     // A national dataset has many mandi rows per day. Aggregate those rows into
     // one robust daily median so cross-mandi differences are never mistaken for
@@ -80,7 +88,27 @@ export async function GET(request: Request) {
       );
     }
 
-    // Generate leakage-safe time-series forecast
+    // Never present a one-day cross-sectional snapshot as a trained forecast.
+    // Five distinct daily points are a minimum readiness gate; more history is
+    // needed for dependable validation and seasonal modelling.
+    if (observations.length < 5) {
+      return NextResponse.json({
+        ok: true,
+        training_status: 'INSUFFICIENT_HISTORY',
+        message: 'At least five distinct observed dates are required before fitting a price trend. Ingest more official AGMARKNET history.',
+        commodity_code: commodityCode,
+        mandi_code: mandiCode || null,
+        forecast: [],
+        observed_count: observations.length,
+        source_row_count: historyData.length,
+        history_dates: observations.map((item) => item.observed_at),
+        model_name: null,
+        model_version: null,
+        materialized_run_id: null,
+      });
+    }
+
+    // Fit the leakage-safe time-series trend using daily medians of official observations
     const forecastResult = MandiForecastEngine.generatePriceForecast(
       observations,
       commodityCode,
