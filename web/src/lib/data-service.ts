@@ -1,29 +1,13 @@
 import {
-  UserProfile,
-  Farm,
-  CropCatalogItem,
-  Cultivation,
-  FieldObservation,
-  HarvestBatch,
-  ProduceLot,
-  Listing,
-  MarketplaceOrder,
-  RFQ,
-  Offer,
-  MarketPriceObservation,
-  WeatherForecast,
-  FinanceRecord,
-  FarmTask,
-  FarmerDocument,
-  ColdStorage,
-  LogisticsRequest,
-  AiInteraction,
+  UserProfile, Farm, CropCatalogItem, Cultivation, FieldObservation, HarvestBatch,
+  ProduceLot, Listing, MarketplaceOrder, RFQ, Offer, MarketPriceObservation,
+  WeatherForecast, FinanceRecord, FarmTask, FarmerDocument, ColdStorage,
+  LogisticsRequest, AiInteraction,
 } from '@/types';
 import { supabase } from './supabase';
 import { api } from './api';
 
 export const dataService = {
-  // Profiles
   async getProfile(userId: string): Promise<UserProfile | null> {
     try {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
@@ -40,21 +24,20 @@ export const dataService = {
     return null;
   },
 
-  // Farms
+  // Use the authenticated backend for farmer writes and reads.
   async getFarms(ownerId?: string): Promise<Farm[]> {
     if (!ownerId) return [];
     return api.getFarms(ownerId);
   },
 
-  async createFarm(farm: Partial<Farm>): Promise<Farm | null> {
-    try {
-      const { data, error } = await supabase.from('farms').insert(farm).select('*').single();
-      if (!error && data) return data as Farm;
-    } catch {}
-    return null;
+  async createFarm(farm: Partial<Farm> & { owner_id: string }): Promise<Farm> {
+    if (!farm.owner_id) throw new Error('Sign in before registering a farm.');
+    const { owner_id, ...payload } = farm;
+    const created = await api.createFarm(owner_id, payload);
+    if (!created?.id) throw new Error('AgriMark did not confirm the farm was saved.');
+    return created;
   },
 
-  // Crop Catalog & Cultivations
   async getCropCatalog(): Promise<CropCatalogItem[]> {
     const response = await api.getCrops();
     return response.items.map((crop) => ({
@@ -81,9 +64,7 @@ export const dataService = {
   },
 
   async createCultivation(cult: Partial<Cultivation> & { farmer_id: string }): Promise<Cultivation> {
-    if (!cult.farm_id || !cult.crop_id) {
-      throw new Error('Select a farm and crop before saving cultivation.');
-    }
+    if (!cult.farm_id || !cult.crop_id) throw new Error('Select a farm and crop before saving cultivation.');
     const created = await api.createFarmerCultivation({
       farm_id: cult.farm_id,
       crop_id: cult.crop_id,
@@ -110,7 +91,6 @@ export const dataService = {
     } as Cultivation;
   },
 
-  // Field Observations
   async getFieldObservations(cultivationId?: string): Promise<FieldObservation[]> {
     try {
       let query = supabase.from('field_observations').select('*');
@@ -129,7 +109,6 @@ export const dataService = {
     return null;
   },
 
-  // Harvest & Produce Lots
   async getHarvestBatches(farmerId?: string): Promise<HarvestBatch[]> {
     try {
       let query = supabase.from('harvest_batches').select('*');
@@ -166,7 +145,6 @@ export const dataService = {
     return null;
   },
 
-  // Marketplace Listings
   async getListings(filters?: { search?: string; category?: string; district?: string; minPrice?: number; maxPrice?: number; grade?: string; sort?: string; sellerId?: string }): Promise<Listing[]> {
     try {
       let query = supabase.from('listings').select('*').eq('status', 'active');
@@ -176,7 +154,6 @@ export const dataService = {
       if (filters?.grade && filters.grade !== 'All') query = query.eq('quality_grade', filters.grade);
       if (filters?.minPrice) query = query.gte('price_per_kg', filters.minPrice);
       if (filters?.maxPrice) query = query.lte('price_per_kg', filters.maxPrice);
-
       const { data, error } = await query;
       if (!error && data) {
         let result = data as Listing[];
@@ -184,11 +161,8 @@ export const dataService = {
           const q = filters.search.toLowerCase();
           result = result.filter((l) => l.title.toLowerCase().includes(q) || (l.crop_name && l.crop_name.toLowerCase().includes(q)) || (l.location && l.location.toLowerCase().includes(q)));
         }
-        if (filters?.sort === 'price_asc') {
-          result.sort((a, b) => (a.price_per_kg || a.price_per_unit) - (b.price_per_kg || b.price_per_unit));
-        } else if (filters?.sort === 'price_desc') {
-          result.sort((a, b) => (b.price_per_kg || b.price_per_unit) - (a.price_per_kg || a.price_per_unit));
-        }
+        if (filters?.sort === 'price_asc') result.sort((a, b) => (a.price_per_kg || a.price_per_unit) - (b.price_per_kg || b.price_per_unit));
+        else if (filters?.sort === 'price_desc') result.sort((a, b) => (b.price_per_kg || b.price_per_unit) - (a.price_per_kg || a.price_per_unit));
         return result;
       }
     } catch {}
@@ -212,12 +186,9 @@ export const dataService = {
   },
 
   async updateListingStatus(id: string, status: Listing['status']): Promise<void> {
-    try {
-      await supabase.from('listings').update({ status }).eq('id', id);
-    } catch {}
+    try { await supabase.from('listings').update({ status }).eq('id', id); } catch {}
   },
 
-  // Orders
   async getOrders(userId?: string, role?: string): Promise<MarketplaceOrder[]> {
     try {
       let query = supabase.from('orders').select('*');
@@ -240,12 +211,9 @@ export const dataService = {
   },
 
   async updateOrderStatus(orderId: string, status: MarketplaceOrder['status']): Promise<void> {
-    try {
-      await supabase.from('orders').update({ status }).eq('id', orderId);
-    } catch {}
+    try { await supabase.from('orders').update({ status }).eq('id', orderId); } catch {}
   },
 
-  // RFQs & Offers
   async getRFQs(buyerId?: string): Promise<RFQ[]> {
     try {
       let query = supabase.from('rfqs').select('*');
@@ -283,7 +251,6 @@ export const dataService = {
     return null;
   },
 
-  // Market Prices & Weather
   async getMarketPrices(commodity?: string, district?: string): Promise<MarketPriceObservation[]> {
     try {
       let query = supabase.from('market_prices').select('*');
@@ -306,64 +273,17 @@ export const dataService = {
   },
 
   async getLiveWeather(latitude: number, longitude: number) {
-    const params = new URLSearchParams({
-      latitude: String(latitude),
-      longitude: String(longitude),
-    });
-
-    const response = await fetch(`/api/v1/interoperability/weather?${params.toString()}`, {
-      cache: 'no-store',
-    });
-
+    const params = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude) });
+    const response = await fetch(`/api/v1/interoperability/weather?${params.toString()}`, { cache: 'no-store' });
     const payload = await response.json().catch(() => null);
-
     if (!response.ok) {
-      throw new Error(
-        payload && typeof payload === 'object' && 'meta' in payload
-          ? String((payload as { meta?: { message?: unknown } }).meta?.message || 'Live weather request failed.')
-          : 'Live weather request failed.',
-      );
+      throw new Error(payload && typeof payload === 'object' && 'meta' in payload
+        ? String((payload as { meta?: { message?: unknown } }).meta?.message || 'Live weather request failed.')
+        : 'Live weather request failed.');
     }
-
-    return payload as {
-      success: true;
-      data: {
-        latitude: number | null;
-        longitude: number | null;
-        timezone_offset_seconds?: number | null;
-        location_name?: string | null;
-        country?: string | null;
-        condition?: string | null;
-        description?: string | null;
-        icon?: string | null;
-        temperature_c?: number | null;
-        feels_like_c?: number | null;
-        min_temperature_c?: number | null;
-        max_temperature_c?: number | null;
-        humidity_pct?: number | null;
-        pressure_hpa?: number | null;
-        wind_speed_mps?: number | null;
-        wind_direction_deg?: number | null;
-        wind_gust_mps?: number | null;
-        cloudiness_pct?: number | null;
-        visibility_m?: number | null;
-        rain_1h_mm?: number | null;
-        snow_1h_mm?: number | null;
-        observed_at_unix?: number | null;
-        observed_at?: string | null;
-        sunrise_unix?: number | null;
-        sunset_unix?: number | null;
-      };
-      meta: {
-        data_origin: string;
-        provider: string;
-        observed_at: string | null;
-        freshness: string;
-      };
-    };
+    return payload as { success: true; data: Record<string, unknown>; meta: { data_origin: string; provider: string; observed_at: string | null; freshness: string } };
   },
 
-  // Finance, Tasks, Documents
   async getFinance(userId?: string): Promise<FinanceRecord[]> {
     try {
       let query = supabase.from('finance_records').select('*');
@@ -402,8 +322,7 @@ export const dataService = {
 
   async toggleTaskStatus(id: string, currentStatus: string): Promise<void> {
     try {
-      const nextStatus = currentStatus === 'completed' ? 'pending' : 'completed';
-      await supabase.from('farm_tasks').update({ status: nextStatus }).eq('id', id);
+      await supabase.from('farm_tasks').update({ status: currentStatus === 'completed' ? 'pending' : 'completed' }).eq('id', id);
     } catch {}
   },
 
@@ -412,27 +331,17 @@ export const dataService = {
     return api.getFarmerDocuments();
   },
 
-  async uploadFarmerDocument(
-    userId: string,
-    file: File,
-    metadata: {
-      doc_type: FarmerDocument['doc_type'];
-      doc_number?: string;
-      issuing_authority?: string;
-      farm_id?: string | null;
-      issue_date?: string;
-      expiry_date?: string;
-      description?: string;
-    },
-  ): Promise<FarmerDocument> {
-    const allowedTypes = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
-    if (!allowedTypes.has(file.type)) {
-      throw new Error('Choose a PDF, JPG, PNG, or WebP document.');
-    }
-    if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
-      throw new Error('Choose a non-empty document that is 10 MB or smaller.');
-    }
-    // The server derives the owner from the verified Firebase bearer token.
+  async uploadFarmerDocument(userId: string, file: File, metadata: {
+    doc_type: FarmerDocument['doc_type'];
+    doc_number?: string;
+    issuing_authority?: string;
+    farm_id?: string | null;
+    issue_date?: string;
+    expiry_date?: string;
+    description?: string;
+  }): Promise<FarmerDocument> {
+    if (!['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(file.type)) throw new Error('Choose a PDF, JPG, PNG, or WebP document.');
+    if (file.size <= 0 || file.size > 10 * 1024 * 1024) throw new Error('Choose a non-empty document that is 10 MB or smaller.');
     return api.uploadFarmerDocument(file, metadata);
   },
 
@@ -440,7 +349,6 @@ export const dataService = {
     return api.getFarmerDocumentDownloadUrl(documentId);
   },
 
-  // Cold Storage & Logistics
   async getColdStorage(district?: string): Promise<ColdStorage[]> {
     try {
       let query = supabase.from('cold_storage').select('*');
@@ -469,7 +377,6 @@ export const dataService = {
     return null;
   },
 
-  // Crop Passport Lookups
   async getPassportByCode(code: string): Promise<{ batch?: HarvestBatch; lot?: ProduceLot; farm?: Farm } | null> {
     try {
       const { data: batch } = await supabase.from('harvest_batches').select('*').eq('trace_code', code).maybeSingle();
@@ -480,7 +387,6 @@ export const dataService = {
     return null;
   },
 
-  // AI Interactions
   async logAiInteraction(interaction: { query: string; response: string; context?: string; model?: string; userId?: string }): Promise<void> {
     try {
       await supabase.from('ai_interactions').insert({
