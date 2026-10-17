@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle2, ClipboardList, PackageCheck, Plus, RefreshCw
 import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
+import { getSupabaseClient } from '@/lib/supabase';
 import { Farm, ProduceLot } from '@/types';
 
 type CropOption = { id: string; name: string; category?: string | null };
@@ -56,17 +57,49 @@ export default function HarvestPage() {
     setLoading(true);
     setErrorDetails('');
     try {
+      const supabase = getSupabaseClient();
+      // Load public catalogue and inventory directly from Supabase. The backend's
+      // public list endpoints were timing out; RLS already allows these SELECTs.
       const [farmResult, lotResult, harvestResult, cropResult] = await Promise.allSettled([
         id ? api.getFarms(id) : Promise.resolve([] as Farm[]),
-        api.getPublicProduceLots(),
-        api.getPublicHarvestBatches(),
-        api.getCrops(),
+        supabase
+          .from('produce_lots')
+          .select('id,cultivation_id,crop_id,quantity,unit,quality_grade,available_quantity,harvested_at,status,is_listed,crops(name)')
+          .order('created_at', { ascending: false })
+          .limit(200),
+        supabase
+          .from('harvest_batches')
+          .select('id,cultivation_id,harvested_at,quantity,grade,trace_code')
+          .order('harvested_at', { ascending: false })
+          .limit(200),
+        supabase
+          .from('crops')
+          .select('id,name,category')
+          .order('name', { ascending: true }),
       ]);
 
-      const farmRes = farmResult.status === 'fulfilled' ? farmResult.value : [];
-      const lotRes = lotResult.status === 'fulfilled' ? lotResult.value : [];
-      const harvestRes = harvestResult.status === 'fulfilled' ? harvestResult.value : [];
-      const cropRes = cropResult.status === 'fulfilled' ? cropResult.value : { items: [] };
+      const farmRes = farmResult.status === 'fulfilled' && Array.isArray(farmResult.value) ? farmResult.value : [];
+      const lotRows = lotResult.status === 'fulfilled' ? lotResult.value.data : null;
+      const harvestRows = harvestResult.status === 'fulfilled' ? harvestResult.value.data : null;
+      const cropRows = cropResult.status === 'fulfilled' ? cropResult.value.data : null;
+      const lotRes: ProduceLot[] = Array.isArray(lotRows)
+        ? lotRows.map((row: any) => {
+            const crop = row.crops;
+            const { crops: _crops, ...lot } = row;
+            return { ...lot, crop_name: crop && typeof crop === 'object' && !Array.isArray(crop) ? crop.name : null } as ProduceLot;
+          })
+        : [];
+      const harvestRes = Array.isArray(harvestRows)
+        ? harvestRows.map((row: any) => ({
+            id: row.id,
+            cultivation_id: row.cultivation_id,
+            harvest_date: String(row.harvested_at ?? '').slice(0, 10),
+            total_quantity_kg: Number(row.quantity ?? 0),
+            quality_grade: row.grade ?? '',
+            trace_code: row.trace_code ?? '',
+          }))
+        : [];
+      const cropRes = { items: Array.isArray(cropRows) ? cropRows as CropOption[] : [] };
 
       setFarms(farmRes.length ? farmRes : (DEMO_MODE ? [DEMO_FARM] : []));
       setLots(lotRes.length ? lotRes : (DEMO_MODE ? DEMO_LOTS : []));
@@ -79,13 +112,19 @@ export default function HarvestPage() {
         ['public harvest batches', harvestResult],
         ['crop catalog', cropResult],
       ];
-      const failedResources = requests
-        .filter(([, result]) => result.status === 'rejected')
-        .map(([name, result]) => {
-          const reason = (result as PromiseRejectedResult).reason;
+      const describeFailure = (name: string, result: PromiseSettledResult<any>) => {
+        if (result.status === 'rejected') {
+          const reason = result.reason;
           return `${name}: ${reason instanceof Error ? reason.message : 'request failed'}`;
-        });
-      setErrorDetails(failedResources.length ? `Some harvest data could not be loaded. ${failedResources.join(' | ')}` : '');
+        }
+        if (result.value?.error) return `${name}: ${result.value.error.message || 'Supabase query failed'}`;
+        if (!Array.isArray(result.value) && !Array.isArray(result.value?.data) && name !== 'farms') {
+          return `${name}: unexpected response format`;
+        }
+        return '';
+      };
+      const issues = requests.map(([name, result]) => describeFailure(name, result)).filter(Boolean);
+      setErrorDetails(issues.length ? `Some harvest data could not be loaded. ${issues.join(' | ')}` : '');
 
       if (!farmId && farmRes[0]?.id) setFarmId(farmRes[0].id);
       if (!cropId && cropRes.items?.[0]?.id) setCropId(cropRes.items[0].id);
@@ -211,12 +250,6 @@ export default function HarvestPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <div className="rounded-2xl border border-emerald-900/70 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
-        <span className="font-semibold">{DEMO_MODE ? 'AgriMark Demo Mode:' : 'Public harvest view:'}</span>{' '}
-        {DEMO_MODE
-          ? 'Presentation data is available immediately without login. You can browse farms, harvest batches, traceable lots, stock and quality details.'
-          : 'Anyone can browse available AgriMark harvest and produce-lot information. Sign in only when you want to create your own farm harvest record.'}
-      </div>
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-100">{t('harvest')} & Produce Lots</h1>
