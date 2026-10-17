@@ -64,7 +64,7 @@ export default function HarvestPage() {
         id ? api.getFarms(id) : Promise.resolve([] as Farm[]),
         supabase
           .from('produce_lots')
-          .select('id,owner_id,cultivation_id,crop_id,quantity,unit,quality_grade,available_quantity,harvested_at,status,is_listed,crops(name)')
+          .select('id,cultivation_id,crop_id,quantity,unit,quality_grade,available_quantity,harvested_at,status,is_listed,crops(name)')
           .order('created_at', { ascending: false })
           .limit(200),
         supabase
