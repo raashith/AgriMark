@@ -337,4 +337,5 @@ export default function HarvestPage() {
         @media(max-width:640px) { .harvest-stat-card { min-height:100px; padding:15px; } .harvest-stat-icon { width:48px; height:48px; } .harvest-hero { padding:22px 18px; } }
       `}</style>
     </div>
-  );}
+  );
+}
