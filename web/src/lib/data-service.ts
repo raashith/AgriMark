@@ -20,6 +20,7 @@ import {
   AiInteraction,
 } from '@/types';
 import { supabase } from './supabase';
+import { api } from './api';
 
 export const dataService = {
   // Profiles
@@ -41,13 +42,8 @@ export const dataService = {
 
   // Farms
   async getFarms(ownerId?: string): Promise<Farm[]> {
-    try {
-      let query = supabase.from('farms').select('*');
-      if (ownerId) query = query.eq('owner_id', ownerId);
-      const { data, error } = await query;
-      if (!error && data) return data as Farm[];
-    } catch {}
-    return [];
+    if (!ownerId) return [];
+    return api.getFarms(ownerId);
   },
 
   async createFarm(farm: Partial<Farm>): Promise<Farm | null> {
@@ -60,46 +56,27 @@ export const dataService = {
 
   // Crop Catalog & Cultivations
   async getCropCatalog(): Promise<CropCatalogItem[]> {
-    // The canonical catalog is public.crops. Do not query a parallel crop_catalog table.
-    const { data, error } = await supabase
-      .from('crops')
-      .select('id,name,category,created_at')
-      .order('name');
-    if (error) throw new Error(`Could not load the crop catalog: ${error.message}`);
-    const rows = (data ?? []) as Array<{ id: string; name: string; category: string | null }>;
-    return rows.map((crop) => ({
+    const response = await api.getCrops();
+    return response.items.map((crop) => ({
       id: crop.id,
       name: crop.name,
-      category: crop.category || 'Cereals',
+      category: (crop.category || 'Cereals') as CropCatalogItem['category'],
       typical_duration_days: 120,
       season: 'Kharif',
-    })) as CropCatalogItem[];
+    }));
   },
 
   async getCultivations(farmId?: string, ownerId?: string): Promise<Cultivation[]> {
     if (!ownerId) return [];
-    let query = supabase
-      .from('farmer_cultivation_records')
-      .select('*,crops(id,name,category)')
-      .eq('farmer_id', ownerId)
-      .order('created_at', { ascending: false });
-    if (farmId) query = query.eq('farm_id', farmId);
-    const { data, error } = await query;
-    if (error) throw new Error(`Could not load cultivation records: ${error.message}`);
-    return (data ?? []).map((row) => ({
-      id: row.id,
-      farm_id: row.farm_id,
-      farmer_id: row.farmer_id,
-      crop_id: row.crop_id,
-      crop_name: row.crops?.name || 'Unknown crop',
+    const rows = await api.getFarmerCultivations(farmId);
+    return rows.map((row) => ({
+      ...row,
+      crop_name: row.crop_name || 'Unknown crop',
       variety: row.variety || '',
       season: row.season || 'Kharif',
-      sowing_date: row.sowing_date,
-      expected_harvest_date: row.expected_harvest_date,
       area_acres: Number(row.area_acres || 0),
       expected_yield_kg: row.expected_yield_kg == null ? null : Number(row.expected_yield_kg),
       status: row.status || 'planned',
-      created_at: row.created_at,
     })) as Cultivation[];
   },
 
@@ -107,39 +84,26 @@ export const dataService = {
     if (!cult.farm_id || !cult.crop_id) {
       throw new Error('Select a farm and crop before saving cultivation.');
     }
-    const payload = {
-      farmer_id: cult.farmer_id,
+    const created = await api.createFarmerCultivation({
       farm_id: cult.farm_id,
       crop_id: cult.crop_id,
       variety: cult.variety?.trim() || null,
       season: cult.season || 'Kharif',
       sowing_date: cult.sowing_date || null,
       expected_harvest_date: cult.expected_harvest_date || null,
-      area_acres: cult.area_acres ?? null,
+      area_acres: Number(cult.area_acres),
       expected_yield_kg: cult.expected_yield_kg ?? null,
       status: cult.status || 'planned',
       notes: cult.agronomy_notes || null,
-    };
-    const { data, error } = await supabase
-      .from('farmer_cultivation_records')
-      .insert(payload)
-      .select('*,crops(id,name,category)')
-      .single();
-    if (error) throw new Error(`Could not save cultivation: ${error.message}`);
+    });
     return {
-      id: data.id,
-      farm_id: data.farm_id,
-      farmer_id: data.farmer_id,
-      crop_id: data.crop_id,
-      crop_name: data.crops?.name || 'Unknown crop',
-      variety: data.variety || '',
-      season: data.season || 'Kharif',
-      sowing_date: data.sowing_date,
-      expected_harvest_date: data.expected_harvest_date,
-      area_acres: Number(data.area_acres || 0),
-      expected_yield_kg: data.expected_yield_kg == null ? null : Number(data.expected_yield_kg),
-      status: data.status || 'planned',
-      created_at: data.created_at,
+      ...created,
+      crop_name: created.crop_name || 'Unknown crop',
+      variety: created.variety || '',
+      season: created.season || 'Kharif',
+      area_acres: Number(created.area_acres || 0),
+      expected_yield_kg: created.expected_yield_kg == null ? null : Number(created.expected_yield_kg),
+      status: created.status || 'planned',
     } as Cultivation;
   },
 
@@ -442,52 +406,34 @@ export const dataService = {
 
   async getDocuments(userId?: string): Promise<FarmerDocument[]> {
     if (!userId) return [];
-    const { data, error } = await supabase
-      .from('farmer_documents')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-    if (error) throw new Error(`Could not load documents: ${error.message}`);
-    return (data ?? []) as FarmerDocument[];
+    return api.getFarmerDocuments();
   },
 
-  async uploadFarmerDocument(userId: string, file: File): Promise<string> {
+  async uploadFarmerDocument(
+    userId: string,
+    file: File,
+    metadata: {
+      doc_type: FarmerDocument['doc_type'];
+      doc_number?: string;
+      issuing_authority?: string;
+      farm_id?: string | null;
+      issue_date?: string;
+      expiry_date?: string;
+    },
+  ): Promise<FarmerDocument> {
     const allowedTypes = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
     if (!allowedTypes.has(file.type)) {
       throw new Error('Choose a PDF, JPG, PNG, or WebP document.');
     }
-    if (file.size > 10 * 1024 * 1024) {
-      throw new Error('Documents must be 10 MB or smaller.');
+    if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
+      throw new Error('Choose a non-empty document that is 10 MB or smaller.');
     }
-    const safeName = file.name.normalize('NFKD').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120) || 'document';
-    const objectPath = `${userId}/${crypto.randomUUID()}-${safeName}`;
-    const { data, error } = await supabase.storage.from('farmer-documents').upload(objectPath, file, {
-      contentType: file.type,
-      cacheControl: '3600',
-      upsert: false,
-    });
-    if (error) throw new Error(`Could not upload document file: ${error.message}`);
-    return data.path;
+    // The server derives the owner from the verified Firebase bearer token.
+    return api.uploadFarmerDocument(file, metadata);
   },
 
-  async getFarmerDocumentDownloadUrl(objectPath: string): Promise<string> {
-    const { data, error } = await supabase.storage
-      .from('farmer-documents')
-      .createSignedUrl(objectPath, 60);
-    if (error || !data?.signedUrl) {
-      throw new Error(`Could not create a private document link: ${error?.message || 'No URL returned'}`);
-    }
-    return data.signedUrl;
-  },
-
-  async createDocument(doc: Partial<FarmerDocument>): Promise<FarmerDocument> {
-    const { data, error } = await supabase
-      .from('farmer_documents')
-      .insert(doc)
-      .select('*')
-      .single();
-    if (error) throw new Error(`Could not save document metadata: ${error.message}`);
-    return data as FarmerDocument;
+  async getFarmerDocumentDownloadUrl(documentId: string): Promise<string> {
+    return api.getFarmerDocumentDownloadUrl(documentId);
   },
 
   // Cold Storage & Logistics
