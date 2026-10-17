@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -104,3 +104,43 @@ class ListingResponse(ListingCreate):
 
 class CropCatalogResponse(BaseModel):
     items: list[CropResponse]
+
+
+
+class FarmerCultivationCreate(BaseModel):
+    farm_id: UUID
+    crop_id: UUID
+    variety: str | None = Field(default=None, max_length=160)
+    season: str = Field(default="Kharif", max_length=40)
+    sowing_date: date | None = None
+    expected_harvest_date: date | None = None
+    area_acres: Decimal = Field(gt=0)
+    expected_yield_kg: Decimal | None = Field(default=None, ge=0)
+    status: str = Field(default="planned", max_length=30)
+    notes: str | None = Field(default=None, max_length=4000)
+
+
+class FarmerCultivationResponse(FarmerCultivationCreate):
+    id: UUID
+    farmer_id: UUID
+    crop_name: str | None = None
+    created_at: datetime | None = None
+
+
+class FarmerDocumentResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    farm_id: UUID | None = None
+    doc_type: str
+    doc_number: str | None = None
+    issuing_authority: str | None = None
+    issue_date: date | None = None
+    expiry_date: date | None = None
+    verification_status: str = "unverified"
+    file_path: str | None = None
+    file_name: str | None = None
+    file_mime_type: str | None = None
+    file_size_bytes: int | None = None
+    extracted_info: str | None = None
+    is_private: bool = True
+    created_at: datetime | None = None
