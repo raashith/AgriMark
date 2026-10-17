@@ -21,10 +21,11 @@ def get_supabase() -> Client:
         )
         return create_client(settings.supabase_url, key, options=options)
 
-    key = settings.supabase_service_role_key
+    # Use the service-role key only for private/profile writes. Public read
+    # endpoints must work with the publishable key and remain governed by RLS.
+    key = settings.supabase_service_role_key or settings.supabase_publishable_key
     if not key:
-        raise RuntimeError("Supabase service role key is required for server-side operations")
-
+        raise RuntimeError("No Supabase server credential configured")
     return create_client(settings.supabase_url, key)
 
 
