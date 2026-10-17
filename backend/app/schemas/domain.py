@@ -118,6 +118,9 @@ class FarmerCultivationCreate(BaseModel):
     expected_yield_kg: Decimal | None = Field(default=None, ge=0)
     status: str = Field(default="planned", max_length=30)
     notes: str | None = Field(default=None, max_length=4000)
+    organic_practice: bool = False
+    budget_inr: Decimal | None = Field(default=None, ge=0)
+    agronomy_notes: str | None = Field(default=None, max_length=4000)
 
 
 class FarmerCultivationResponse(BaseModel):
@@ -134,6 +137,9 @@ class FarmerCultivationResponse(BaseModel):
     status: str = "planned"
     notes: str | None = None
     crop_name: str | None = None
+    organic_practice: bool = False
+    budget_inr: Decimal | None = None
+    agronomy_notes: str | None = None
     created_at: datetime | None = None
 
 
@@ -146,6 +152,9 @@ class FarmerDocumentResponse(BaseModel):
     issuing_authority: str | None = None
     issue_date: date | None = None
     expiry_date: date | None = None
+    description: str | None = None
+    document_date: date | None = None
+    tags: list[str] = Field(default_factory=list)
     verification_status: str = "unverified"
     file_path: str | None = None
     file_name: str | None = None
