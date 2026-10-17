@@ -54,7 +54,7 @@ export default function MarketPricesPage() {
       if (mandiResult.error) throw mandiResult.error;
       const commodityNames = new Map((commodityResult.data || []).map((r: any) => [r.code, r.name]));
       const mandiByCode = new Map((mandiResult.data || []).map((r: any) => [r.mandi_code, r]));
-      setRows(raw.map((r: any) => {
+      const normalizedRows: Row[] = raw.map((r: any) => {
         const mandi = mandiByCode.get(r.mandi_code) as any;
         return {
           commodity_code: r.commodity_code,
@@ -69,7 +69,9 @@ export default function MarketPricesPage() {
           max_price: Number(r.max_price ?? r.modal_price),
           arrival_quantity_mt: r.arrival_quantity == null ? null : Number(r.arrival_quantity),
         };
-      }));
+      });
+      // Query returns newest first; latest/previous calculations use ascending dates.
+      setRows(normalizedRows.reverse());
     } catch (error) {
       console.error('[AgriMark market prices] Could not load Supabase records', error);
       setRows([]);
