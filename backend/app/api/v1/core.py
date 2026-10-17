@@ -218,6 +218,13 @@ def create_farmer_cultivation(
 
     payload = request.model_dump(exclude_none=True, mode="json")
     payload["farmer_id"] = str(user.id)
+    # Persist richer cultivation data through the canonical farmer record table.
+    if request.organic_practice is not None:
+        payload["organic_practice"] = request.organic_practice
+    if request.budget_inr is not None:
+        payload["budget_inr"] = str(request.budget_inr)
+    if request.agronomy_notes is not None:
+        payload["agronomy_notes"] = request.agronomy_notes
     try:
         result = (
             get_supabase()
