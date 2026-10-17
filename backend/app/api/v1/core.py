@@ -139,14 +139,21 @@ def list_cultivations(
 @router.get("/public/harvest-batches")
 def list_public_harvest_batches() -> list[dict]:
     """Read-only public harvest data. Never exposes farm ownership details."""
-    result = (
-        get_supabase()
-        .table("harvest_batches")
-        .select("id,cultivation_id,harvested_at,quantity,unit,grade,trace_code")
-        .order("harvested_at", desc=True)
-        .limit(200)
-        .execute()
-    )
+    # This Supabase project currently provisions market tables only. Treat missing
+    # optional harvest tables as an empty catalog rather than crashing the page.
+    try:
+        result = (
+            get_supabase()
+            .table("harvest_batches")
+            .select("id,cultivation_id,harvested_at,quantity,unit,grade,trace_code")
+            .order("harvested_at", desc=True)
+            .limit(200)
+            .execute()
+        )
+    except Exception as exc:
+        if "PGRST205" in str(exc) or "does not exist" in str(exc).lower():
+            return []
+        raise
     return [
         {
             "id": row["id"],
@@ -163,20 +170,23 @@ def list_public_harvest_batches() -> list[dict]:
 @router.get("/public/produce-lots")
 def list_public_produce_lots() -> list[dict]:
     """Read-only public stock data. Farm owner IDs are intentionally excluded."""
-    result = (
-        get_supabase()
-        .table("produce_lots")
-        .select("id,cultivation_id,crop_id,quantity,unit,quality_grade,available_quantity,harvested_at,status,is_listed,crops(name)")
-        .order("created_at", desc=True)
-        .limit(200)
-        .execute()
-    )
+    try:
+        result = (
+            get_supabase()
+            .table("produce_lots")
+            .select("id,cultivation_id,crop_id,quantity,unit,quality_grade,available_quantity,harvested_at,status,is_listed")
+            .order("created_at", desc=True)
+            .limit(200)
+            .execute()
+        )
+    except Exception as exc:
+        if "PGRST205" in str(exc) or "does not exist" in str(exc).lower():
+            return []
+        raise
     items = []
     for row in (result.data or []):
-        crop = row.get("crops")
         item = dict(row)
-        item.pop("crops", None)
-        item["crop_name"] = crop.get("name") if isinstance(crop, dict) else None
+        item["crop_name"] = None
         items.append(item)
     return items
 
