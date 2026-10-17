@@ -294,6 +294,7 @@ async def upload_farmer_document(
     farm_id: UUID | None = Form(default=None),
     issue_date: date | None = Form(default=None),
     expiry_date: date | None = Form(default=None),
+    description: str | None = Form(default=None),
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> FarmerDocumentResponse:
     if doc_type not in _ALLOWED_DOCUMENT_TYPES:
@@ -350,6 +351,8 @@ async def upload_farmer_document(
         "issuing_authority": (issuing_authority or "").strip() or "Revenue Department",
         "issue_date": issue_date.isoformat() if issue_date else None,
         "expiry_date": expiry_date.isoformat() if expiry_date else None,
+        "description": (description or "").strip() or None,
+        "document_date": issue_date.isoformat() if issue_date else None,
         "verification_status": "unverified",
         "file_path": object_path,
         "file_name": display_name,
