@@ -220,12 +220,6 @@ export default function HarvestPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <div className="rounded-2xl border border-emerald-900/70 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
-        <span className="font-semibold">{DEMO_MODE ? 'AgriMark Demo Mode:' : 'Public harvest view:'}</span>{' '}
-        {DEMO_MODE
-          ? 'Presentation data is available immediately without login. You can browse farms, harvest batches, traceable lots, stock and quality details.'
-          : 'Anyone can browse available AgriMark harvest and produce-lot information. Sign in only when you want to create your own farm harvest record.'}
-      </div>
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-100">{t('harvest')} & Produce Lots</h1>
