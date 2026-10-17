@@ -38,11 +38,21 @@ def _owned_profile(user: AuthenticatedUser, profile_id: UUID) -> None:
 
 @router.get("/crops", response_model=CropCatalogResponse)
 def list_crops(search: str | None = Query(default=None, max_length=100)) -> CropCatalogResponse:
-    query = get_supabase_public().table("crops").select("id,name,category").order("name")
+    """Serve the canonical national commodity catalog with legacy crop-shaped fields.
+
+    The active AgriMark Supabase project stores market commodities in
+    national_commodities; it does not contain the legacy public.crops table.
+    """
+    query = get_supabase_public().table("national_commodities").select("code,name").order("name")
     if search:
         query = query.ilike("name", f"%{search}%")
     result = query.execute()
-    return CropCatalogResponse(items=[CropResponse(**row) for row in (result.data or [])])
+    return CropCatalogResponse(
+        items=[
+            CropResponse(id=row["code"], name=row["name"], category=None)
+            for row in (result.data or [])
+        ]
+    )
 
 
 @router.post("/profiles", response_model=ProfileResponse, status_code=201)
