@@ -1,4 +1,4 @@
-import { UserProfile, Farm, Cultivation, ProduceLot, Listing, MarketplaceOrder, MarketPriceObservation } from '@/types';
+import { UserProfile, Farm, Cultivation, FarmerDocument, ProduceLot, Listing, MarketplaceOrder, MarketPriceObservation } from '@/types';
 
 const DEFAULT_API_BASE_URL = 'https://agrimark-api.onrender.com/api/v1';
 const configuredApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
@@ -99,9 +99,10 @@ async function request<T>(endpoint: string, options: RequestInit = {}, explicitT
     ? explicitToken
     : (typeof window !== 'undefined' ? localStorage.getItem('agrimark_token') : null);
 
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers: Record<string, string> = {
     Accept: 'application/json',
-    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(options.body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers as Record<string, string>),
   };
 
@@ -197,6 +198,50 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  getFarmerCultivations: (farmId?: string) => {
+    const query = farmId ? `?farm_id=${encodeURIComponent(farmId)}` : '';
+    return request<Cultivation[]>(`/core/farmer-cultivations${query}`);
+  },
+  createFarmerCultivation: (data: {
+    farm_id: string;
+    crop_id: string;
+    variety?: string | null;
+    season?: string;
+    sowing_date?: string | null;
+    expected_harvest_date?: string | null;
+    area_acres: number;
+    expected_yield_kg?: number | null;
+    status?: string;
+    notes?: string | null;
+  }) => request<Cultivation>('/core/farmer-cultivations', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  getFarmerDocuments: () => request<FarmerDocument[]>('/core/documents'),
+  uploadFarmerDocument: (file: File, metadata: {
+    doc_type: FarmerDocument['doc_type'];
+    doc_number?: string;
+    issuing_authority?: string;
+    farm_id?: string | null;
+    issue_date?: string;
+    expiry_date?: string;
+  }) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('doc_type', metadata.doc_type);
+    if (metadata.doc_number) form.append('doc_number', metadata.doc_number);
+    if (metadata.issuing_authority) form.append('issuing_authority', metadata.issuing_authority);
+    if (metadata.farm_id) form.append('farm_id', metadata.farm_id);
+    if (metadata.issue_date) form.append('issue_date', metadata.issue_date);
+    if (metadata.expiry_date) form.append('expiry_date', metadata.expiry_date);
+    return request<FarmerDocument>('/core/documents', { method: 'POST', body: form });
+  },
+  getFarmerDocumentDownloadUrl: async (documentId: string) => {
+    const response = await request<{ url: string }>(
+      `/core/documents/${encodeURIComponent(documentId)}/download-url`
+    );
+    return response.url;
+  },
   getPublicHarvestBatches: () =>
     request<Array<{
       id: string;
