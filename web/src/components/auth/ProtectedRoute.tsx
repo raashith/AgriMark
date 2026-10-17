@@ -12,6 +12,71 @@ interface ProtectedRouteProps {
   requireAuth?: boolean;
 }
 
+const ProtectedRouteSkeleton: React.FC = () => (
+  <section
+    aria-label="Loading page content"
+    aria-busy="true"
+    className="mx-auto min-h-[60vh] w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8"
+  >
+    <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="w-full max-w-lg space-y-3">
+        <Skeleton className="h-8 w-48 max-w-full rounded-lg sm:h-9 sm:w-64" />
+        <Skeleton className="h-4 w-4/5 max-w-sm rounded-md" />
+      </div>
+      <div className="flex gap-3">
+        <Skeleton className="h-10 w-28 rounded-xl" />
+        <Skeleton className="h-10 w-32 rounded-xl" />
+      </div>
+    </div>
+
+    <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {Array.from({ length: 3 }, (_, index) => (
+        <div
+          key={index}
+          className="rounded-2xl border border-[#1e2d26] bg-[#101914] p-5"
+        >
+          <Skeleton className="mb-4 h-4 w-28 rounded-md" />
+          <Skeleton className="mb-3 h-8 w-36 max-w-full rounded-lg" />
+          <Skeleton className="h-3 w-2/3 rounded-md" />
+        </div>
+      ))}
+    </div>
+
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+      <div className="rounded-2xl border border-[#1e2d26] bg-[#101914] p-5 sm:p-6">
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <Skeleton className="h-6 w-40 max-w-[60%] rounded-md" />
+          <Skeleton className="h-9 w-24 rounded-lg" />
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {Array.from({ length: 2 }, (_, index) => (
+            <div key={index} className="rounded-xl border border-[#1e2d26] p-4">
+              <Skeleton className="mb-4 h-28 w-full rounded-lg sm:h-36" />
+              <Skeleton className="mb-3 h-5 w-3/4 rounded-md" />
+              <Skeleton className="mb-2 h-4 w-1/2 rounded-md" />
+              <Skeleton className="h-4 w-2/3 rounded-md" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-[#1e2d26] bg-[#101914] p-5 sm:p-6">
+        <Skeleton className="mb-6 h-6 w-36 rounded-md" />
+        {Array.from({ length: 4 }, (_, index) => (
+          <div key={index} className="flex items-center gap-3 border-b border-[#1e2d26] py-4 last:border-0">
+            <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-3/4 rounded-md" />
+              <Skeleton className="h-3 w-1/2 rounded-md" />
+            </div>
+            <Skeleton className="h-5 w-5 shrink-0 rounded-md" />
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+);
+
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   allowedRoles,
@@ -53,12 +118,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }, [isLoading, isAuthenticated, user, allowedRoles, requireAuth, router, pathname]);
 
   if (isLoading) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
-        <Skeleton className="w-12 h-12 rounded-full" />
-        <p className="text-sm font-medium text-emerald-400 animate-pulse">Loading AgriMark...</p>
-      </div>
-    );
+    return <ProtectedRouteSkeleton />;
   }
 
   if (!demoMode && requireAuth && !isAuthenticated) return null;
