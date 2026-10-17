@@ -87,7 +87,14 @@ export default function HarvestPage() {
           const reason = (result as PromiseRejectedResult).reason;
           return `${name}: ${reason instanceof Error ? reason.message : 'request failed'}`;
         });
-      setErrorDetails(failedResources.length ? `Some harvest data could not be loaded. ${failedResources.join(' | ')}` : '');
+      const malformedResources = [
+        ['farms', farmResult.status === 'fulfilled' && !Array.isArray(farmResult.value)],
+        ['public produce lots', lotResult.status === 'fulfilled' && !Array.isArray(lotResult.value)],
+        ['public harvest batches', harvestResult.status === 'fulfilled' && !Array.isArray(harvestResult.value)],
+        ['crop catalog', cropResult.status === 'fulfilled' && (!cropResult.value || !Array.isArray(cropResult.value.items))],
+      ].filter(([, malformed]) => malformed).map(([name]) => name);
+      const issues = [...failedResources, ...malformedResources.map((name) => `${name}: unexpected response format`)];
+      setErrorDetails(issues.length ? `Some harvest data could not be loaded. ${issues.join(' | ')}` : '');
 
       if (!farmId && farmRes[0]?.id) setFarmId(farmRes[0].id);
       if (!cropId && cropRes.items?.[0]?.id) setCropId(cropRes.items[0].id);
