@@ -202,7 +202,7 @@ def get_market_context(message: str) -> str:
             "FORECAST LIMITATION: fewer than five distinct observation dates are present in this sample. "
             "Do not claim a trained time-series forecast or infer a time trend from cross-sectional mandi prices."
         )
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 
 @router.post("/chat", response_model=AIChatResponse)
