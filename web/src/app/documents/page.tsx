@@ -22,6 +22,10 @@ export default function DocumentsPage() {
   const [docType, setDocType] = useState<FarmerDocument['doc_type']>('Land Record (Patta/Chitta)');
   const [docNumber, setDocNumber] = useState('');
   const [authority, setAuthority] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fileFarmId, setFileFarmId] = useState('');
+  const [farms, setFarms] = useState<Array<{ id: string; name?: string | null; village?: string | null }>>([]);
 
   useEffect(() => {
     async function loadData() {
@@ -30,8 +34,13 @@ export default function DocumentsPage() {
         return;
       }
       try {
-        const list = await dataService.getDocuments(user.id);
+        const [list, ownedFarms] = await Promise.all([
+          dataService.getDocuments(user.id),
+          dataService.getFarms(user.id),
+        ]);
         setDocs(list);
+        setFarms(ownedFarms);
+        setFileFarmId((current) => current || ownedFarms[0]?.id || '');
       } catch {
       } finally {
         setLoading(false);
@@ -42,28 +51,47 @@ export default function DocumentsPage() {
 
   const handleUploadDoc = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!user?.id) {
       showError('Authentication Required', 'Please sign in to upload documents.');
       return;
     }
+    if (!selectedFile) {
+      showError('Select a Document', 'Choose the PDF or image file you want to upload.');
+      return;
+    }
+    setIsSubmitting(true);
+    let uploadedPath: string | null = null;
     try {
+      uploadedPath = await dataService.uploadFarmerDocument(user.id, selectedFile);
       const created = await dataService.createDocument({
         user_id: user.id,
+        farm_id: fileFarmId || null,
         doc_type: docType,
-        doc_number: docNumber,
-        issuing_authority: authority || 'Revenue Department',
+        doc_number: docNumber.trim(),
+        issuing_authority: authority.trim() || 'Revenue Department',
+        file_path: uploadedPath,
+        file_url: uploadedPath,
+        file_name: selectedFile.name,
+        file_mime_type: selectedFile.type,
+        file_size_bytes: selectedFile.size,
         is_private: true,
-      });
-      if (created) {
-        setDocs((prev) => [created, ...prev]);
-        showSuccess('Document Uploaded Successfully!', 'Document stored under your private vault.');
-        setIsModalOpen(false);
-        setDocNumber('');
-      } else {
-        showError('Upload Failed', 'Database submission failed.');
+      } as Partial<FarmerDocument>);
+      setDocs((prev) => [created, ...prev.filter((doc) => doc.id !== created.id)]);
+      showSuccess('Document Uploaded Successfully!', 'Your file and document details are saved in the private vault.');
+      setIsModalOpen(false);
+      setDocNumber('');
+      setAuthority('');
+      setSelectedFile(null);
+    } catch (err: unknown) {
+      // If the metadata write failed, remove the already-uploaded private object so
+      // a failed submission does not leave an orphaned file in Storage.
+      if (uploadedPath) {
+        await (await import('@/lib/supabase')).supabase.storage.from('farmer-documents').remove([uploadedPath]).catch(() => ({ data: [], error: null }));
       }
-    } catch (err: any) {
-      showError('Failed to upload document', err.message);
+      showError('Failed to upload document', err instanceof Error ? err.message : 'The document could not be saved.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -136,6 +164,27 @@ export default function DocumentsPage() {
                   </div>
                 </div>
 
+                {doc.file_name && (
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-[#1e2d26] bg-[#0a0f0d] p-3 text-xs">
+                    <span className="min-w-0 break-all text-gray-300">{doc.file_name}</span>
+                    {doc.file_path && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const url = await dataService.getFarmerDocumentDownloadUrl(doc.file_path!);
+                            window.open(url, '_blank', 'noopener,noreferrer');
+                          } catch (err) {
+                            showError('Unable to open document', err instanceof Error ? err.message : 'Please try again.');
+                          }
+                        }}
+                        className="shrink-0 font-bold text-emerald-400 hover:text-emerald-300"
+                      >
+                        Open file
+                      </button>
+                    )}
+                  </div>
+                )}
                 {doc.extracted_info && (
                   <p className="text-xs text-gray-400 bg-[#0a0f0d] p-3 rounded-xl border border-[#1e2d26]">
                     {doc.extracted_info}
@@ -171,8 +220,30 @@ export default function DocumentsPage() {
               <input type="text" value={authority} onChange={(e) => setAuthority(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" placeholder="Revenue Dept, Govt of Tamil Nadu" />
             </div>
 
-            <button type="submit" className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition">
-              Upload Document
+            <div>
+              <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Link to Farm (optional)</label>
+              <select value={fileFarmId} onChange={(e) => setFileFarmId(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-xs focus:border-emerald-500 focus:outline-none">
+                <option value="">No specific farm</option>
+                {farms.map((farm) => (
+                  <option key={farm.id} value={farm.id}>{farm.name || 'Unnamed farm'} · {farm.village || 'Location not set'}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Select File (PDF, JPG, PNG, WebP; max 10 MB)</label>
+              <input
+                type="file"
+                accept=".pdf,image/jpeg,image/png,image/webp"
+                required
+                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                className="block w-full text-xs text-gray-300 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-950 file:px-3 file:py-2 file:font-bold file:text-emerald-300"
+              />
+              {selectedFile && <p className="mt-2 break-all text-xs text-gray-400">{selectedFile.name} · {(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>}
+            </div>
+
+            <button type="submit" disabled={isSubmitting} className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 text-white font-bold rounded-xl shadow-lg transition">
+              {isSubmitting ? 'Uploading and saving…' : 'Upload Document'}
             </button>
           </form>
         </Modal>
