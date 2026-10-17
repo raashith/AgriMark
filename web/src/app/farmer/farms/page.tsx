@@ -17,6 +17,7 @@ export default function FarmerFarmsPage() {
   const [farms, setFarms] = useState<Farm[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state
   const [name, setName] = useState('');
@@ -46,30 +47,45 @@ export default function FarmerFarmsPage() {
 
   const handleAddFarm = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!user?.id) {
       showError('Authentication Required', 'Please sign in to register a farm.');
       return;
     }
+    const acreage = Number(areaAcres);
+    if (!Number.isFinite(acreage) || acreage <= 0) {
+      showError('Check farm acreage', 'Enter an acreage greater than zero.');
+      return;
+    }
+    if (!name.trim() || !village.trim() || !district.trim() || !state.trim()) {
+      showError('Missing farm details', 'Enter the farm name, village, district, and state.');
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
       const created = await api.createFarm(user.id, {
-        name,
-        village,
-        district,
-        state,
-        area_acres: Number(areaAcres),
+        name: name.trim(),
+        village: village.trim(),
+        district: district.trim(),
+        state: state.trim(),
+        area_acres: acreage,
         soil_type: soilType,
         irrigation_source: irrigation,
       });
-      if (created?.id) {
-        setFarms((prev) => [created, ...prev]);
-        showSuccess('Farm Created Successfully!', `${name} added to your AgriMark profile.`);
-        setIsModalOpen(false);
-        setName('');
-      } else {
-        showError('Registration Failed', 'Database submission failed.');
+      if (!created?.id) {
+        showError('Registration Failed', 'The server did not confirm that the farm was saved. Refresh your farm list before trying again.');
+        return;
       }
-    } catch (err: any) {
-      showError('Failed to create farm', err.message);
+      setFarms((prev) => [created, ...prev.filter((farm) => farm.id !== created.id)]);
+      showSuccess('Farm Created Successfully!', `${created.name || name} added to your AgriMark profile.`);
+      setIsModalOpen(false);
+      setName('');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'AgriMark could not save this farm. Please try again.';
+      showError('Failed to create farm', message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -176,7 +192,7 @@ export default function FarmerFarmsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Area (in Acres)</label>
-                <input type="number" step="0.1" required value={areaAcres} onChange={(e) => setAreaAcres(Number(e.target.value))} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" />
+                <input type="number" min="0.1" step="0.1" required value={areaAcres} onChange={(e) => setAreaAcres(Number(e.target.value))} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" />
               </div>
               <div>
                 <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Soil Type</label>
@@ -189,8 +205,8 @@ export default function FarmerFarmsPage() {
               </div>
             </div>
 
-            <button type="submit" className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition">
-              Save Farm Details
+            <button type="submit" disabled={isSubmitting} className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg transition">
+              {isSubmitting ? "Saving Farm..." : "Save Farm Details"}
             </button>
           </form>
         </Modal>
