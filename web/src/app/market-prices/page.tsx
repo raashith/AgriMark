@@ -36,19 +36,26 @@ export default function MarketPricesPage() {
   async function load() {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('national_market_price_observations')
-        .select('id,commodity_code,mandi_code,state_code,district_code,observation_date,modal_price,min_price,max_price,arrival_quantity')
-        .order('observation_date', { ascending: false })
-        .order('id', { ascending: false })
-        .limit(5000);
-      if (error) throw error;
-      const raw = data || [];
-      const commodityCodes = Array.from(new Set(raw.map((r: any) => r.commodity_code).filter(Boolean)));
-      const mandiCodes = Array.from(new Set(raw.map((r: any) => r.mandi_code).filter(Boolean)));
+      // Supabase projects commonly cap responses at 1,000 rows. Fetch in
+      // stable pages so the complete imported AGMARKNET set is available.
+      const pageSize = 1000;
+      const pages = await Promise.all(
+        Array.from({ length: 12 }, (_, index) => {
+          const from = index * pageSize;
+          return supabase
+            .from('national_market_price_observations')
+            .select('id,commodity_code,mandi_code,state_code,district_code,observation_date,modal_price,min_price,max_price,arrival_quantity')
+            .order('observation_date', { ascending: false })
+            .order('id', { ascending: false })
+            .range(from, from + pageSize - 1);
+        }),
+      );
+      const pageError = pages.find((result) => result.error)?.error;
+      if (pageError) throw pageError;
+      const raw = pages.flatMap((result) => result.data || []);
       const [commodityResult, mandiResult] = await Promise.all([
-        commodityCodes.length ? supabase.from('national_commodities').select('code,name').in('code', commodityCodes) : Promise.resolve({ data: [], error: null } as any),
-        mandiCodes.length ? supabase.from('national_mandis').select('mandi_code,mandi_name,district_code,state_code').in('mandi_code', mandiCodes) : Promise.resolve({ data: [], error: null } as any),
+        supabase.from('national_commodities').select('code,name').limit(2000),
+        supabase.from('national_mandis').select('mandi_code,mandi_name,district_code,state_code').limit(5000),
       ]);
       if (commodityResult.error) throw commodityResult.error;
       if (mandiResult.error) throw mandiResult.error;
@@ -70,7 +77,7 @@ export default function MarketPricesPage() {
           arrival_quantity_mt: r.arrival_quantity == null ? null : Number(r.arrival_quantity),
         };
       });
-      // Query returns newest first; latest/previous calculations use ascending dates.
+      // Rows were fetched newest-first; chart calculations expect chronological order.
       setRows(normalizedRows.reverse());
     } catch (error) {
       console.error('[AgriMark market prices] Could not load Supabase records', error);
@@ -131,8 +138,8 @@ export default function MarketPricesPage() {
     setForecast(payload.forecast || []);
     setForecastStatus(
       payload.observed_count >= 3
-        ? '7-day transparent time-series projection from observed modal prices'
-        : 'Need at least 3 observed price points for a projection',
+        ? `7-day projection from ${payload.observed_count} distinct observed dates`
+        : `Only ${payload.observed_count} distinct observed date(s); showing a flat baseline from real prices, not a learned trend`,
     );
   }
 
