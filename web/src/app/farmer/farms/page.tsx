@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Farm } from '@/types';
 import { api } from '@/lib/api';
@@ -9,7 +9,7 @@ import { useToast } from '@/components/ui/Toast';
 import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { MapPin, Plus } from 'lucide-react';
+import { MapPin, Plus, RefreshCw } from 'lucide-react';
 
 export default function FarmerFarmsPage() {
   const { user } = useAuth();
@@ -18,8 +18,6 @@ export default function FarmerFarmsPage() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Form state
   const [name, setName] = useState('');
   const [village, setVillage] = useState('');
   const [district, setDistrict] = useState('Thanjavur');
@@ -28,22 +26,23 @@ export default function FarmerFarmsPage() {
   const [soilType, setSoilType] = useState('Alluvial Clay Loam');
   const [irrigation, setIrrigation] = useState('Canal & Borewell');
 
-  useEffect(() => {
-    async function loadData() {
-      if (!user?.id) {
-        setLoading(false);
-        return;
-      }
-      try {
-        const list = await api.getFarms(user.id);
-        setFarms(list);
-      } catch {
-      } finally {
-        setLoading(false);
-      }
+  const loadFarms = useCallback(async () => {
+    if (!user?.id) {
+      setFarms([]);
+      setLoading(false);
+      return;
     }
-    loadData();
-  }, [user]);
+    setLoading(true);
+    try {
+      setFarms(await api.getFarms(user.id));
+    } catch (err) {
+      showError('Unable to load farms', err instanceof Error ? err.message : 'Refresh the page and try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, showError]);
+
+  useEffect(() => { void loadFarms(); }, [loadFarms]);
 
   const handleAddFarm = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,17 +72,14 @@ export default function FarmerFarmsPage() {
         soil_type: soilType,
         irrigation_source: irrigation,
       });
-      if (!created?.id) {
-        showError('Registration Failed', 'The server did not confirm that the farm was saved. Refresh your farm list before trying again.');
-        return;
-      }
+      if (!created?.id) throw new Error('AgriMark did not confirm the farm was saved.');
       setFarms((prev) => [created, ...prev.filter((farm) => farm.id !== created.id)]);
       showSuccess('Farm Created Successfully!', `${created.name || name} added to your AgriMark profile.`);
       setIsModalOpen(false);
       setName('');
+      await loadFarms();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'AgriMark could not save this farm. Please try again.';
-      showError('Failed to create farm', message);
+      showError('Failed to create farm', err instanceof Error ? err.message : 'AgriMark could not save this farm. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -94,120 +90,37 @@ export default function FarmerFarmsPage() {
       <div className="space-y-6">
         <div className="bg-[#121a16] border border-[#1e2d26] p-6 md:p-8 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xl">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-950/80 border border-emerald-800/60 rounded-full text-xs font-mono font-bold text-emerald-400">
-              <MapPin className="w-4 h-4" /> Agricultural Land & Infrastructure
-            </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-white">
-              My Farms & Field Coordinates
-            </h1>
-            <p className="text-xs text-gray-300 max-w-xl">
-              Manage your registered farm acreage, soil characteristics, water sources, and field infrastructure.
-            </p>
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-950/80 border border-emerald-800/60 rounded-full text-xs font-mono font-bold text-emerald-400"><MapPin className="w-4 h-4" /> Agricultural Land & Infrastructure</div>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-white">My Farms & Field Coordinates</h1>
+            <p className="text-xs text-gray-300 max-w-xl">Manage your registered farm acreage, soil characteristics, water sources, and field infrastructure.</p>
           </div>
-
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg flex items-center gap-2 transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add New Farm</span>
-          </button>
+          <button onClick={() => setIsModalOpen(true)} className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg flex items-center gap-2 transition"><Plus className="w-4 h-4" /><span>Add New Farm</span></button>
         </div>
 
-        {/* Farms Grid */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-44 rounded-3xl" />
-            ))}
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-44 rounded-3xl" />)}</div>
         ) : farms.length === 0 ? (
-          <EmptyState
-            title="No Registered Farms Found"
-            description="You have not registered any farm acreage yet. Click 'Add New Farm' to add your field details."
-          />
+          <EmptyState title="No Registered Farms Found" description="You have not registered any farm acreage yet. Click 'Add New Farm' to add your field details." />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {farms.map((farm) => (
               <div key={farm.id} className="bg-[#121a16] border border-[#1e2d26] rounded-3xl p-6 space-y-4 shadow-lg">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-extrabold text-lg text-white">{farm.name}</h3>
-                    <p className="text-xs text-emerald-400 flex items-center gap-1 mt-0.5">
-                      <MapPin className="w-3.5 h-3.5" /> {farm.village}, {farm.district}, {farm.state}
-                    </p>
-                  </div>
-                  <span className="px-3 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 text-xs font-mono font-bold rounded-full">
-                    {farm.area_acres} Acres
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl">
-                    <span className="text-gray-400 uppercase font-mono text-[10px]">Soil Type</span>
-                    <p className="font-bold text-white text-xs mt-0.5">{farm.soil_type}</p>
-                  </div>
-                  <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl">
-                    <span className="text-gray-400 uppercase font-mono text-[10px]">Irrigation Source</span>
-                    <p className="font-bold text-white text-xs mt-0.5">{farm.irrigation_source}</p>
-                  </div>
-                </div>
-
-                {farm.infrastructure && farm.infrastructure.length > 0 && (
-                  <div className="space-y-1.5 pt-2 border-t border-[#1e2d26]">
-                    <span className="text-[10px] font-mono uppercase text-gray-400">Registered Infrastructure</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {farm.infrastructure.map((infra, idx) => (
-                        <span key={idx} className="px-2.5 py-0.5 bg-[#0a0f0d] border border-[#1e2d26] text-gray-300 text-[10px] rounded-lg">
-                          {infra}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <div className="flex justify-between items-start"><div><h3 className="font-extrabold text-lg text-white">{farm.name}</h3><p className="text-xs text-emerald-400 flex items-center gap-1 mt-0.5"><MapPin className="w-3.5 h-3.5" /> {farm.village}, {farm.district}, {farm.state}</p></div><span className="px-3 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 text-xs font-mono font-bold rounded-full">{farm.area_acres} Acres</span></div>
+                <div className="grid grid-cols-2 gap-3 text-xs"><div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl"><span className="text-gray-400 uppercase font-mono text-[10px]">Soil Type</span><p className="font-bold text-white text-xs mt-0.5">{farm.soil_type || 'Not set'}</p></div><div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl"><span className="text-gray-400 uppercase font-mono text-[10px]">Irrigation Source</span><p className="font-bold text-white text-xs mt-0.5">{farm.irrigation_source || 'Not set'}</p></div></div>
+                {farm.infrastructure && farm.infrastructure.length > 0 && <div className="space-y-1.5 pt-2 border-t border-[#1e2d26]"><span className="text-[10px] font-mono uppercase text-gray-400">Registered Infrastructure</span><div className="flex flex-wrap gap-1.5">{farm.infrastructure.map((infra, idx) => <span key={idx} className="px-2.5 py-0.5 bg-[#0a0f0d] border border-[#1e2d26] text-gray-300 text-[10px] rounded-lg">{infra}</span>)}</div></div>}
               </div>
             ))}
           </div>
         )}
 
-        {/* Modal */}
+        <div className="flex justify-end"><button type="button" onClick={() => void loadFarms()} disabled={loading} className="inline-flex items-center gap-2 text-xs text-emerald-400 disabled:opacity-50"><RefreshCw className="h-3.5 w-3.5" /> Refresh records</button></div>
+
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Register New Farm" subtitle="Enter your field location & acreage">
           <form onSubmit={handleAddFarm} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Farm Name</label>
-              <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" placeholder="e.g. Kaveri Delta Field 1" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Village</label>
-                <input type="text" required value={village} onChange={(e) => setVillage(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" placeholder="Papanasam" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">District</label>
-                <input type="text" required value={district} onChange={(e) => setDistrict(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" placeholder="Thanjavur" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Area (in Acres)</label>
-                <input type="number" min="0.1" step="0.1" required value={areaAcres} onChange={(e) => setAreaAcres(Number(e.target.value))} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Soil Type</label>
-                <select value={soilType} onChange={(e) => setSoilType(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-xs focus:border-emerald-500 focus:outline-none">
-                  <option value="Alluvial Clay Loam">Alluvial Clay Loam</option>
-                  <option value="Red Sandy Loam">Red Sandy Loam</option>
-                  <option value="Black Cotton Soil">Black Cotton Soil</option>
-                  <option value="Laterite Soil">Laterite Soil</option>
-                </select>
-              </div>
-            </div>
-
-            <button type="submit" disabled={isSubmitting} className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg transition">
-              {isSubmitting ? "Saving Farm..." : "Save Farm Details"}
-            </button>
+            <div><label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Farm Name</label><input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" placeholder="e.g. Kaveri Delta Field 1" /></div>
+            <div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Village</label><input type="text" required value={village} onChange={(e) => setVillage(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" placeholder="Papanasam" /></div><div><label className="block text-xs font-semibold uppercase text-gray-400 mb-1">District</label><input type="text" required value={district} onChange={(e) => setDistrict(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" placeholder="Thanjavur" /></div></div>
+            <div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Area (in Acres)</label><input type="number" min="0.1" step="0.1" required value={areaAcres} onChange={(e) => setAreaAcres(Number(e.target.value))} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" /></div><div><label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Soil Type</label><select value={soilType} onChange={(e) => setSoilType(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-xs focus:border-emerald-500 focus:outline-none"><option value="Alluvial Clay Loam">Alluvial Clay Loam</option><option value="Red Sandy Loam">Red Sandy Loam</option><option value="Black Cotton Soil">Black Cotton Soil</option><option value="Laterite Soil">Laterite Soil</option></select></div></div>
+            <button type="submit" disabled={isSubmitting} className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg transition">{isSubmitting ? 'Saving Farm...' : 'Save Farm Details'}</button>
           </form>
         </Modal>
       </div>
