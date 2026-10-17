@@ -20,6 +20,7 @@ import {
   AiInteraction,
 } from '@/types';
 import { supabase } from './supabase';
+import { api } from './api';
 
 export const dataService = {
   // Profiles
@@ -41,13 +42,8 @@ export const dataService = {
 
   // Farms
   async getFarms(ownerId?: string): Promise<Farm[]> {
-    try {
-      let query = supabase.from('farms').select('*');
-      if (ownerId) query = query.eq('owner_id', ownerId);
-      const { data, error } = await query;
-      if (!error && data) return data as Farm[];
-    } catch {}
-    return [];
+    if (!ownerId) return [];
+    return api.getFarms(ownerId);
   },
 
   async createFarm(farm: Partial<Farm>): Promise<Farm | null> {
@@ -60,32 +56,58 @@ export const dataService = {
 
   // Crop Catalog & Cultivations
   async getCropCatalog(): Promise<CropCatalogItem[]> {
-    try {
-      const { data, error } = await supabase.from('crop_catalog').select('*').order('name');
-      if (error) throw error;
-      return (data ?? []) as CropCatalogItem[];
-    } catch {
-      return [];
-    }
+    const response = await api.getCrops();
+    return response.items.map((crop) => ({
+      id: crop.id,
+      name: crop.name,
+      category: (crop.category || 'Cereals') as CropCatalogItem['category'],
+      typical_duration_days: 120,
+      season: 'Kharif',
+    }));
   },
 
   async getCultivations(farmId?: string, ownerId?: string): Promise<Cultivation[]> {
-    try {
-      let query = supabase.from('cultivations').select('*');
-      if (farmId) query = query.eq('farm_id', farmId);
-      if (ownerId) query = query.eq('farmer_id', ownerId);
-      const { data, error } = await query;
-      if (!error && data) return data as Cultivation[];
-    } catch {}
-    return [];
+    if (!ownerId) return [];
+    const rows = await api.getFarmerCultivations(farmId);
+    return rows.map((row) => ({
+      ...row,
+      crop_name: row.crop_name || 'Unknown crop',
+      variety: row.variety || '',
+      season: row.season || 'Kharif',
+      area_acres: Number(row.area_acres || 0),
+      expected_yield_kg: row.expected_yield_kg == null ? null : Number(row.expected_yield_kg),
+      status: row.status || 'planned',
+    })) as Cultivation[];
   },
 
-  async createCultivation(cult: Partial<Cultivation>): Promise<Cultivation | null> {
-    try {
-      const { data, error } = await supabase.from('cultivations').insert(cult).select('*').single();
-      if (!error && data) return data as Cultivation;
-    } catch {}
-    return null;
+  async createCultivation(cult: Partial<Cultivation> & { farmer_id: string }): Promise<Cultivation> {
+    if (!cult.farm_id || !cult.crop_id) {
+      throw new Error('Select a farm and crop before saving cultivation.');
+    }
+    const created = await api.createFarmerCultivation({
+      farm_id: cult.farm_id,
+      crop_id: cult.crop_id,
+      variety: cult.variety?.trim() || null,
+      season: cult.season || 'Kharif',
+      sowing_date: cult.sowing_date || null,
+      expected_harvest_date: cult.expected_harvest_date || null,
+      area_acres: Number(cult.area_acres),
+      expected_yield_kg: cult.expected_yield_kg ?? null,
+      status: cult.status || 'planned',
+      notes: cult.agronomy_notes || null,
+      organic_practice: cult.organic_practice ?? false,
+      budget_inr: cult.budget_inr,
+      agronomy_notes: cult.agronomy_notes || null,
+    });
+    return {
+      ...created,
+      crop_name: created.crop_name || 'Unknown crop',
+      variety: created.variety || '',
+      season: created.season || 'Kharif',
+      area_acres: Number(created.area_acres || 0),
+      expected_yield_kg: created.expected_yield_kg == null ? null : Number(created.expected_yield_kg),
+      status: created.status || 'planned',
+    } as Cultivation;
   },
 
   // Field Observations
@@ -386,21 +408,36 @@ export const dataService = {
   },
 
   async getDocuments(userId?: string): Promise<FarmerDocument[]> {
-    try {
-      let query = supabase.from('farmer_documents').select('*');
-      if (userId) query = query.eq('user_id', userId);
-      const { data, error } = await query;
-      if (!error && data) return data as FarmerDocument[];
-    } catch {}
-    return [];
+    if (!userId) return [];
+    return api.getFarmerDocuments();
   },
 
-  async createDocument(doc: Partial<FarmerDocument>): Promise<FarmerDocument | null> {
-    try {
-      const { data, error } = await supabase.from('farmer_documents').insert(doc).select('*').single();
-      if (!error && data) return data as FarmerDocument;
-    } catch {}
-    return null;
+  async uploadFarmerDocument(
+    userId: string,
+    file: File,
+    metadata: {
+      doc_type: FarmerDocument['doc_type'];
+      doc_number?: string;
+      issuing_authority?: string;
+      farm_id?: string | null;
+      issue_date?: string;
+      expiry_date?: string;
+      description?: string;
+    },
+  ): Promise<FarmerDocument> {
+    const allowedTypes = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
+    if (!allowedTypes.has(file.type)) {
+      throw new Error('Choose a PDF, JPG, PNG, or WebP document.');
+    }
+    if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
+      throw new Error('Choose a non-empty document that is 10 MB or smaller.');
+    }
+    // The server derives the owner from the verified Firebase bearer token.
+    return api.uploadFarmerDocument(file, metadata);
+  },
+
+  async getFarmerDocumentDownloadUrl(documentId: string): Promise<string> {
+    return api.getFarmerDocumentDownloadUrl(documentId);
   },
 
   // Cold Storage & Logistics

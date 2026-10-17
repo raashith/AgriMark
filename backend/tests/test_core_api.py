@@ -100,3 +100,194 @@ def test_create_farm_returns_saved_database_row(monkeypatch):
         assert response.json()["area_acres"] == "1.2"
     finally:
         app.dependency_overrides.clear()
+
+
+
+def test_create_farmer_cultivation_persists_owned_farm_crop_and_profile(monkeypatch):
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    from backend.app.api.v1 import core
+
+    user_id = UUID("00000000-0000-0000-0000-000000000123")
+    farm_id = UUID("00000000-0000-0000-0000-000000000456")
+    crop_id = UUID("00000000-0000-0000-0000-000000000789")
+    cultivation_id = UUID("00000000-0000-0000-0000-000000000abc")
+    inserted = {}
+
+    class FakeQuery:
+        def __init__(self, table_name):
+            self.table_name = table_name
+
+        def select(self, _columns):
+            return self
+
+        def eq(self, *_args):
+            return self
+
+        def limit(self, _limit):
+            return self
+
+        def order(self, *_args, **_kwargs):
+            return self
+
+        def insert(self, payload):
+            inserted.update(payload)
+            return self
+
+        def execute(self):
+            if self.table_name == "farms":
+                return SimpleNamespace(data=[{"id": str(farm_id), "area_acres": 2.0}])
+            if self.table_name == "crops":
+                return SimpleNamespace(data=[{"id": str(crop_id), "name": "Paddy"}])
+            if self.table_name == "farmer_cultivation_records":
+                return SimpleNamespace(data=[{
+                    **inserted,
+                    "id": str(cultivation_id),
+                    "created_at": datetime(2026, 10, 17, tzinfo=timezone.utc).isoformat(),
+                    "crops": {"name": "Paddy"},
+                }])
+            raise AssertionError(f"Unexpected table: {self.table_name}")
+
+    class FakeDatabase:
+        def table(self, name):
+            return FakeQuery(name)
+
+    monkeypatch.setattr(core, "get_supabase", lambda: FakeDatabase())
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(id=user_id, role="farmer")
+    try:
+        response = client.post(
+            "/api/v1/core/farmer-cultivations",
+            headers={"Authorization": "Bearer fake_token"},
+            json={
+                "farm_id": str(farm_id),
+                "crop_id": str(crop_id),
+                "variety": "IR64",
+                "season": "Kharif",
+                "area_acres": 1.25,
+                "expected_yield_kg": 2200,
+                "status": "planned",
+            },
+        )
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert body["id"] == str(cultivation_id)
+        assert body["farmer_id"] == str(user_id)
+        assert body["crop_name"] == "Paddy"
+        assert body["area_acres"] == "1.25"
+        assert inserted["farmer_id"] == str(user_id)
+        assert inserted["farm_id"] == str(farm_id)
+        assert inserted["crop_id"] == str(crop_id)
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_upload_farmer_document_persists_private_object_and_metadata(monkeypatch):
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    from backend.app.api.v1 import core
+
+    user_id = UUID("00000000-0000-0000-0000-000000000123")
+    farm_id = UUID("00000000-0000-0000-0000-000000000456")
+    document_id = UUID("00000000-0000-0000-0000-000000000ddd")
+    uploaded = {}
+    inserted = {}
+
+    class FakeQuery:
+        def __init__(self, table_name):
+            self.table_name = table_name
+
+        def select(self, _columns):
+            return self
+
+        def eq(self, *_args):
+            return self
+
+        def limit(self, _limit):
+            return self
+
+        def order(self, *_args, **_kwargs):
+            return self
+
+        def insert(self, payload):
+            inserted.update(payload)
+            return self
+
+        def execute(self):
+            if self.table_name == "farms":
+                return SimpleNamespace(data=[{"id": str(farm_id)}])
+            if self.table_name == "farmer_documents":
+                return SimpleNamespace(data=[{
+                    **inserted,
+                    "id": str(document_id),
+                    "created_at": datetime(2026, 10, 17, tzinfo=timezone.utc).isoformat(),
+                }])
+            raise AssertionError(f"Unexpected table: {self.table_name}")
+
+    class FakeStorageBucket:
+        def upload(self, path, contents, options):
+            uploaded["path"] = path
+            uploaded["contents"] = contents
+            uploaded["options"] = options
+            return {"path": path}
+
+        def remove(self, paths):
+            uploaded["removed"] = paths
+            return {"data": []}
+
+    class FakeStorage:
+        def from_(self, bucket_name):
+            assert bucket_name == "farmer-documents"
+            return FakeStorageBucket()
+
+    class FakeDatabase:
+        storage = FakeStorage()
+
+        def table(self, name):
+            return FakeQuery(name)
+
+    monkeypatch.setattr(core, "get_supabase", lambda: FakeDatabase())
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(id=user_id, role="farmer")
+    try:
+        response = client.post(
+            "/api/v1/core/documents",
+            headers={"Authorization": "Bearer fake_token"},
+            data={
+                "doc_type": "Land Record (Patta/Chitta)",
+                "doc_number": "PATTA-123",
+                "issuing_authority": "Revenue Department",
+                "farm_id": str(farm_id),
+            },
+            files={"file": ("patta.pdf", b"%PDF-1.7\nprivate test document", "application/pdf")},
+        )
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert body["id"] == str(document_id)
+        assert body["user_id"] == str(user_id)
+        assert body["farm_id"] == str(farm_id)
+        assert body["file_path"] == uploaded["path"]
+        assert body["file_name"] == "patta.pdf"
+        assert body["is_private"] is True
+        assert uploaded["path"].startswith(f"{user_id}/")
+        assert uploaded["options"]["content-type"] == "application/pdf"
+        assert inserted["user_id"] == str(user_id)
+        assert inserted["file_size_bytes"] == len(b"%PDF-1.7\nprivate test document")
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_upload_farmer_document_rejects_mismatched_file_signature(monkeypatch):
+    from backend.app.api.v1 import core
+
+    user_id = UUID("00000000-0000-0000-0000-000000000123")
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(id=user_id, role="farmer")
+    try:
+        response = client.post(
+            "/api/v1/core/documents",
+            headers={"Authorization": "Bearer fake_token"},
+            data={"doc_type": "Land Record (Patta/Chitta)", "doc_number": "PATTA-123"},
+            files={"file": ("patta.pdf", b"not really a PDF", "application/pdf")},
+        )
+        assert response.status_code == 415
+        assert "contents do not match" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()

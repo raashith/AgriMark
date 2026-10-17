@@ -298,8 +298,16 @@ export interface FarmerDocument {
   issuing_authority?: string;
   issue_date?: string;
   expiry_date?: string;
+  document_date?: string | null;
+  description?: string | null;
+  tags?: string[];
   verification_status: 'unverified' | 'pending' | 'verified' | 'rejected';
-  file_url: string;
+  file_url?: string;
+  file_path?: string | null;
+  file_name?: string | null;
+  file_mime_type?: string | null;
+  file_size_bytes?: number | null;
+  farm_id?: string | null;
   extracted_info?: string;
   is_private: boolean;
   created_at?: string;

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -104,3 +104,62 @@ class ListingResponse(ListingCreate):
 
 class CropCatalogResponse(BaseModel):
     items: list[CropResponse]
+
+
+
+class FarmerCultivationCreate(BaseModel):
+    farm_id: UUID
+    crop_id: UUID
+    variety: str | None = Field(default=None, max_length=160)
+    season: str = Field(default="Kharif", max_length=40)
+    sowing_date: date | None = None
+    expected_harvest_date: date | None = None
+    area_acres: Decimal = Field(gt=0)
+    expected_yield_kg: Decimal | None = Field(default=None, ge=0)
+    status: str = Field(default="planned", max_length=30)
+    notes: str | None = Field(default=None, max_length=4000)
+    organic_practice: bool | None = None
+    budget_inr: Decimal | None = Field(default=None, ge=0)
+    agronomy_notes: str | None = Field(default=None, max_length=4000)
+
+
+class FarmerCultivationResponse(BaseModel):
+    id: UUID
+    farmer_id: UUID
+    farm_id: UUID
+    crop_id: UUID
+    variety: str | None = None
+    season: str | None = None
+    sowing_date: date | None = None
+    expected_harvest_date: date | None = None
+    area_acres: Decimal | None = None
+    expected_yield_kg: Decimal | None = None
+    status: str = "planned"
+    notes: str | None = None
+    crop_name: str | None = None
+    organic_practice: bool = False
+    budget_inr: Decimal | None = None
+    agronomy_notes: str | None = None
+    created_at: datetime | None = None
+
+
+class FarmerDocumentResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    farm_id: UUID | None = None
+    doc_type: str
+    doc_number: str | None = None
+    issuing_authority: str | None = None
+    issue_date: date | None = None
+    expiry_date: date | None = None
+    description: str | None = None
+    document_date: date | None = None
+    tags: list[str] = Field(default_factory=list)
+    verification_status: str = "unverified"
+    file_path: str | None = None
+    file_name: str | None = None
+    file_mime_type: str | None = None
+    file_size_bytes: int | None = None
+    extracted_info: str | None = None
+    is_private: bool = True
+    created_at: datetime | None = None
