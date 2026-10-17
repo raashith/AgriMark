@@ -80,65 +80,128 @@ def extract_market_filters(message: str) -> tuple[str | None, str | None]:
 
 
 def get_market_context(message: str) -> str:
-    commodity, state = extract_market_filters(message)
+    """Ground AgriAI market answers in the live canonical AGMARKNET table schema."""
+    commodity_alias, state_alias = extract_market_filters(message)
+    db = get_supabase()
 
     try:
-        query = (
-            get_supabase()
-            .table("national_market_price_observations")
-            .select(
-                "commodity_code,variant_code,mandi_code,district_code,state_code,"
-                "min_price,max_price,modal_price,observed_at,source,geography,unit"
+        # Resolve display names/codes using the actual reference tables rather than
+        # assuming commodity names are the same as ingestion codes.
+        commodity_rows = db.table("national_commodities").select("code,name").order("name").limit(2000).execute().data or []
+        state_rows = db.table("national_states").select("state_code,state_name").order("state_name").limit(1000).execute().data or []
+        mandi_rows = db.table("national_mandis").select("mandi_code,mandi_name,state_code").order("mandi_name").limit(5000).execute().data or []
+        commodity_names = {str(row.get("code")): str(row.get("name") or row.get("code")) for row in commodity_rows}
+        state_names = {str(row.get("state_code")): str(row.get("state_name") or row.get("state_code")) for row in state_rows}
+        mandi_names = {str(row.get("mandi_code")): str(row.get("mandi_name") or row.get("mandi_code")) for row in mandi_rows}
+
+        commodity_code = None
+        if commodity_alias:
+            alias = commodity_alias.casefold()
+            matches = [
+                row for row in commodity_rows
+                if alias in str(row.get("name") or "").casefold()
+                or str(row.get("name") or "").casefold() in alias
+                or alias in str(row.get("code") or "").casefold()
+            ]
+            if matches:
+                commodity_code = str(matches[0].get("code"))
+
+        state_code = state_alias
+        if state_alias:
+            matched_state = next(
+                (row for row in state_rows
+                 if str(row.get("state_code") or "").upper() == state_alias
+                 or state_alias.casefold() in str(row.get("state_name") or "").casefold()),
+                None,
             )
-            .eq("price_signal_type", "OBSERVED_MANDI")
-            .order("observed_at", desc=True)
-            .limit(40)
+            if matched_state:
+                state_code = str(matched_state.get("state_code"))
+
+        query = (
+            db.table("national_market_price_observations")
+            .select("id,commodity_code,variety,mandi_code,district_code,state_code,min_price,max_price,modal_price,observation_date,source,arrival_quantity,created_at")
+            .ilike("source", "%AGMARKNET%")
+            .order("observation_date", desc=True)
+            .order("id", desc=True)
+            .limit(80)
         )
-        if commodity:
-            query = query.eq("commodity_code", commodity)
-        if state:
-            query = query.eq("state_code", state)
+        if commodity_alias:
+            if not commodity_code:
+                return (
+                    "AGMARKNET DATA STATUS: the official market table is reachable, but no reference-table commodity matched "
+                    f"the requested commodity alias '{commodity_alias}'. Ask the user to choose a commodity listed in AgriMark. "
+                    "Do not invent a price or substitute a different crop."
+                )
+            query = query.eq("commodity_code", commodity_code)
+        if state_code:
+            query = query.eq("state_code", state_code)
 
         rows = query.execute().data or []
+        count_query = (
+            db.table("national_market_price_observations")
+            .select("id", count="exact", head=True)
+            .ilike("source", "%AGMARKNET%")
+        )
+        if commodity_code:
+            count_query = count_query.eq("commodity_code", commodity_code)
+        if state_code:
+            count_query = count_query.eq("state_code", state_code)
+        matching_count = count_query.execute().count
     except Exception as exc:
         raise RuntimeError("AGMARKNET market database is temporarily unavailable.") from exc
 
     if not rows:
         return (
-            "AGMARKNET DATABASE STATUS: connected, but no matching official observations "
-            "have been ingested yet for this query. Do not invent a price. "
-            "Tell the user that official observations are not available for the requested filters."
+            "AGMARKNET DATA STATUS: connected, but no matching official AGMARKNET observations were found "
+            "for the requested filters. Do not invent a price. Explain that the selected commodity/state "
+            "has no matching imported records and suggest checking the filters."
         )
 
+    # The source table's live schema uses observation_date, variety, arrival_quantity,
+    # and source. Do not query migration-only fields such as observed_at or price_signal_type.
+    dates = sorted({str(row.get("observation_date"))[:10] for row in rows if row.get("observation_date")})
+    latest_date = dates[-1] if dates else "unknown"
     now = datetime.now(timezone.utc)
+    try:
+        age_days = max((now - datetime.fromisoformat(latest_date).replace(tzinfo=timezone.utc)).total_seconds() / 86400, 0)
+    except ValueError:
+        age_days = None
+
+    prices = [float(row["modal_price"]) for row in rows if row.get("modal_price") is not None]
     lines = [
-        "AGMARKNET OFFICIAL MARKET CONTEXT",
-        "Source: Government of India AGMARKNET via data.gov.in.",
-        "Unit: INR per quintal.",
-        "These are observed administrative market reports, not predictions or guaranteed live quotes.",
+        "VERIFIED AGMARKNET MARKET DATA",
+        "Official source: Government of India AGMARKNET records imported into AgriMark Supabase.",
+        "Unit: INR per quintal unless the source record says otherwise.",
+        "Use the actual observations below as evidence. These are recorded market reports, not guaranteed live quotes.",
+        f"Matching official records in database: {matching_count if matching_count is not None else 'count unavailable'}.",
+        f"Rows supplied for analysis: {len(rows)}; distinct observation dates in this sample: {len(dates)}; newest date: {latest_date}.",
+        f"Newest observation age: approximately {age_days:.1f} days." if age_days is not None else "Observation freshness could not be calculated.",
+        f"Observed modal-price range in supplied sample: ₹{min(prices):,.2f} to ₹{max(prices):,.2f}." if prices else "No numeric modal prices in the returned sample.",
     ]
-    if commodity:
-        lines.append(f"Commodity filter: {commodity}")
-    if state:
-        lines.append(f"State filter: {state}")
-
+    if commodity_alias:
+        lines.append(f"Commodity requested: {commodity_alias}; resolved commodity: {commodity_names.get(commodity_code or '', commodity_code or 'unresolved')}.")
+    if state_code:
+        lines.append(f"State: {state_names.get(state_code, state_code)} ({state_code}).")
+    if dates:
+        lines.append("Observation dates available in this sample: " + ", ".join(dates[-20:]) + ".")
+    lines.append("Official observations (newest first):")
     for row in rows:
-        observed = row.get("observed_at") or ""
+        observed = str(row.get("observation_date") or "unknown")[:10]
+        modal = row.get("modal_price")
+        minimum = row.get("min_price")
+        maximum = row.get("max_price")
+        arrival = row.get("arrival_quantity")
         lines.append(
-            f"- commodity={row.get('commodity_code')}; variant={row.get('variant_code')}; "
-            f"mandi={row.get('mandi_code')}; geography={row.get('geography')}; "
-            f"modal=₹{row.get('modal_price')}; min=₹{row.get('min_price')}; "
-            f"max=₹{row.get('max_price')}; observed_at={observed}; source={row.get('source')}"
+            f"- date={observed}; commodity={commodity_names.get(str(row.get('commodity_code')), row.get('commodity_code'))}; "
+            f"variety={row.get('variety') or 'not supplied'}; mandi={mandi_names.get(str(row.get('mandi_code')), row.get('mandi_code') or 'not supplied')}; "
+            f"district={row.get('district_code') or 'not supplied'}; state={state_names.get(str(row.get('state_code')), row.get('state_code') or 'not supplied')}; "
+            f"min=₹{minimum}; modal=₹{modal}; max=₹{maximum}; arrival_quantity={arrival}; source={row.get('source')}"
         )
-
-    latest = rows[0].get("observed_at")
-    if latest:
-        try:
-            age_days = (now - datetime.fromisoformat(latest.replace("Z", "+00:00"))).total_seconds() / 86400
-            lines.append(f"Freshness: newest stored observation is approximately {max(age_days, 0):.1f} days old.")
-        except ValueError:
-            pass
-
+    if len(dates) < 5:
+        lines.append(
+            "FORECAST LIMITATION: fewer than five distinct observation dates are present in this sample. "
+            "Do not claim a trained time-series forecast or infer a time trend from cross-sectional mandi prices."
+        )
     return "\n".join(lines)
 
 
