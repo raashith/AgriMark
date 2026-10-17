@@ -225,6 +225,7 @@ export const api = {
     farm_id?: string | null;
     issue_date?: string;
     expiry_date?: string;
+    description?: string;
   }) => {
     const form = new FormData();
     form.append('file', file);
@@ -234,6 +235,7 @@ export const api = {
     if (metadata.farm_id) form.append('farm_id', metadata.farm_id);
     if (metadata.issue_date) form.append('issue_date', metadata.issue_date);
     if (metadata.expiry_date) form.append('expiry_date', metadata.expiry_date);
+    if (metadata.description) form.append('description', metadata.description);
     return request<FarmerDocument>('/core/documents', { method: 'POST', body: form });
   },
   getFarmerDocumentDownloadUrl: async (documentId: string) => {
