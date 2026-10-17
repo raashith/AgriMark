@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -22,6 +23,7 @@ from ...schemas.domain import (
 )
 
 router = APIRouter(prefix="/core", tags=["core"])
+logger = logging.getLogger(__name__)
 
 
 def _single(result):
@@ -80,10 +82,39 @@ def create_farm(
     payload = request.model_dump(exclude_none=True)
     payload["owner_id"] = str(user.id)
     try:
-        result = get_supabase().table("farms").insert(payload).execute()
+        # Explicitly request the inserted representation so the API can return the
+        # canonical row and the frontend can update without guessing a generated ID.
+        result = get_supabase().table("farms").insert(payload).select("*").execute()
+    except Exception as exc:
+        # Keep the raw database exception in server logs, never expose credentials or
+        # SQL internals to the browser. Map common failures to actionable messages.
+        code = str(getattr(exc, "code", "") or "")
+        logger.exception("Farm creation failed for authenticated profile %s (db_code=%s)", user.id, code or "unknown")
+        if code in {"23503", "PGRST116"}:
+            detail = "Your farmer profile could not be matched to this account. Sign out, sign in again, and retry."
+            status_code = 409
+        elif code in {"23514", "22P02"}:
+            detail = "Please check the farm acreage and location details, then try again."
+            status_code = 422
+        elif code in {"PGRST204", "PGRST205", "42703", "42P01"}:
+            detail = "The farm database schema is not ready on the AgriMark service. Please retry after the service is updated."
+            status_code = 503
+        elif type(exc).__name__ in {"ReadError", "ConnectError", "TimeoutException"}:
+            detail = "The farm database is temporarily unreachable. Your form has not been confirmed as saved; please retry."
+            status_code = 503
+        else:
+            detail = "AgriMark could not save this farm. Your details remain in the form; please retry."
+            status_code = 500
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+
+    try:
         return FarmResponse(**_single(result))
     except Exception as exc:
-        raise HTTPException(status_code=400, detail="Unable to create farm") from exc
+        logger.exception("Farm insert returned an unexpected response for profile %s", user.id)
+        raise HTTPException(
+            status_code=502,
+            detail="AgriMark received an unexpected response after saving the farm. Refresh your farm list before retrying.",
+        ) from exc
 
 
 @router.get("/profiles/{profile_id}/farms", response_model=list[FarmResponse])
