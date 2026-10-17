@@ -1,7 +1,12 @@
 import { UserProfile, Farm, Cultivation, ProduceLot, Listing, MarketplaceOrder, MarketPriceObservation } from '@/types';
 
-const rawApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://agrimark-api.onrender.com/api/v1';
-const API_BASE_URL = rawApiUrl.includes('supabase.co') ? 'https://agrimark-api.onrender.com/api/v1' : rawApiUrl;
+const DEFAULT_API_BASE_URL = 'https://agrimark-api.onrender.com/api/v1';
+const configuredApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+const API_BASE_URL = (() => {
+  if (!configuredApiUrl || configuredApiUrl.includes('supabase.co')) return DEFAULT_API_BASE_URL;
+  const base = configuredApiUrl.replace(/\\/+$/, '').replace(/\\/api\\/v1$/i, '');
+  return `${base}/api/v1`;
+})();
 
 export class ApiError extends Error {
   statusCode: number;
@@ -122,10 +127,14 @@ async function request<T>(endpoint: string, options: RequestInit = {}, explicitT
     return data as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
+    const detail = error instanceof Error ? error.message : 'Unknown network error';
+    const timedOut = error instanceof Error && error.name === 'AbortError';
     throw new ApiError(
-      'Unable to reach AgriMark services. Please check your connection and try again.',
+      timedOut
+        ? 'AgriMark services took too long to respond. Please retry in a moment.'
+        : 'Unable to reach AgriMark services. Please check your connection and try again.',
       0,
-      (error as Error).message
+      detail
     );
   }
 }
