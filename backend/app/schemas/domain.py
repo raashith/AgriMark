@@ -118,7 +118,7 @@ class FarmerCultivationCreate(BaseModel):
     expected_yield_kg: Decimal | None = Field(default=None, ge=0)
     status: str = Field(default="planned", max_length=30)
     notes: str | None = Field(default=None, max_length=4000)
-    organic_practice: bool = False
+    organic_practice: bool | None = None
     budget_inr: Decimal | None = Field(default=None, ge=0)
     agronomy_notes: str | None = Field(default=None, max_length=4000)
 
