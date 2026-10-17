@@ -87,7 +87,12 @@ export default function DocumentsPage() {
       // If the metadata write failed, remove the already-uploaded private object so
       // a failed submission does not leave an orphaned file in Storage.
       if (uploadedPath) {
-        await (await import('@/lib/supabase')).supabase.storage.from('farmer-documents').remove([uploadedPath]).catch(() => ({ data: [], error: null }));
+        try {
+          const { supabase } = await import('@/lib/supabase');
+          await supabase.storage.from('farmer-documents').remove([uploadedPath]);
+        } catch {
+          // Keep the original submit error visible; an orphan-cleanup can be retried by an administrator.
+        }
       }
       showError('Failed to upload document', err instanceof Error ? err.message : 'The document could not be saved.');
     } finally {
