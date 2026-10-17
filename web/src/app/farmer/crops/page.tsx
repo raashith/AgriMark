@@ -31,6 +31,9 @@ export default function FarmerCropsPage() {
   const [sowingDate, setSowingDate] = useState('');
   const [expectedHarvestDate, setExpectedHarvestDate] = useState('');
   const [expectedYieldKg, setExpectedYieldKg] = useState<number | ''>('');
+  const [organicPractice, setOrganicPractice] = useState(false);
+  const [budgetInr, setBudgetInr] = useState<number | ''>('');
+  const [agronomyNotes, setAgronomyNotes] = useState('');
 
   useEffect(() => {
     async function loadData() {
@@ -87,6 +90,9 @@ export default function FarmerCropsPage() {
         expected_harvest_date: expectedHarvestDate || null,
         area_acres: acres,
         expected_yield_kg: expectedYieldKg === '' ? null : Number(expectedYieldKg),
+        organic_practice: organicPractice,
+        budget_inr: budgetInr === '' ? undefined : Number(budgetInr),
+        agronomy_notes: agronomyNotes.trim() || undefined,
         status: 'planned',
       });
       setCultivations((prev) => [created, ...prev.filter((item) => item.id !== created.id)]);
@@ -223,6 +229,20 @@ export default function FarmerCropsPage() {
               <input type="number" min="0" step="1" value={expectedYieldKg} onChange={(e) => setExpectedYieldKg(e.target.value === '' ? '' : Number(e.target.value))} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" placeholder="Expected yield in kilograms" />
             </div>
 
+            <label className="flex items-center gap-3 rounded-xl border border-[#1e2d26] bg-[#0a0f0d] px-4 py-3 text-sm text-gray-200">
+              <input type="checkbox" checked={organicPractice} onChange={(e) => setOrganicPractice(e.target.checked)} className="accent-emerald-500" />
+              Follow organic cultivation practices
+            </label>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Estimated Cultivation Budget (₹)</label>
+                <input type="number" min="0" step="1" value={budgetInr} onChange={(e) => setBudgetInr(e.target.value === '' ? '' : Number(e.target.value))} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" placeholder="Optional" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Agronomy Notes</label>
+                <textarea value={agronomyNotes} onChange={(e) => setAgronomyNotes(e.target.value)} maxLength={4000} rows={2} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" placeholder="Seed source, methods, observations…" />
+              </div>
+            </div>
             <button type="submit" disabled={isSubmitting || !farms.length || !catalog.length} className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-bold rounded-xl shadow-lg transition">
               {isSubmitting ? 'Saving cultivation…' : 'Save Cultivation Record'}
             </button>
