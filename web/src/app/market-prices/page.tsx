@@ -123,24 +123,35 @@ export default function MarketPricesPage() {
     : null;
 
   async function loadForecast() {
-    const params = new URLSearchParams();
-    if (selectedCommodity !== 'all') params.set('commodity', selectedCommodity);
-    if (selectedMandi !== 'all') params.set('mandi', selectedMandi);
-    params.set('days', '7');
-    setForecastStatus('Calculating forecast…');
-    const response = await fetch('/api/v1/mandi/forecast?' + params.toString(), { cache: 'no-store' });
-    const payload = await response.json();
-    if (!payload.ok) {
+    // Forecasts are commodity-specific; never label a single-commodity forecast
+    // as a forecast for the "All commodities" view.
+    if (selectedCommodity === 'all') {
       setForecast([]);
-      setForecastStatus(payload.error || 'Forecast unavailable');
+      setForecastStatus('Choose a commodity to forecast its observed mandi prices');
       return;
     }
-    setForecast(payload.forecast || []);
-    setForecastStatus(
-      payload.observed_count >= 3
-        ? `7-day projection from ${payload.observed_count} distinct observed dates`
-        : `Only ${payload.observed_count} distinct observed date(s); showing a flat baseline from real prices, not a learned trend`,
-    );
+    const params = new URLSearchParams({ commodity: selectedCommodity, days: '7' });
+    if (selectedMandi !== 'all') params.set('mandi', selectedMandi);
+    setForecastStatus('Calculating forecast…');
+    try {
+      const response = await fetch('/api/v1/mandi/forecast?' + params.toString(), { cache: 'no-store' });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok) {
+        setForecast([]);
+        setForecastStatus(payload.error || 'Forecast unavailable');
+        return;
+      }
+      setForecast(payload.forecast || []);
+      setForecastStatus(
+        payload.observed_count >= 3
+          ? `7-day projection from ${payload.observed_count} distinct observed dates`
+          : `Only ${payload.observed_count} distinct observed date(s); showing a flat baseline from real prices, not a learned trend`,
+      );
+    } catch (error) {
+      console.error('[AgriMark forecast] request failed', error);
+      setForecast([]);
+      setForecastStatus('Forecast service is temporarily unavailable. Refresh and try again.');
+    }
   }
 
   useEffect(() => {
