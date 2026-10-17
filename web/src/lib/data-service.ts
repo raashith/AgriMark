@@ -66,7 +66,8 @@ export const dataService = {
       .select('id,name,category,created_at')
       .order('name');
     if (error) throw new Error(`Could not load the crop catalog: ${error.message}`);
-    return (data ?? []).map((crop) => ({
+    const rows = (data ?? []) as Array<{ id: string; name: string; category: string | null }>;
+    return rows.map((crop) => ({
       id: crop.id,
       name: crop.name,
       category: crop.category || 'Cereals',
