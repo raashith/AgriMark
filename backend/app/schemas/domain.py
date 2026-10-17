@@ -104,3 +104,46 @@ class ListingResponse(ListingCreate):
 
 class CropCatalogResponse(BaseModel):
     items: list[CropResponse]
+
+
+class FarmerCultivationRecordCreate(BaseModel):
+    farm_id: UUID
+    crop_id: UUID
+    variety: str | None = Field(default=None, max_length=160)
+    season: str | None = Field(default=None, max_length=60)
+    sowing_date: date | None = None
+    expected_harvest_date: date | None = None
+    area_acres: Decimal | None = Field(default=None, ge=0)
+    expected_yield_kg: Decimal | None = Field(default=None, ge=0)
+    status: str = "planned"
+    notes: str | None = Field(default=None, max_length=4000)
+
+
+class FarmerCultivationRecordResponse(FarmerCultivationRecordCreate):
+    id: UUID
+    farmer_id: UUID
+    created_at: str | None = None
+    crop_name: str | None = None
+    crop_category: str | None = None
+    farm_name: str | None = None
+    farm_village: str | None = None
+    farm_district: str | None = None
+
+
+class FarmerDocumentResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    farm_id: UUID | None = None
+    doc_type: str
+    doc_number: str | None = None
+    issuing_authority: str | None = None
+    issue_date: date | None = None
+    expiry_date: date | None = None
+    verification_status: str = "unverified"
+    file_path: str | None = None
+    file_name: str | None = None
+    file_mime_type: str | None = None
+    file_size_bytes: int | None = None
+    extracted_info: str | None = None
+    is_private: bool = True
+    created_at: str | None = None
