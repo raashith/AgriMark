@@ -61,21 +61,13 @@ export default function DocumentsPage() {
       return;
     }
     setIsSubmitting(true);
-    let uploadedPath: string | null = null;
     try {
-      uploadedPath = await dataService.uploadFarmerDocument(user.id, selectedFile);
-      const created = await dataService.createDocument({
-        user_id: user.id,
-        farm_id: fileFarmId || null,
+      const created = await dataService.uploadFarmerDocument(user.id, selectedFile, {
         doc_type: docType,
         doc_number: docNumber.trim(),
         issuing_authority: authority.trim() || 'Revenue Department',
-        file_path: uploadedPath,
-        file_name: selectedFile.name,
-        file_mime_type: selectedFile.type,
-        file_size_bytes: selectedFile.size,
-        is_private: true,
-      } as Partial<FarmerDocument>);
+        farm_id: fileFarmId || null,
+      });
       setDocs((prev) => [created, ...prev.filter((doc) => doc.id !== created.id)]);
       showSuccess('Document Uploaded Successfully!', 'Your file and document details are saved in the private vault.');
       setIsModalOpen(false);
@@ -83,16 +75,6 @@ export default function DocumentsPage() {
       setAuthority('');
       setSelectedFile(null);
     } catch (err: unknown) {
-      // If the metadata write failed, remove the already-uploaded private object so
-      // a failed submission does not leave an orphaned file in Storage.
-      if (uploadedPath) {
-        try {
-          const { supabase } = await import('@/lib/supabase');
-          await supabase.storage.from('farmer-documents').remove([uploadedPath]);
-        } catch {
-          // Keep the original submit error visible; an orphan-cleanup can be retried by an administrator.
-        }
-      }
       showError('Failed to upload document', err instanceof Error ? err.message : 'The document could not be saved.');
     } finally {
       setIsSubmitting(false);
@@ -176,7 +158,7 @@ export default function DocumentsPage() {
                         type="button"
                         onClick={async () => {
                           try {
-                            const url = await dataService.getFarmerDocumentDownloadUrl(doc.file_path!);
+                            const url = await dataService.getFarmerDocumentDownloadUrl(doc.id);
                             window.open(url, '_blank', 'noopener,noreferrer');
                           } catch (err) {
                             showError('Unable to open document', err instanceof Error ? err.message : 'Please try again.');
