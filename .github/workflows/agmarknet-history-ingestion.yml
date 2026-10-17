@@ -1,0 +1,77 @@
+name: AGMARKNET history and daily ingestion
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Official data ingestion mode"
+        required: true
+        default: historical
+        type: choice
+        options:
+          - historical
+          - daily
+          - both
+  schedule:
+    - cron: "20 1 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agrimark-agmarknet-ingestion
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      DATA_GOV_IN_API_KEY: ${{ secrets.DATA_GOV_IN_API_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install ingestion dependencies
+        run: python -m pip install --upgrade pip supabase python-dotenv
+
+      - name: Validate required secrets
+        shell: bash
+        run: |
+          test -n "$DATA_GOV_IN_API_KEY" || { echo "::error::Add DATA_GOV_IN_API_KEY to GitHub Actions secrets."; exit 1; }
+          test -n "$SUPABASE_URL" || { echo "::error::Add SUPABASE_URL to GitHub Actions secrets."; exit 1; }
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "::error::Add SUPABASE_SERVICE_ROLE_KEY to GitHub Actions secrets."; exit 1; }
+
+      - name: Backfill official historical data (manual historical/both runs)
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.mode == 'historical' || inputs.mode == 'both') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The existing worker stores its pagination offset in Supabase and
+          # upserts with official source/date keys, so reruns are resumable.
+          for page in $(seq 1 250); do
+            output="$(python scripts/data/ingest_agmarknet.py --mode historical)"
+            echo "$output"
+            finished="$(python -c 'import json,sys; print(str(json.loads(sys.argv[1]).get("finished", False)).lower())' "$output")"
+            if [ "$finished" = "true" ]; then
+              echo "Historical AGMARKNET backfill reached the end of the official resource."
+              exit 0
+            fi
+          done
+          echo "Backfill paused after 250 pages; run this workflow again to resume from the stored offset."
+
+      - name: Ingest one daily page (scheduled runs and daily dispatch)
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'daily') }}
+        run: python scripts/data/ingest_agmarknet.py --mode daily
+
+      - name: Continue ingestion state machine (manual both run)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'both' }}
+        run: python scripts/data/ingest_agmarknet.py --mode daily
