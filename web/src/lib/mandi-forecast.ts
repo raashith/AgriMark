@@ -63,36 +63,43 @@ export class MandiForecastEngine {
 
     const numPoints = validHistory.length;
 
-    // Fallback baseline if insufficient history
-    let lastObservedPrice = 2000;
+    // No fabricated fallback price: an empty history is reported as unavailable
+    // by the API before this engine is called.
+    let lastObservedPrice = 0;
     let dailySlope = 0;
-    let stdDev = 50;
+    let stdDev = 0;
+    let daysSinceLastObservation = 0;
 
     if (numPoints > 0) {
-      const prices = validHistory.map((h) => Number(h.modal_price) || 0);
-      lastObservedPrice = prices[prices.length - 1];
+      const prices = validHistory.map((h) => Number(h.modal_price)).filter((p) => Number.isFinite(p) && p > 0);
+      lastObservedPrice = prices[prices.length - 1] || 0;
+      const firstTime = new Date(validHistory[0].observed_at).getTime();
+      const lastTime = new Date(validHistory[validHistory.length - 1].observed_at).getTime();
+      daysSinceLastObservation = Math.max(0, Math.round((cutoffTime - lastTime) / 86400000));
 
-      if (numPoints >= 2) {
-        // Simple linear trend estimation over history
+      if (numPoints >= 2 && prices.length === numPoints) {
+        // Fit trend against elapsed calendar days, not array position. This
+        // remains correct when observation dates have gaps.
+        const xValues = validHistory.map((h) => (new Date(h.observed_at).getTime() - firstTime) / 86400000);
         const n = prices.length;
-        const xAvg = (n - 1) / 2;
-        const yAvg = prices.reduce((acc, p) => acc + p, 0) / n;
-
-        let num = 0;
-        let den = 0;
-        prices.forEach((y, x) => {
-          num += (x - xAvg) * (y - yAvg);
-          den += (x - xAvg) * (x - xAvg);
-        });
-
-        dailySlope = den !== 0 ? num / den : 0;
-        // Cap daily slope to prevent explosive forecasts
+        const xAvg = xValues.reduce((sum, x) => sum + x, 0) / n;
+        const yAvg = prices.reduce((sum, p) => sum + p, 0) / n;
+        let numerator = 0;
+        let denominator = 0;
+        for (let i = 0; i < n; i += 1) {
+          numerator += (xValues[i] - xAvg) * (prices[i] - yAvg);
+          denominator += (xValues[i] - xAvg) ** 2;
+        }
+        dailySlope = denominator > 0 ? numerator / denominator : 0;
         dailySlope = Math.max(-50, Math.min(50, dailySlope));
 
-        // Calculate standard deviation for prediction intervals
-        const variance = prices.reduce((acc, p) => acc + Math.pow(p - yAvg, 2), 0) / n;
-        stdDev = Math.sqrt(variance) || 40;
+        const residuals = prices.map((price, index) => price - (yAvg + dailySlope * (xValues[index] - xAvg)));
+        const residualVariance = residuals.reduce((sum, residual) => sum + residual ** 2, 0) / n;
+        stdDev = Math.sqrt(residualVariance);
       }
+      // A single date supports only a flat baseline. Use a modest price-relative
+      // uncertainty band rather than inventing a historic trend.
+      stdDev = stdDev || Math.max(10, lastObservedPrice * 0.015);
     }
 
     const predictions: ForecastPoint[] = [];
@@ -103,7 +110,7 @@ export class MandiForecastEngine {
       const targetDateStr = targetTime.toISOString().split('T')[0];
 
       // Projected point estimate
-      const predictedVal = Math.max(100, Math.round((lastObservedPrice + dailySlope * day) * 100) / 100);
+      const predictedVal = Math.max(1, Math.round((lastObservedPrice + dailySlope * (daysSinceLastObservation + day)) * 100) / 100);
 
       // Uncertainty expands with horizon length
       const horizonFactor = 1.0 + Math.sqrt(day) * 0.15;
