@@ -135,6 +135,24 @@ drop policy if exists "Service role full access to firebase_identities" on publi
 create policy "Service role full access to firebase_identities" on public.firebase_identities
 for all to service_role using (true) with check (true);
 
+-- Remove broad default grants from the public API role before allowing read-only catalog access.
+revoke all privileges on table public.profiles, public.farms, public.cultivations, public.firebase_identities from anon;
+revoke all privileges (id, full_name, phone, role, created_at, updated_at)
+  on table public.profiles from anon;
+revoke all privileges (id, owner_id, name, village, district, state, latitude, longitude, area_acres, soil_type, irrigation_source, created_at)
+  on table public.farms from anon;
+revoke all privileges (id, farm_id, crop_id, season, sowing_date, expected_harvest_date, area_acres, status, created_at)
+  on table public.cultivations from anon;
+revoke all privileges (firebase_uid, profile_id, email, created_at, updated_at)
+  on table public.firebase_identities from anon;
+
+revoke all privileges on table public.crops, public.harvest_batches, public.produce_lots from anon;
+revoke all privileges (id, name, category, created_at) on table public.crops from anon;
+revoke all privileges (id, cultivation_id, farm_id, harvested_at, quantity, unit, grade, trace_code, created_at)
+  on table public.harvest_batches from anon;
+revoke all privileges (id, owner_id, cultivation_id, crop_id, quantity, unit, quality_grade, available_quantity, harvested_at, status, is_listed, created_at)
+  on table public.produce_lots from anon;
+
 grant select on public.crops to anon, authenticated;
 grant select (id, cultivation_id, harvested_at, quantity, unit, grade, trace_code) on public.harvest_batches to anon, authenticated;
 grant select (id, cultivation_id, crop_id, quantity, unit, quality_grade, available_quantity, harvested_at, status, is_listed) on public.produce_lots to anon, authenticated;
