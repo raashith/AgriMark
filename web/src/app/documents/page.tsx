@@ -26,6 +26,9 @@ export default function DocumentsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fileFarmId, setFileFarmId] = useState('');
   const [farms, setFarms] = useState<Array<{ id: string; name?: string | null; village?: string | null }>>([]);
+  const [description, setDescription] = useState('');
+  const [issueDate, setIssueDate] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
 
   useEffect(() => {
     async function loadData() {
@@ -67,6 +70,9 @@ export default function DocumentsPage() {
         doc_number: docNumber.trim(),
         issuing_authority: authority.trim() || 'Revenue Department',
         farm_id: fileFarmId || null,
+        issue_date: issueDate || undefined,
+        expiry_date: expiryDate || undefined,
+        description: description.trim() || undefined,
       });
       setDocs((prev) => [created, ...prev.filter((doc) => doc.id !== created.id)]);
       showSuccess('Document Uploaded Successfully!', 'Your file and document details are saved in the private vault.');
@@ -74,6 +80,9 @@ export default function DocumentsPage() {
       setDocNumber('');
       setAuthority('');
       setSelectedFile(null);
+      setDescription('');
+      setIssueDate('');
+      setExpiryDate('');
     } catch (err: unknown) {
       showError('Failed to upload document', err instanceof Error ? err.message : 'The document could not be saved.');
     } finally {
@@ -228,6 +237,20 @@ export default function DocumentsPage() {
               {selectedFile && <p className="mt-2 break-all text-xs text-gray-400">{selectedFile.name} · {(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>}
             </div>
 
+            <div>
+              <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Description / Notes (optional)</label>
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength={2000} rows={2} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" placeholder="Brief details about this document" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Issue Date</label>
+                <input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Expiry Date</label>
+                <input type="date" min={issueDate || undefined} value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white text-sm focus:border-emerald-500 focus:outline-none" />
+              </div>
+            </div>
             <button type="submit" disabled={isSubmitting} className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 text-white font-bold rounded-xl shadow-lg transition">
               {isSubmitting ? 'Uploading and saving…' : 'Upload Document'}
             </button>
