@@ -17,6 +17,7 @@ import {
   Building2,
   ChevronDown,
   MapPin,
+  TrendingUp,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -46,6 +47,17 @@ export const Navbar: React.FC = () => {
               <Sprout className="w-6 h-6 text-emerald-400" />
             </div>
             <span className="hidden xs:inline sm:inline">AgriMark</span>
+          </Link>
+
+          {/* Mandi prices and forecasting — first-class AgriMark navigation */}
+          <Link
+            href="/market-prices"
+            aria-label="Open mandi prices and forecasting"
+            className="hidden md:inline-flex shrink-0 items-center gap-2 rounded-xl border border-emerald-700/60 bg-emerald-950/60 px-3 py-2 text-xs font-bold text-emerald-300 transition hover:border-emerald-400 hover:bg-emerald-900/60 hover:text-emerald-200"
+          >
+            <TrendingUp className="h-4 w-4" />
+            <span className="hidden lg:inline">Market Forecast</span>
+            <span className="lg:hidden">Markets</span>
           </Link>
 
           {/* Quick Search / Command Launcher */}
