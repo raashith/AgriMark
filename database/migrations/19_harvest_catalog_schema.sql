@@ -243,3 +243,35 @@ insert into public.crops(name,category) values
  ('Onion','Vegetables'), ('Potato','Vegetables'), ('Chilli','Spices'), ('Turmeric','Spices'),
  ('Banana','Fruits'), ('Coconut','Fruits')
 on conflict(name) do nothing;
+
+-- Tie the harvest catalog to the official market commodity dimension.
+alter table public.crops
+  add column if not exists market_commodity_code text
+  references public.national_commodities(code) on delete set null;
+
+create index if not exists idx_crops_market_commodity_code
+  on public.crops(market_commodity_code);
+
+update public.crops c
+set market_commodity_code = nc.code
+from public.national_commodities nc
+where lower(trim(c.name)) = lower(trim(nc.name))
+  and c.market_commodity_code is null;
+
+insert into public.crops (name, category, market_commodity_code)
+select
+  nc.name,
+  case
+    when lower(nc.name) ~ '(rice|paddy|wheat|maize|bajra|jowar|ragi|barley|millet|sorghum|oat)' then 'Cereals'
+    when lower(nc.name) ~ '(gram|pulse|lentil|arhar|tur|urad|moong|masur|pea|bean|chana|rajma)' then 'Pulses'
+    when lower(nc.name) ~ '(groundnut|mustard|soyabean|soybean|sesame|sesamum|sunflower|castor|linseed|safflower|oilseed)' then 'Oilseeds'
+    when lower(nc.name) ~ '(tomato|onion|potato|brinjal|cabbage|cauliflower|chilli|okra|garlic|ginger|cucumber|carrot|pumpkin|radish|vegetable)' then 'Vegetables'
+    when lower(nc.name) ~ '(apple|banana|mango|orange|grape|coconut|papaya|guava|lemon|pomegranate|fruit|pineapple|watermelon)' then 'Fruits'
+    when lower(nc.name) ~ '(turmeric|cumin|coriander|pepper|cardamom|spice|clove|fennel|fenugreek)' then 'Spices'
+    when lower(nc.name) ~ '(cotton|sugarcane|jute|tobacco|rubber|tea|coffee|fiber|fibre)' then 'Cash Crops'
+    else 'Other'
+  end,
+  nc.code
+from public.national_commodities nc
+on conflict (name) do update
+set market_commodity_code = coalesce(public.crops.market_commodity_code, excluded.market_commodity_code);
