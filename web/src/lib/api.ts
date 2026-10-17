@@ -213,6 +213,9 @@ export const api = {
     expected_yield_kg?: number | null;
     status?: string;
     notes?: string | null;
+    organic_practice?: boolean;
+    budget_inr?: number;
+    agronomy_notes?: string | null;
   }) => request<Cultivation>('/core/farmer-cultivations', {
     method: 'POST',
     body: JSON.stringify(data),
