@@ -151,9 +151,17 @@ BEGIN
   )
   RETURNING * INTO v_order;
 
+  INSERT INTO public.admin_audit_log (user_id, action, details, created_at)
+  VALUES (
+    p_buyer_id,
+    'MARKETPLACE_ORDER_CREATED',
+    FORMAT('Order %s created for listing %s; quantity=%s kg.', v_order.id, v_listing.id, p_quantity),
+    NOW()
+  );
+
   RETURN NEXT v_order;
 END;
-$$;
+$;
 
 REVOKE ALL ON FUNCTION public.create_marketplace_order_atomic(UUID, UUID, NUMERIC) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.create_marketplace_order_atomic(UUID, UUID, NUMERIC) FROM anon;
