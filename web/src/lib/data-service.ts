@@ -87,7 +87,9 @@ export const dataService = {
     const created = await api.createFarmerCultivation({
       farm_id: cult.farm_id,
       crop_id: cult.crop_id,
+      crop_name: cult.crop_name?.trim() || undefined,
       variety: cult.variety?.trim() || null,
+      seed_variety: cult.seed_variety?.trim() || cult.variety?.trim() || undefined,
       season: cult.season || 'Kharif',
       sowing_date: cult.sowing_date || null,
       expected_harvest_date: cult.expected_harvest_date || null,

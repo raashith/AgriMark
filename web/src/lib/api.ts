@@ -205,7 +205,9 @@ export const api = {
   createFarmerCultivation: (data: {
     farm_id: string;
     crop_id: string;
+    crop_name?: string | null;
     variety?: string | null;
+    seed_variety?: string | null;
     season?: string;
     sowing_date?: string | null;
     expected_harvest_date?: string | null;
