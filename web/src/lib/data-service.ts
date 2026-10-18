@@ -151,13 +151,16 @@ export const dataService = {
   },
 
   async getProduceLots(farmerId?: string): Promise<ProduceLot[]> {
+    // The canonical schema stores ownership in owner_id, not farmer_id.
+    // Read through the authenticated API so RLS/schema differences cannot silently
+    // turn the farmer's own inventory into an empty list.
     try {
-      let query = supabase.from('produce_lots').select('*');
-      if (farmerId) query = query.eq('farmer_id', farmerId);
-      const { data, error } = await query;
-      if (!error && data) return data as ProduceLot[];
-    } catch {}
-    return [];
+      const rows = await api.getProduceLots();
+      return farmerId ? rows.filter((lot) => lot.owner_id === farmerId) : rows;
+    } catch (error) {
+      console.error('[AgriMark] Failed to load produce lots from API', error);
+      throw error;
+    }
   },
 
   async createProduceLot(lot: Partial<ProduceLot>): Promise<ProduceLot | null> {
@@ -170,31 +173,44 @@ export const dataService = {
 
   // Marketplace Listings
   async getListings(filters?: { search?: string; category?: string; district?: string; minPrice?: number; maxPrice?: number; grade?: string; sort?: string; sellerId?: string }): Promise<Listing[]> {
+    // Use the same backend listing feed consumed by buyers. It enriches each
+    // listing with its real crop name, quality and available lot quantity.
     try {
-      let query = supabase.from('listings').select('*').eq('status', 'active');
-      if (filters?.sellerId) query = query.eq('seller_id', filters.sellerId);
-      if (filters?.category && filters.category !== 'All') query = query.eq('crop_category', filters.category);
-      if (filters?.district && filters.district !== 'All') query = query.eq('district', filters.district);
-      if (filters?.grade && filters.grade !== 'All') query = query.eq('quality_grade', filters.grade);
-      if (filters?.minPrice) query = query.gte('price_per_kg', filters.minPrice);
-      if (filters?.maxPrice) query = query.lte('price_per_kg', filters.maxPrice);
-
-      const { data, error } = await query;
-      if (!error && data) {
-        let result = data as Listing[];
-        if (filters?.search) {
-          const q = filters.search.toLowerCase();
-          result = result.filter((l) => l.title.toLowerCase().includes(q) || (l.crop_name && l.crop_name.toLowerCase().includes(q)) || (l.location && l.location.toLowerCase().includes(q)));
-        }
-        if (filters?.sort === 'price_asc') {
-          result.sort((a, b) => (a.price_per_kg || a.price_per_unit) - (b.price_per_kg || b.price_per_unit));
-        } else if (filters?.sort === 'price_desc') {
-          result.sort((a, b) => (b.price_per_kg || b.price_per_unit) - (a.price_per_kg || a.price_per_unit));
-        }
-        return result;
+      let result = await api.getListings();
+      if (filters?.sellerId) result = result.filter((listing) => listing.seller_id === filters.sellerId);
+      if (filters?.category && filters.category !== 'All') {
+        result = result.filter((listing) => listing.crop_category === filters.category);
       }
-    } catch {}
-    return [];
+      if (filters?.district && filters.district !== 'All') {
+        result = result.filter((listing) => listing.district === filters.district);
+      }
+      if (filters?.grade && filters.grade !== 'All') {
+        result = result.filter((listing) => listing.quality_grade === filters.grade);
+      }
+      if (filters?.minPrice != null) {
+        result = result.filter((listing) => Number(listing.price_per_kg ?? listing.price_per_unit ?? 0) >= filters.minPrice!);
+      }
+      if (filters?.maxPrice != null) {
+        result = result.filter((listing) => Number(listing.price_per_kg ?? listing.price_per_unit ?? 0) <= filters.maxPrice!);
+      }
+      if (filters?.search) {
+        const q = filters.search.toLowerCase();
+        result = result.filter((listing) =>
+          (listing.title || '').toLowerCase().includes(q) ||
+          (listing.crop_name || '').toLowerCase().includes(q) ||
+          (listing.location || '').toLowerCase().includes(q)
+        );
+      }
+      if (filters?.sort === 'price_asc') {
+        result.sort((a, b) => Number(a.price_per_kg ?? a.price_per_unit ?? 0) - Number(b.price_per_kg ?? b.price_per_unit ?? 0));
+      } else if (filters?.sort === 'price_desc') {
+        result.sort((a, b) => Number(b.price_per_kg ?? b.price_per_unit ?? 0) - Number(a.price_per_kg ?? a.price_per_unit ?? 0));
+      }
+      return result;
+    } catch (error) {
+      console.error('[AgriMark] Failed to load marketplace listings from API', error);
+      throw error;
+    }
   },
 
   async getListingById(id: string): Promise<Listing | null> {
