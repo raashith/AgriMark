@@ -78,6 +78,7 @@ export interface Cultivation {
   crop_id: string;
   crop_name?: string;
   variety?: string;
+  seed_variety?: string;
   season?: string;
   sowing_date?: string | null;
   expected_harvest_date?: string | null;
