@@ -28,7 +28,7 @@ Do not assume the runbook and live app point to the same database. Before enabli
 4. Confirm the backend service-role configuration and browser publishable key refer to that same project.
 5. Run a read-only health check and a controlled order test using pilot accounts.
 
-Do not create a second order table just to make a dashboard card work. Reconcile the canonical schema first.
+Do not create a second order table just to make a dashboard card work. Reconcile the canonical schema first. A reviewed migration draft is tracked at `database/migrations/21_marketplace_order_atomic_reservation.sql`; it creates the expected order/audit tables when absent and defines the `create_marketplace_order_atomic` RPC. It has **not** been applied to any live project because the production project reference must first be confirmed.
 
 ## Admin dashboard sections
 
