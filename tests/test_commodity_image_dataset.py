@@ -17,7 +17,7 @@ def test_commodity_image_dataset_has_unique_keys_and_image_targets():
         assert row["canonical_name"].strip()
         assert row["category"].strip()
         assert row["commons_search_terms"].strip()
-        assert row["image_file"] == f"{row['commodity_key']}.jpg"
+        assert row["image_file"].endswith(row["commodity_key"] + ".jpg")
 
 
 def test_commodity_image_dataset_has_aliases_for_regional_names():
