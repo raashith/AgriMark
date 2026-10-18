@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { resolveCommodityImageRecord } from '@/lib/commodity-images';
 
 type CommodityImageProps = {
@@ -20,6 +20,7 @@ export function CommodityImage({
 }: CommodityImageProps) {
   const record = resolveCommodityImageRecord(name, title);
   const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => { setImageFailed(false); }, [record?.key]);
 
   if (!record || imageFailed) {
     const label = record?.name || name || title || category || 'Produce';
