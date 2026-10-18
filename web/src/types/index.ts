@@ -86,7 +86,6 @@ export interface Cultivation {
   expected_yield_kg?: number | null;
   status: 'planned' | 'active' | 'harvested' | 'cancelled' | 'failed';
   organic_practice?: boolean;
-  seed_variety?: string;
   agronomy_notes?: string;
   budget_inr?: number;
   created_at?: string;
