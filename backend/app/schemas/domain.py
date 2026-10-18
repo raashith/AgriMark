@@ -111,6 +111,8 @@ class FarmerCultivationCreate(BaseModel):
     farm_id: UUID
     crop_id: UUID
     variety: str | None = Field(default=None, max_length=160)
+    crop_name: str | None = Field(default=None, max_length=160)
+    seed_variety: str | None = Field(default=None, max_length=160)
     season: str = Field(default="Kharif", max_length=40)
     sowing_date: date | None = None
     expected_harvest_date: date | None = None
@@ -137,6 +139,7 @@ class FarmerCultivationResponse(BaseModel):
     status: str = "planned"
     notes: str | None = None
     crop_name: str | None = None
+    seed_variety: str | None = None
     organic_practice: bool = False
     budget_inr: Decimal | None = None
     agronomy_notes: str | None = None
