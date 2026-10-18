@@ -628,7 +628,17 @@ def list_listings(status: str = Query(default="active", max_length=30)) -> list[
         item = dict(row)
         if item.get("lot_id"):
             try:
-                lot_res = get_supabase_public().table("produce_lots").select("*,crops(name)").eq("id", item["lot_id"]).limit(1).execute()
+                # Public marketplace clients have column-level SELECT grants on
+                # produce_lots; SELECT * requests restricted owner/internal fields and
+                # can fail, leaving quantity_available_kg null so buyers hide the listing.
+                lot_res = (
+                    get_supabase_public()
+                    .table("produce_lots")
+                    .select("id,crop_id,quantity,unit,quality_grade,available_quantity,harvested_at,status,is_listed,crops(name)")
+                    .eq("id", item["lot_id"])
+                    .limit(1)
+                    .execute()
+                )
                 if lot_res.data:
                     lot_row = lot_res.data[0]
                     crop = lot_row.get("crops")
@@ -636,7 +646,7 @@ def list_listings(status: str = Query(default="active", max_length=30)) -> list[
                     item["quality_grade"] = lot_row.get("quality_grade")
                     item["quantity_available_kg"] = lot_row.get("available_quantity")
             except Exception:
-                pass
+                logger.exception("Marketplace listing enrichment failed for listing %s", item.get("id"))
         item["price_per_kg"] = item.get("price_per_unit")
         items.append(ListingResponse(**item))
     return items
