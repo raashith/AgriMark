@@ -201,9 +201,31 @@ function SellForm() {
   };
 
   const asking = Number(askingPrice);
-  const priceDifference = comparison && asking > 0
+  const priceDifference = comparison && asking > 0 && comparison.medianPerKg > 0
     ? ((asking - comparison.medianPerKg) / comparison.medianPerKg) * 100
     : null;
+
+  const analyzeAskingPrice = async () => {
+    if (!comparison || !selectedLot || !Number.isFinite(asking) || asking <= 0) return;
+    setAiLoading(true);
+    try {
+      const context = [
+        'You are AgriMark AI. Compare a farmer\'s proposed agricultural produce selling price with the official mandi observations provided below.',
+        'Use only these figures. Do not invent data or promise a sale. Mention that grade, location, transport, and buyer demand affect realized price.',
+        `Crop: ${comparison.commodity}; quality: ${selectedLot.quality_grade || 'not specified'}.`,
+        `Farmer asking price: ₹${asking.toFixed(2)}/kg.`,
+        `Observed modal median: ₹${comparison.medianPerKg.toFixed(2)}/kg; observed low: ₹${comparison.lowPerKg.toFixed(2)}/kg; observed high: ₹${comparison.highPerKg.toFixed(2)}/kg.`,
+        `Records: ${comparison.observations}; latest observation: ${comparison.latestDate || 'unknown'}; source: ${comparison.source}.`,
+        'In 2-4 concise sentences, say whether the asking price is above, below, or near the observed median and give a cautious practical interpretation. Do not recommend a new unsupported exact price.',
+      ].join('\\n');
+      const result = await api.askAgriAI(context, 'PRICE_COMPARISON_FROM_OFFICIAL_MANDI_OBSERVATIONS');
+      setAiAdvice(result.answer || 'Compare your asking price with the observed median and account for quality, location and transport costs.');
+    } catch {
+      setAiAdvice('Your price comparison is shown above. Consider quality, location, transport costs and current buyer demand before publishing.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   return (
     <div className="bg-[#121a16] border border-[#1e2d26] p-6 rounded-2xl shadow-md space-y-5">
@@ -230,6 +252,7 @@ function SellForm() {
               <div className="rounded-xl border border-white/10 bg-[#0a0f0d] p-3">
                 <p className="text-xs text-gray-400">AI analysis</p>
                 {aiLoading ? <p className="mt-1 text-sm text-gray-300">Analysing the observed prices…</p> : <p className="mt-1 text-sm leading-6 text-gray-200">{aiAdvice || 'Compare your asking price with the observed median and account for quality, location and transport costs.'}</p>}
+                <button type="button" onClick={() => void analyzeAskingPrice()} disabled={aiLoading || !askingPrice || asking <= 0} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-emerald-500/30 px-3 py-2 text-xs font-semibold text-emerald-200 disabled:opacity-40"><Sparkles className="h-3.5 w-3.5" />Analyze my asking price</button>
               </div>
               <p className="text-[11px] text-gray-500">Based on {comparison.observations} stored mandi observations · Latest record: {comparison.latestDate || 'date unavailable'} · {comparison.source} · Reference shown in ₹/kg.</p>
             </div>}
