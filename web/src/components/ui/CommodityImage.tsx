@@ -43,7 +43,7 @@ export function CommodityImage({
 
   return (
     <img
-      src={record.imagePath}
+      src={record.imageUrl || record.imagePath}
       alt={record.name}
       loading="lazy"
       decoding="async"
