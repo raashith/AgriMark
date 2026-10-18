@@ -29,52 +29,87 @@ export default function FarmerMarketPage() {
   const [lots, setLots] = useState<any[]>([]);
   const [marketRows, setMarketRows] = useState<MarketRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     const userId = user?.id;
-    if (!userId) return;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
     let mounted = true;
 
     async function load() {
       setLoading(true);
-      const [myListings, marketListingsData, myLots] = await Promise.all([
-        dataService.getListings({ sellerId: userId }),
-        dataService.getListings(),
-        dataService.getProduceLots(userId),
-      ]);
+      setLoadError('');
+      try {
+        // A failed listings endpoint must not keep the entire market page spinning.
+        const [myListingsResult, marketListingsResult, myLotsResult] = await Promise.allSettled([
+          dataService.getListings({ sellerId: userId }),
+          dataService.getListings(),
+          dataService.getProduceLots(userId),
+        ]);
+        const myListings = myListingsResult.status === 'fulfilled' ? myListingsResult.value : [];
+        const marketListingsData = marketListingsResult.status === 'fulfilled' ? marketListingsResult.value : [];
+        const myLots = myLotsResult.status === 'fulfilled' ? myLotsResult.value : [];
+        const inventoryFailed = [myListingsResult, marketListingsResult, myLotsResult].some((result) => result.status === 'rejected');
+        if (inventoryFailed) {
+          console.error('[AgriMark farmer market] one or more inventory requests failed', {
+            myListings: myListingsResult.status,
+            marketplace: marketListingsResult.status,
+            lots: myLotsResult.status,
+          });
+        }
 
-      const marketRowsResult = await supabase
-        .from('national_market_price_observations')
-        .select('id,commodity_code,mandi_code,observation_date,modal_price,min_price,max_price')
-        .order('observation_date', { ascending: false })
-        .order('id', { ascending: false })
-        .limit(120);
-      if (marketRowsResult.error) console.error('[AgriMark farmer market] market data load failed', marketRowsResult.error);
-      const rawMarketRows = marketRowsResult.data || [];
-      const commodityCodes = Array.from(new Set(rawMarketRows.map((r: any) => r.commodity_code).filter(Boolean)));
-      const mandiCodes = Array.from(new Set(rawMarketRows.map((r: any) => r.mandi_code).filter(Boolean)));
-      const [commodityResult, mandiResult] = await Promise.all([
-        commodityCodes.length ? supabase.from('national_commodities').select('code,name').in('code', commodityCodes) : Promise.resolve({ data: [], error: null } as any),
-        mandiCodes.length ? supabase.from('national_mandis').select('mandi_code,mandi_name').in('mandi_code', mandiCodes) : Promise.resolve({ data: [], error: null } as any),
-      ]);
-      const commodityNames = new Map((commodityResult.data || []).map((r: any) => [r.code, r.name]));
-      const mandiNames = new Map((mandiResult.data || []).map((r: any) => [r.mandi_code, r.mandi_name]));
-      const mappedMarketRows: MarketRow[] = rawMarketRows.map((r: any) => ({
-        commodity_code: r.commodity_code,
-        commodity_name: (commodityNames.get(r.commodity_code) as string | undefined) || r.commodity_code,
-        mandi_code: r.mandi_code || null,
-        mandi_name: (mandiNames.get(r.mandi_code) as string | undefined) || r.mandi_code || 'Unknown mandi',
-        observed_at: r.observation_date,
-        modal_price: Number(r.modal_price),
-        min_price: Number(r.min_price ?? r.modal_price),
-        max_price: Number(r.max_price ?? r.modal_price),
-      }));
-      if (!mounted) return;
-      setListings(myListings || []);
-      setMarketListings(marketListingsData || []);
-      setLots(myLots || []);
-      setMarketRows(mappedMarketRows);
-      setLoading(false);
+        let mappedMarketRows: MarketRow[] = [];
+        try {
+          const marketRowsResult = await supabase
+            .from('national_market_price_observations')
+            .select('id,commodity_code,mandi_code,observation_date,modal_price,min_price,max_price')
+            .order('observation_date', { ascending: false })
+            .order('id', { ascending: false })
+            .limit(120);
+          if (marketRowsResult.error) throw marketRowsResult.error;
+          const rawMarketRows = marketRowsResult.data || [];
+          const commodityCodes = Array.from(new Set(rawMarketRows.map((r: any) => r.commodity_code).filter(Boolean)));
+          const mandiCodes = Array.from(new Set(rawMarketRows.map((r: any) => r.mandi_code).filter(Boolean)));
+          const [commodityResult, mandiResult] = await Promise.all([
+            commodityCodes.length ? supabase.from('national_commodities').select('code,name').in('code', commodityCodes) : Promise.resolve({ data: [], error: null } as any),
+            mandiCodes.length ? supabase.from('national_mandis').select('mandi_code,mandi_name').in('mandi_code', mandiCodes) : Promise.resolve({ data: [], error: null } as any),
+          ]);
+          if (commodityResult.error) console.error('[AgriMark farmer market] commodity labels failed', commodityResult.error);
+          if (mandiResult.error) console.error('[AgriMark farmer market] mandi labels failed', mandiResult.error);
+          const commodityNames = new Map((commodityResult.data || []).map((r: any) => [r.code, r.name]));
+          const mandiNames = new Map((mandiResult.data || []).map((r: any) => [r.mandi_code, r.mandi_name]));
+          mappedMarketRows = rawMarketRows.map((r: any) => ({
+            commodity_code: r.commodity_code,
+            commodity_name: (commodityNames.get(r.commodity_code) as string | undefined) || r.commodity_code,
+            mandi_code: r.mandi_code || null,
+            mandi_name: (mandiNames.get(r.mandi_code) as string | undefined) || r.mandi_code || 'Unknown mandi',
+            observed_at: r.observation_date,
+            modal_price: Number(r.modal_price),
+            min_price: Number(r.min_price ?? r.modal_price),
+            max_price: Number(r.max_price ?? r.modal_price),
+          }));
+        } catch (error) {
+          console.error('[AgriMark farmer market] market prices failed to load', error);
+          if (mounted) setLoadError('Some market data is temporarily unavailable. Your page is still usable; please refresh later.');
+        }
+
+        if (!mounted) return;
+        setListings(myListings || []);
+        setMarketListings(marketListingsData || []);
+        setLots(myLots || []);
+        setMarketRows(mappedMarketRows);
+        if (inventoryFailed) {
+          setLoadError('Marketplace data could not fully load. The page stopped loading; try refreshing after the service is restored.');
+        }
+      } catch (error) {
+        console.error('[AgriMark farmer market] failed to load', error);
+        if (mounted) setLoadError('Market data could not be loaded right now. Please refresh to retry.');
+      } finally {
+        if (mounted) setLoading(false);
+      }
     }
 
     void load();
@@ -103,6 +138,11 @@ export default function FarmerMarketPage() {
   return (
     <ProtectedRoute allowedRoles={['farmer', 'fpo', 'admin', 'service_provider']}>
       <div className="space-y-6">
+        {loadError && (
+          <div role="status" className="rounded-xl border border-amber-800/60 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+            {loadError}
+          </div>
+        )}
         <section className="relative overflow-hidden rounded-[30px] border border-emerald-900/60 bg-[#07130e] shadow-[0_24px_80px_rgba(0,0,0,0.30)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_10%,rgba(52,211,153,0.18),transparent_34%),radial-gradient(circle_at_20%_100%,rgba(229,169,60,0.10),transparent_42%)]" />
           <div className="absolute inset-0 tech-grid opacity-30" />
