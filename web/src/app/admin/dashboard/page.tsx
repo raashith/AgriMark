@@ -3,7 +3,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { supabase } from '@/lib/supabase';
+import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import {
   Activity, AlertTriangle, ArrowRight, Boxes, CheckCircle2, Clock3,
   Database, RefreshCw, ShieldCheck, ShoppingBag, Users, Warehouse,
@@ -12,6 +13,14 @@ import {
 type RecentListing = { id: string; title: string | null; status: string | null; created_at: string | null };
 type RecentOrder = { id: string; status: string | null; created_at: string | null };
 type AuditEvent = { id: string; action: string | null; created_at: string | null };
+type OverviewResponse = {
+  metrics: { users: number | null; farmers: number | null; active_listings: number | null; orders: number | null };
+  recent_listings: RecentListing[];
+  recent_orders: RecentOrder[];
+  audit_events: AuditEvent[];
+  latest_market_date: string | null;
+  source_errors: string[];
+};
 type DashboardData = {
   users: number | null;
   farmers: number | null;
@@ -53,48 +62,43 @@ function MetricCard({ label, value, detail, icon: Icon }: {
 }
 
 export default function AdminDashboardPage() {
+  const { user, isLoading: authLoading } = useAuth();
   const [data, setData] = useState<DashboardData>(initialData);
   const [loading, setLoading] = useState(true);
   const [lastChecked, setLastChecked] = useState<string | null>(null);
 
   const loadAdminData = useCallback(async () => {
+    if (authLoading) return;
+    if (!user || user.role !== 'admin') {
+      setData({ ...initialData, errors: ['Admin authentication required'] });
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    const errors: string[] = [];
-    const read = async <T,>(label: string, operation: () => PromiseLike<{ data: T | null; error: any; count?: number | null }>) => {
-      try {
-        const result = await operation();
-        if (result.error) throw result.error;
-        return result;
-      } catch (error) {
-        errors.push(label + ': ' + (error instanceof Error ? error.message : 'request failed'));
-        return null;
-      }
-    };
-
-    const [usersCount, farmersCount, listingsCount, recentListingsResult, ordersResult, auditResult, marketResult] = await Promise.all([
-      read('User count', () => supabase.from('profiles').select('id', { count: 'exact', head: true })),
-      read('Farmer count', () => supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'farmer')),
-      read('Active listing count', () => supabase.from('listings').select('id', { count: 'exact', head: true }).eq('status', 'active')),
-      read<RecentListing[]>('Recent listings', () => supabase.from('listings').select('id,title,status,created_at').order('created_at', { ascending: false }).limit(6)),
-      read<RecentOrder[]>('Marketplace orders', () => supabase.from('marketplace_orders').select('id,status,created_at', { count: 'exact' }).order('created_at', { ascending: false }).limit(6)),
-      read<AuditEvent[]>('Admin audit log', () => supabase.from('admin_audit_log').select('id,action,created_at').order('created_at', { ascending: false }).limit(6)),
-      read<Array<{ observation_date: string | null }>>('Market-data freshness', () => supabase.from('national_market_price_observations').select('observation_date').order('observation_date', { ascending: false }).limit(1)),
-    ]);
-
-    setData({
-      users: usersCount ? usersCount.count ?? 0 : null,
-      farmers: farmersCount ? farmersCount.count ?? 0 : null,
-      activeListings: listingsCount ? listingsCount.count ?? 0 : null,
-      orders: ordersResult ? ordersResult.count ?? 0 : null,
-      recentListings: recentListingsResult?.data || [],
-      recentOrders: ordersResult?.data || [],
-      auditEvents: auditResult?.data || [],
-      latestMarketDate: marketResult?.data?.[0]?.observation_date || null,
-      errors,
-    });
-    setLastChecked(new Date().toISOString());
-    setLoading(false);
-  }, []);
+    try {
+      const overview = await api.getAdminOperationsOverview() as OverviewResponse;
+      setData({
+        users: overview.metrics?.users ?? null,
+        farmers: overview.metrics?.farmers ?? null,
+        activeListings: overview.metrics?.active_listings ?? null,
+        orders: overview.metrics?.orders ?? null,
+        recentListings: overview.recent_listings || [],
+        recentOrders: overview.recent_orders || [],
+        auditEvents: overview.audit_events || [],
+        latestMarketDate: overview.latest_market_date || null,
+        errors: (overview.source_errors || []).map((source) => source + ': source unavailable or access denied'),
+      });
+    } catch (error) {
+      console.error('[AgriMark admin dashboard] overview request failed', error);
+      setData({
+        ...initialData,
+        errors: [error instanceof Error ? error.message : 'Admin overview service is unavailable'],
+      });
+    } finally {
+      setLastChecked(new Date().toISOString());
+      setLoading(false);
+    }
+  }, [authLoading, user]);
 
   useEffect(() => { void loadAdminData(); }, [loadAdminData]);
 
@@ -102,7 +106,7 @@ export default function AdminDashboardPage() {
     { label: 'User profiles', ok: data.users !== null },
     { label: 'Marketplace listings', ok: data.activeListings !== null },
     { label: 'Buyer orders', ok: data.orders !== null },
-    { label: 'Audit trail', ok: data.errors.every((error) => !error.startsWith('Admin audit log:')) },
+    { label: 'Audit trail', ok: !data.errors.some((error) => error.startsWith('admin_audit_log:')) },
     { label: 'Mandi data', ok: data.latestMarketDate !== null },
   ];
   const passedChecks = healthyChecks.filter((check) => check.ok).length;
@@ -217,7 +221,7 @@ export default function AdminDashboardPage() {
             <h2 className="flex items-center gap-2 text-lg font-bold text-white"><Database className="h-5 w-5 text-emerald-300" /> Recent audit activity</h2>
             <p className="mt-1 text-xs text-gray-500">Recent actions from admin_audit_log, when available to the current admin session.</p>
             <div className="mt-4">
-              {loading ? <p className="py-6 text-sm text-gray-400">Loading audit events…</p> : data.errors.some((error) => error.startsWith('Admin audit log:')) ? (
+              {loading ? <p className="py-6 text-sm text-gray-400">Loading audit events…</p> : data.errors.some((error) => error.startsWith('admin_audit_log:')) ? (
                 <p className="rounded-xl border border-dashed border-amber-800 p-4 text-sm text-amber-200">Audit events could not be read. Verify the table and access policy; do not treat this as an empty audit trail.</p>
               ) : data.auditEvents.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-[#26372e] p-4 text-sm text-gray-400">No audit events returned by the connected data source.</p>
