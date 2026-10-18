@@ -37,3 +37,25 @@ def test_order_rejects_below_minimum(monkeypatch):
     )
 
     assert Decimal("10") < Decimal("50")
+
+
+
+def test_order_creation_rejects_farmer_role_before_database_access():
+    from uuid import UUID
+    from backend.app.core.auth import AuthenticatedUser, get_current_user
+
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
+        id=UUID("00000000-0000-0000-0000-000000000123"),
+        role="farmer",
+    )
+    client = TestClient(app)
+    try:
+        response = client.post(
+            "/api/v1/marketplace/orders",
+            headers={"Authorization": "Bearer fake_token"},
+            json={"listing_id": "00000000-0000-0000-0000-000000000456", "quantity": 5, "unit": "kg"},
+        )
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Buyer or FPO access is required to place an order"
+    finally:
+        app.dependency_overrides.clear()
