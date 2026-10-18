@@ -1,7 +1,26 @@
+# Dependencies and build output
 node_modules/
 .next/
 out/
 build/
-.env*.local
+
+# Never commit real environment files.
+.env
+.env.*
+.env*
+**/.env
+**/.env.*
+**/.env*
+
+# Allow placeholder-only templates.
+!.env.example
+!.env.sample
+!.env.*.example
+!.env.*.sample
+!**/.env.example
+!**/.env.sample
+!**/.env.*.example
+!**/.env.*.sample
+
 *.log
 *.tsbuildinfo
