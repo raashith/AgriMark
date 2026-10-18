@@ -69,9 +69,9 @@ export default function FarmerDashboardPage() {
 
         if (!isMounted) return;
 
-        const totalAcres = farms.reduce((acc, f) => acc + (f.area_acres || 0), 0);
-        const totalStock = lots.reduce((acc, l) => acc + (l.quantity_kg || 0), 0);
-        const revenue = orders.filter((o) => o.status === 'delivered' || o.status === 'confirmed' || o.payment_status === 'escrowed').reduce((acc, o) => acc + (o.total_price || o.total_amount || 0), 0);
+        const totalAcres = farms.reduce((acc, farm) => acc + Number(farm.area_acres ?? 0), 0);
+        const totalStock = lots.reduce((acc, lot) => acc + Number(lot.quantity_kg ?? lot.quantity ?? lot.available_quantity ?? 0), 0);
+        const revenue = orders.filter((order) => order.status === 'delivered' || order.status === 'confirmed' || order.payment_status === 'escrowed').reduce((acc, order) => acc + Number(order.total_price ?? order.total_amount ?? 0), 0);
         const pendingT = tasks.filter((t) => t.status === 'pending').length;
         const latestRainfall = Number(weather?.data?.rain_1h_mm || 0);
         const latestHumidity = Number(weather?.data?.humidity_pct || 0);
@@ -85,10 +85,10 @@ export default function FarmerDashboardPage() {
           revenueInr: revenue,
           pendingTasks: pendingT,
           cultivationAcres: totalAcres,
-          avgHealth: latestHumidity,
-          latestRainfall,
-          latestHumidity,
-          latestTemperature,
+          avgHealth: Number.isFinite(latestHumidity) ? latestHumidity : 0,
+          latestRainfall: Number.isFinite(latestRainfall) ? latestRainfall : 0,
+          latestHumidity: Number.isFinite(latestHumidity) ? latestHumidity : 0,
+          latestTemperature: Number.isFinite(latestTemperature) ? latestTemperature : 0,
         });
         setWeatherLocation(weather?.data?.location_name || null);
       } catch {
@@ -114,7 +114,7 @@ export default function FarmerDashboardPage() {
                 <Activity className="h-3.5 w-3.5" /> Live Farm Operations
               </div>
               <h1 className="mt-4 text-3xl md:text-5xl font-black tracking-tight text-white">
-                Welcome back, {user?.full_name?.split(' ')[0] || 'Farmer'}.
+                Welcome back, {(typeof user?.full_name === 'string' ? user.full_name.trim().split(/\\s+/)[0] : '') || 'Farmer'}.
               </h1>
               <p className="mt-3 max-w-xl text-sm md:text-base text-gray-300">
                 Your fields, crop health, harvest inventory and market actions are organized in one operating view.
