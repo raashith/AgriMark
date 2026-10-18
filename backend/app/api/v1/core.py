@@ -218,6 +218,13 @@ def create_farmer_cultivation(
 
     payload = request.model_dump(exclude_none=True, mode="json")
     payload["farmer_id"] = str(user.id)
+    # Store crop and seed labels alongside stable catalog IDs for reporting/export.
+    if request.crop_name:
+        payload["crop_name"] = request.crop_name.strip()
+    else:
+        payload["crop_name"] = crop_result.data[0].get("name")
+    if request.seed_variety:
+        payload["seed_variety"] = request.seed_variety.strip()
     # Persist richer cultivation data through the canonical farmer record table.
     if request.organic_practice is not None:
         payload["organic_practice"] = request.organic_practice
@@ -235,7 +242,8 @@ def create_farmer_cultivation(
         )
         row = dict(_single(result))
         crop = row.pop("crops", None)
-        row["crop_name"] = crop.get("name") if isinstance(crop, dict) else crop_result.data[0].get("name")
+        row["crop_name"] = crop.get("name") if isinstance(crop, dict) else (row.get("crop_name") or crop_result.data[0].get("name"))
+        row["seed_variety"] = row.get("seed_variety") or row.get("variety")
         return FarmerCultivationResponse(**row)
     except HTTPException:
         raise
