@@ -137,7 +137,7 @@ BEGIN
   WHERE id = v_lot.id;
 
   IF v_available = 0 THEN
-    UPDATE public.listings SET status = 'sold_out', updated_at = NOW()
+    UPDATE public.listings SET status = 'sold', updated_at = NOW()
     WHERE id = v_listing.id;
   END IF;
 
