@@ -106,7 +106,7 @@ export default function AdminDashboardPage() {
     { label: 'User profiles', ok: data.users !== null },
     { label: 'Marketplace listings', ok: data.activeListings !== null },
     { label: 'Buyer orders', ok: data.orders !== null },
-    { label: 'Audit trail', ok: !data.errors.some((error) => error.startsWith('admin_audit_log:')) },
+    { label: 'Audit trail', ok: data.users !== null && !data.errors.some((error) => error.startsWith('admin_audit_log:')) },
     { label: 'Mandi data', ok: data.latestMarketDate !== null },
   ];
   const passedChecks = healthyChecks.filter((check) => check.ok).length;
