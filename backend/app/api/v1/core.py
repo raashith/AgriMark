@@ -85,7 +85,9 @@ def create_farm(
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> FarmResponse:
     _owned_profile(user, profile_id)
-    payload = request.model_dump(exclude_none=True)
+    # Pydantic Decimal values (notably area_acres) must be converted to JSON-safe
+    # primitives before the Supabase/PostgREST client serializes the insert body.
+    payload = request.model_dump(exclude_none=True, mode="json")
     payload["owner_id"] = str(user.id)
     try:
         # Explicitly request the inserted representation so the API can return the
