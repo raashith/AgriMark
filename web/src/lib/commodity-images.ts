@@ -90,7 +90,7 @@ export function resolveCommodityImageRecord(...candidates: Array<string | null |
     for (const record of COMMODITY_IMAGE_DATASET) {
       if (record.aliases.some((alias) => {
         const normalizedAlias = normalizeCommodityName(alias);
-        return normalizedAlias.length >= 4 && normalized.includes(normalizedAlias);
+        return normalizedAlias.length >= 4 && ` ${normalized} `.includes(` ${normalizedAlias} `);
       })) return record;
     }
   }
