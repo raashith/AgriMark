@@ -25,7 +25,7 @@ def test_auth_rejects_non_200_token_response(monkeypatch: pytest.MonkeyPatch) ->
     )
     credentials = auth.HTTPAuthorizationCredentials(scheme="Bearer", credentials="bad-token")
     with pytest.raises(HTTPException) as exc:
-        auth.get_current_user(credentials)
+        auth._authenticate_supabase(credentials.credentials)
     assert exc.value.status_code == 401
 
 
@@ -42,7 +42,7 @@ def test_auth_returns_verified_user(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda: Mock(supabase_publishable_key="public-key", supabase_service_role_key=None, supabase_url="https://example.supabase.co"),
     )
     credentials = auth.HTTPAuthorizationCredentials(scheme="Bearer", credentials="good-token")
-    user = auth.get_current_user(credentials)
+    user = auth._authenticate_supabase(credentials.credentials)
     assert user.id == user_id
     assert user.role == "authenticated"
     assert user.email == "farmer@example.com"
@@ -60,5 +60,5 @@ def test_auth_maps_http_errors_to_401(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     credentials = auth.HTTPAuthorizationCredentials(scheme="Bearer", credentials="token")
     with pytest.raises(HTTPException) as exc:
-        auth.get_current_user(credentials)
+        auth._authenticate_supabase(credentials.credentials)
     assert exc.value.status_code == 401
