@@ -318,6 +318,8 @@ export const api = {
     }),
   getOffers: () => request<any[]>('/marketplace/offers'),
 
+  getAdminOperationsOverview: () => request<any>('/admin/operations/overview'),
+
   getLatestLocation: () => request<any>('/tracking/latest'),
   recordLocation: (data: any) =>
     request<any>('/tracking/location', {
