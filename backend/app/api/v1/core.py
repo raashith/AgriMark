@@ -531,7 +531,9 @@ def create_harvest_batch(
         "cultivation_id": str(request.cultivation_id),
         "farm_id": cultivation_row["farm_id"],
         "harvested_at": request.harvest_date.isoformat(),
-        "quantity": request.total_quantity_kg,
+        # Pydantic parses this as Decimal; convert before the PostgREST client
+        # attempts JSON serialization, matching the farm-acreage fix.
+        "quantity": str(request.total_quantity_kg),
         "unit": "kg",
         "grade": request.quality_grade,
     }
@@ -546,7 +548,8 @@ def create_harvest_batch(
             trace_code=created["trace_code"],
         )
     except Exception as exc:
-        raise HTTPException(status_code=400, detail="Unable to create harvest batch") from exc
+        logger.exception("Harvest batch creation failed for profile %s (cultivation_id=%s)", user.id, request.cultivation_id)
+        raise HTTPException(status_code=500, detail="AgriMark could not save this harvest batch. Please retry.") from exc
 
 
 @router.get("/produce-lots", response_model=list[ProduceLotResponse])
