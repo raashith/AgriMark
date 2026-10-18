@@ -52,6 +52,7 @@ function SellForm() {
   const [priceError, setPriceError] = useState('');
   const [aiAdvice, setAiAdvice] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  const [resolvedCropName, setResolvedCropName] = useState('');
 
   const fetchLots = useCallback(async () => {
     try {
@@ -80,6 +81,7 @@ function SellForm() {
       setComparison(null);
       setPriceError('');
       setAiAdvice('');
+      setResolvedCropName('');
       if (!selectedLot) return;
       let cropName = selectedLot.crop_name?.trim() || '';
       setPriceLoading(true);
@@ -100,6 +102,7 @@ function SellForm() {
           if (!cancelled) setPriceError('This produce lot has no resolvable crop name. Update the crop record before requesting a comparable mandi price.');
           return;
         }
+        if (!cancelled) setResolvedCropName(cropName);
         const { data: commodities, error: commodityError } = await supabase
           .from('national_commodities')
           .select('code,name')
@@ -117,7 +120,7 @@ function SellForm() {
         }
         const { data: rows, error: observationError } = await supabase
           .from('national_market_price_observations')
-          .select('modal_price,min_price,max_price,observation_date,source,unit')
+          .select('modal_price,min_price,max_price,observation_date,source')
           .eq('commodity_code', commodity.code)
           .gt('modal_price', 0)
           .order('observation_date', { ascending: false })
@@ -128,11 +131,9 @@ function SellForm() {
           if (!cancelled) setPriceError(`No official price observations are available for ${cropName} yet. AgriMark will not guess a comparison price.`);
           return;
         }
-        const perKg = (row: any, field: string) => {
-          const value = Number(row[field] ?? row.modal_price);
-          const unit = String(row.unit || 'INR_PER_QUINTAL').toUpperCase();
-          return unit.includes('QUINTAL') ? value / 100 : unit.includes('KG') ? value : value / 100;
-        };
+        // national_market_price_observations stores AGMARKNET min/modal/max
+        // prices in INR per quintal; the table intentionally has no `unit` column.
+        const perKg = (row: any, field: string) => Number(row[field] ?? row.modal_price) / 100;
         const modalValues = validRows.map((row: any) => perKg(row, 'modal_price')).filter((v: number) => v > 0);
         const lowValues = validRows.map((row: any) => perKg(row, 'min_price')).filter((v: number) => v > 0);
         const highValues = validRows.map((row: any) => perKg(row, 'max_price')).filter((v: number) => v > 0);
@@ -171,6 +172,7 @@ function SellForm() {
           }
         }
       } catch (error) {
+        console.error('[AgriMark price comparison] Failed to load mandi observations:', error);
         if (!cancelled) setPriceError(error instanceof Error ? error.message : 'Could not load comparable mandi prices.');
       } finally {
         if (!cancelled) setPriceLoading(false);
@@ -245,8 +247,8 @@ function SellForm() {
         <div className="p-6 bg-[#0a0f0d] border border-dashed border-[#1e2d26] rounded-xl text-center space-y-3 text-gray-400"><p>No available unlisted produce lots found.</p><p className="text-xs">Record a harvest first before creating a marketplace listing.</p><button type="button" onClick={() => router.push('/farmer/harvest')} className="px-4 py-2 bg-amber-600 text-white font-bold text-xs rounded-lg">+ Go Record Harvest</button></div>
       ) : (
         <form onSubmit={handleCreateListing} className="space-y-5">
-          <div><label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Select Available Produce Lot</label><select value={selectedLotId} onChange={(e) => setSelectedLotId(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white">{lots.map((lot) => <option key={lot.id} value={lot.id}>{lot.crop_name || 'Crop'} — {lot.quantity_kg ?? lot.quantity} KG ({lot.quality_grade || 'Standard quality'})</option>)}</select></div>
-          {selectedLot && <div className="p-3 bg-[#0a0f0d] border border-emerald-950 rounded-xl text-xs text-emerald-300 space-y-1 font-mono"><p><strong>Lot ID:</strong> {selectedLot.id}</p><p><strong>Crop:</strong> {selectedLot.crop_name || 'Not specified'}</p><p><strong>Quantity:</strong> {selectedLot.quantity_kg ?? selectedLot.quantity} KG</p><p><strong>Quality:</strong> {selectedLot.quality_grade || 'Not specified'}</p></div>}
+          <div><label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Select Available Produce Lot</label><select value={selectedLotId} onChange={(e) => setSelectedLotId(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white">{lots.map((lot) => <option key={lot.id} value={lot.id}>{lot.crop_name || (lot.id === selectedLotId ? (resolvedCropName || 'Crop') : 'Crop')} — {lot.quantity_kg ?? lot.quantity} KG ({lot.quality_grade || 'Standard quality'})</option>)}</select></div>
+          {selectedLot && <div className="p-3 bg-[#0a0f0d] border border-emerald-950 rounded-xl text-xs text-emerald-300 space-y-1 font-mono"><p><strong>Lot ID:</strong> {selectedLot.id}</p><p><strong>Crop:</strong> {resolvedCropName || selectedLot.crop_name || 'Resolving crop…'}</p><p><strong>Quantity:</strong> {selectedLot.quantity_kg ?? selectedLot.quantity} KG</p><p><strong>Quality:</strong> {selectedLot.quality_grade || 'Not specified'}</p></div>}
 
           <section className="rounded-2xl border border-emerald-500/25 bg-emerald-950/20 p-4 space-y-3" aria-live="polite">
             <div className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-emerald-300" /><h2 className="font-bold text-white">AgriMark AI · Comparable mandi price</h2></div>
