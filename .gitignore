@@ -1,14 +1,31 @@
+# Dependencies and build output
 node_modules/
 .next/
 out/
 build/
-.env
-.env*.local
-*.log
-*.tsbuildinfo
 stitch_export/
 stitch_downloads/
 backend/venv/
-backend/.env
-.env
 __pycache__/
+
+# Secrets: ignore environment files in every directory.
+.env
+.env.*
+.env*
+**/.env
+**/.env.*
+**/.env*
+
+# Keep safe, placeholder-only templates in Git.
+!.env.example
+!.env.sample
+!.env.*.example
+!.env.*.sample
+!**/.env.example
+!**/.env.sample
+!**/.env.*.example
+!**/.env.*.sample
+
+# Logs and generated files
+*.log
+*.tsbuildinfo
