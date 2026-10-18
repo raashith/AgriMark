@@ -81,14 +81,25 @@ function SellForm() {
       setPriceError('');
       setAiAdvice('');
       if (!selectedLot) return;
-      const cropName = selectedLot.crop_name?.trim();
-      if (!cropName) {
-        setPriceError('This produce lot has no crop name, so AgriMark cannot safely match it to mandi records.');
-        return;
-      }
+      let cropName = selectedLot.crop_name?.trim() || '';
       setPriceLoading(true);
       try {
         const supabase = getSupabaseClient();
+        // Lots created through older API paths may only contain crop_id. Resolve
+        // the display name from the real crop catalogue before matching mandi data.
+        if (!cropName && selectedLot.crop_id) {
+          const { data: cropRow, error: cropError } = await supabase
+            .from('crops')
+            .select('name')
+            .eq('id', selectedLot.crop_id)
+            .maybeSingle();
+          if (cropError) throw cropError;
+          cropName = String(cropRow?.name || '').trim();
+        }
+        if (!cropName) {
+          if (!cancelled) setPriceError('This produce lot has no resolvable crop name. Update the crop record before requesting a comparable mandi price.');
+          return;
+        }
         const { data: commodities, error: commodityError } = await supabase
           .from('national_commodities')
           .select('code,name')
