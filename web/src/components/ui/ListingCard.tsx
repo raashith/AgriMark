@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Listing } from '@/types';
 import { StatusBadge } from './StatusBadge';
+import { CommodityImage } from './CommodityImage';
 import { MapPin, ShieldCheck, ArrowRight, TrendingUp } from 'lucide-react';
 
 export const ListingCard: React.FC<{ listing: Listing }> = ({ listing }) => {
@@ -13,10 +14,12 @@ export const ListingCard: React.FC<{ listing: Listing }> = ({ listing }) => {
     <div className="bg-[#121a16] border border-[#1e2d26] hover:border-emerald-700/80 rounded-3xl overflow-hidden transition-all duration-300 shadow-xl flex flex-col justify-between group">
       {/* Image & Header */}
       <div className="relative h-48 bg-[#0a0f0d] overflow-hidden">
-        <img
-          src={listing.images?.[0] || 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600'}
-          alt={listing.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        <CommodityImage
+          name={listing.crop_name}
+          title={listing.title}
+          category={listing.crop_category}
+          className="h-full w-full"
+          imageClassName="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
         />
         <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
           <StatusBadge status={listing.quality_grade || 'Grade A'} />
