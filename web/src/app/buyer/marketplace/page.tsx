@@ -5,6 +5,7 @@ import { useI18n } from '@/lib/i18n';
 import { api } from '@/lib/api';
 import { Listing, MarketPriceObservation } from '@/types';
 import { ShoppingBag, Search, MapPin, CheckCircle2, AlertCircle } from 'lucide-react';
+import { CommodityImage } from '@/components/ui/CommodityImage';
 
 export default function MarketplacePage() {
   const { t } = useI18n();
@@ -117,6 +118,15 @@ export default function MarketplacePage() {
             const pricePerKg = getPricePerKg(item);
             return (
               <div key={item.id} className="bg-[#121a16] border border-[#1e2d26] p-5 rounded-2xl shadow-md space-y-4 hover:border-emerald-800/60 transition flex flex-col justify-between">
+                <div className="relative -mx-5 -mt-5 h-44 overflow-hidden rounded-t-2xl border-b border-[#1e2d26] bg-[#0a0f0d]">
+                  <CommodityImage
+                    name={item.crop_name}
+                    title={item.title}
+                    category={item.crop_category}
+                    className="h-full w-full"
+                    imageClassName="h-full w-full object-cover"
+                  />
+                </div>
                 <div className="space-y-2">
                   <div className="flex justify-between items-start"><div><h3 className="font-bold text-lg text-emerald-300">{cropName}</h3><p className="text-xs text-gray-400 flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-emerald-400" /> {location}</p></div><span className="text-xs px-2 py-1 bg-emerald-950 text-emerald-300 border border-emerald-800/40 rounded font-mono font-bold">{item.quality_grade || 'Quality verified'}</span></div>
                   <div className="p-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-xs space-y-1.5"><div className="flex justify-between items-center text-gray-300 font-semibold"><span>{t('askingPrice')}:</span><span className="text-base font-extrabold text-emerald-400">₹{pricePerKg} / KG</span></div><div className="pt-1 border-t border-[#1e2d26] flex justify-between text-[11px] text-gray-400"><span>{t('marketReference')}:</span><span className="font-mono text-amber-300">Live reference when available</span></div><div className="flex justify-between text-[11px] text-gray-400"><span>{t('aiIntelligence')}:</span><span className="font-mono text-purple-300">Decision support only</span></div></div>
