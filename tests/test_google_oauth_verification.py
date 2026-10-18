@@ -221,7 +221,10 @@ def test_google_signin_uses_firebase_popup_without_manual_redirect():
     assert "const provider = getGoogleProvider();" in content
     assert "signInWithPopup(getFirebaseAuth(), provider)" in content
     assert "provider.addScope('https://www.googleapis.com/auth/userinfo.email')" in content
-    assert "window.location.assign(oauthUrl.toString())" not in content
+    login_start = content.index("const loginWithGoogle")
+    register_start = content.index("const register", login_start)
+    google_login_implementation = content[login_start:register_start]
+    assert "oauthUrl" not in google_login_implementation
 
 
 
