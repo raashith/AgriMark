@@ -7,7 +7,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { CommodityImage } from '@/components/ui/CommodityImage';
 import {
   Search, ShoppingCart, MapPin, PackageCheck, X, Minus, Plus,
-  CheckCircle2, AlertCircle, SlidersHorizontal, Grid2X2, List, Leaf, TrendingUp, ShieldCheck
+  CheckCircle2, AlertCircle, Grid2X2, List, Leaf, TrendingUp, ShieldCheck
 } from 'lucide-react';
 
 const categories = ['All', 'Cereals', 'Pulses', 'Oilseeds', 'Vegetables', 'Fruits', 'Spices', 'Cash Crops', 'Others'];
@@ -227,15 +227,15 @@ export default function BuyerMarketPage() {
           <p className="mt-1 text-xs text-gray-500">Try another crop or category.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className={view === 'grid' ? 'grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3' : 'space-y-3'}>
           {filtered.map((item) => {
             const name = getName(item);
             const qty = getQty(item);
             const min = getMin(item);
             const price = getPrice(item);
             return (
-              <article key={item.id} className="group rounded-2xl border border-[#1e2d26] bg-[#121a16] p-4 transition hover:-translate-y-0.5 hover:border-emerald-800/70">
-                <div className="relative mb-4 h-40 overflow-hidden rounded-xl border border-[#1e2d26] bg-[#0a110d]">
+              <article key={item.id} className={`group overflow-hidden rounded-2xl border border-[#1e2d26] bg-[#121a16] transition hover:border-emerald-800/70 hover:shadow-xl ${view === 'list' ? 'flex flex-col sm:flex-row' : 'flex flex-col'}`}>
+                <div className={`relative overflow-hidden border-b border-[#1e2d26] bg-[#0a110d] ${view === 'list' ? 'h-48 sm:h-auto sm:w-64 sm:shrink-0' : 'h-40'}`}>
                   <CommodityImage
                     name={item.crop_name}
                     title={item.title}
@@ -247,6 +247,7 @@ export default function BuyerMarketPage() {
                     <ShieldCheck className="h-3 w-3 text-emerald-400" /> Farmer listing
                   </span>
                 </div>
+                <div className="flex min-w-0 flex-1 flex-col justify-between gap-3 p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="text-base font-bold text-white">{name}</h2>
