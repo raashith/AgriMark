@@ -19,6 +19,7 @@ export interface CommodityImageRecord {
 export const COMMODITY_IMAGE_DATASET: CommodityImageRecord[] = [
   { key: 'rice', name: 'Rice', category: 'Cereals', aliases: ['rice', 'paddy', 'raw rice', 'rice grain', 'arisi', 'nel'], emoji: '🌾', imagePath: '/images/commodities/rice.jpg' },
   { key: 'wheat', name: 'Wheat', category: 'Cereals', aliases: ['wheat', 'wheat grain', 'gehun', 'godhumai'], emoji: '🌾', imagePath: '/images/commodities/wheat.jpg' },
+  { key: 'banana', name: 'Banana', category: 'Fruits', aliases: ['banana', 'vazhai pazham', 'kela'], emoji: '🍌', imagePath: '/images/commodities/banana.jpg' },
   { key: 'maize', name: 'Maize', category: 'Cereals', aliases: ['maize', 'corn', 'maize grain', 'makkacholam'], emoji: '🌽', imagePath: '/images/commodities/maize.jpg' },
   { key: 'bajra', name: 'Pearl Millet', category: 'Cereals', aliases: ['bajra', 'pearl millet', 'kambu'], emoji: '🌾', imagePath: '/images/commodities/bajra.jpg' },
   { key: 'jowar', name: 'Sorghum', category: 'Cereals', aliases: ['jowar', 'sorghum', 'cholam'], emoji: '🌾', imagePath: '/images/commodities/jowar.jpg' },
