@@ -17,9 +17,9 @@ export interface CommodityImageRecord {
 }
 
 export const COMMODITY_IMAGE_DATASET: CommodityImageRecord[] = [
-  { key: 'rice', name: 'Rice', category: 'Cereals', aliases: ['rice', 'paddy', 'raw rice', 'rice grain', 'arisi', 'nel'], emoji: '🌾', imagePath: '/images/commodities/rice.jpg' },
+  { key: 'rice', name: 'Rice', category: 'Cereals', aliases: ['rice', 'paddy', 'raw rice', 'rice grain', 'arisi', 'nel'], emoji: '🌾', imagePath: '/images/commodities/rice.jpg', imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Basmati_Rice_India%2C_raw.jpg?width=1200' },
   { key: 'wheat', name: 'Wheat', category: 'Cereals', aliases: ['wheat', 'wheat grain', 'gehun', 'godhumai'], emoji: '🌾', imagePath: '/images/commodities/wheat.jpg' },
-  { key: 'banana', name: 'Banana', category: 'Fruits', aliases: ['banana', 'vazhai pazham', 'kela'], emoji: '🍌', imagePath: '/images/commodities/banana.jpg' },
+  { key: 'banana', name: 'Banana', category: 'Fruits', aliases: ['banana', 'vazhai pazham', 'kela'], emoji: '🍌', imagePath: '/images/commodities/banana.jpg', imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Green_Bananas.jpg?width=1200' },
   { key: 'maize', name: 'Maize', category: 'Cereals', aliases: ['maize', 'corn', 'maize grain', 'makkacholam'], emoji: '🌽', imagePath: '/images/commodities/maize.jpg' },
   { key: 'bajra', name: 'Pearl Millet', category: 'Cereals', aliases: ['bajra', 'pearl millet', 'kambu'], emoji: '🌾', imagePath: '/images/commodities/bajra.jpg' },
   { key: 'jowar', name: 'Sorghum', category: 'Cereals', aliases: ['jowar', 'sorghum', 'cholam'], emoji: '🌾', imagePath: '/images/commodities/jowar.jpg' },
@@ -34,9 +34,9 @@ export const COMMODITY_IMAGE_DATASET: CommodityImageRecord[] = [
   { key: 'soybean', name: 'Soybean', category: 'Oilseeds', aliases: ['soybean', 'soya', 'soy bean'], emoji: '🫘', imagePath: '/images/commodities/soybean.jpg' },
   { key: 'sunflower', name: 'Sunflower Seed', category: 'Oilseeds', aliases: ['sunflower', 'sunflower seed'], emoji: '🌻', imagePath: '/images/commodities/sunflower.jpg' },
   { key: 'sesame', name: 'Sesame Seed', category: 'Oilseeds', aliases: ['sesame', 'gingelly', 'ellu', 'til'], emoji: '🌱', imagePath: '/images/commodities/sesame.jpg' },
-  { key: 'onion', name: 'Onion', category: 'Vegetables', aliases: ['onion', 'vengayam', 'pyaz'], emoji: '🧅', imagePath: '/images/commodities/onion.jpg' },
-  { key: 'tomato', name: 'Tomato', category: 'Vegetables', aliases: ['tomato', 'thakkali'], emoji: '🍅', imagePath: '/images/commodities/tomato.jpg' },
-  { key: 'potato', name: 'Potato', category: 'Vegetables', aliases: ['potato', 'urulai kizhangu', 'aloo'], emoji: '🥔', imagePath: '/images/commodities/potato.jpg' },
+  { key: 'onion', name: 'Onion', category: 'Vegetables', aliases: ['onion', 'vengayam', 'pyaz'], emoji: '🧅', imagePath: '/images/commodities/onion.jpg', imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Onion.jpg?width=1200' },
+  { key: 'tomato', name: 'Tomato', category: 'Vegetables', aliases: ['tomato', 'thakkali'], emoji: '🍅', imagePath: '/images/commodities/tomato.jpg', imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Vegetable_tomatoes.jpg?width=1200' },
+  { key: 'potato', name: 'Potato', category: 'Vegetables', aliases: ['potato', 'urulai kizhangu', 'aloo'], emoji: '🥔', imagePath: '/images/commodities/potato.jpg', imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Potatoes_in_Coop.jpg?width=1200' },
   { key: 'brinjal', name: 'Brinjal', category: 'Vegetables', aliases: ['brinjal', 'eggplant', 'aubergine', 'kathirikai'], emoji: '🍆', imagePath: '/images/commodities/brinjal.jpg' },
   { key: 'okra', name: 'Okra', category: 'Vegetables', aliases: ['okra', 'lady finger', 'vendakkai', 'bhindi'], emoji: '🥬', imagePath: '/images/commodities/okra.jpg' },
   { key: 'cabbage', name: 'Cabbage', category: 'Vegetables', aliases: ['cabbage'], emoji: '🥬', imagePath: '/images/commodities/cabbage.jpg' },
@@ -46,7 +46,7 @@ export const COMMODITY_IMAGE_DATASET: CommodityImageRecord[] = [
   { key: 'garlic', name: 'Garlic', category: 'Vegetables', aliases: ['garlic', 'poondu', 'lahsun'], emoji: '🧄', imagePath: '/images/commodities/garlic.jpg' },
   { key: 'ginger', name: 'Ginger', category: 'Spices', aliases: ['ginger', 'inji', 'adrak'], emoji: '🫚', imagePath: '/images/commodities/ginger.jpg' },
   { key: 'turmeric', name: 'Turmeric', category: 'Spices', aliases: ['turmeric', 'haldi', 'manjal'], emoji: '🟠', imagePath: '/images/commodities/turmeric.jpg' },
-  { key: 'red_chilli', name: 'Red Chilli', category: 'Spices', aliases: ['red chilli', 'red chili', 'dry chilli', 'dry chili'], emoji: '🌶️', imagePath: '/images/commodities/red_chilli.jpg' },
+  { key: 'red_chilli', name: 'Red Chilli', category: 'Spices', aliases: ['red chilli', 'red chili', 'dry chilli', 'dry chili'], emoji: '🌶️', imagePath: '/images/commodities/red_chilli.jpg', imageUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Dried_Chilli.jpg?width=1200' },
   { key: 'coriander', name: 'Coriander Seed', category: 'Spices', aliases: ['coriander seed', 'coriander', 'dhania', 'kothamalli seed'], emoji: '🌿', imagePath: '/images/commodities/coriander.jpg' },
   { key: 'cumin', name: 'Cumin Seed', category: 'Spices', aliases: ['cumin', 'jeera'], emoji: '🌿', imagePath: '/images/commodities/cumin.jpg' },
   { key: 'banana', name: 'Banana', category: 'Fruits', aliases: ['banana', 'vazhai pazham', 'kela'], emoji: '🍌', imagePath: '/images/commodities/banana.jpg' },
