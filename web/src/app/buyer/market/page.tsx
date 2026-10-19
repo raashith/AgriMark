@@ -274,6 +274,7 @@ export default function BuyerMarketPage() {
                 <button onClick={() => openOrder(item)} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-500">
                   <ShoppingCart className="h-4 w-4" /> Order this produce
                 </button>
+                </div>
               </article>
             );
           })}
