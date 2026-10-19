@@ -20,7 +20,9 @@ export function CommodityImage({
 }: CommodityImageProps) {
   const record = resolveCommodityImageRecord(name, title);
   const [imageFailed, setImageFailed] = useState(false);
-  const imageSrc = record?.imageUrl || (record ? `/images/commodities/${record.key}.jpg` : '');
+  const imageSrc = imageFailed
+    ? (record ? `/images/commodities/${record.key}.jpg` : '')
+    : (record?.imageUrl || (record ? `/images/commodities/${record.key}.jpg` : ''));
   useEffect(() => { setImageFailed(false); }, [record?.key]);
 
   if (!record || imageFailed) {
@@ -48,7 +50,10 @@ export function CommodityImage({
       alt={record.name}
       loading="lazy"
       decoding="async"
-      onError={() => setImageFailed(true)}
+      onError={() => {
+        if (!imageFailed && record?.imageUrl) setImageFailed(true);
+        else setImageFailed(true);
+      }}
       className={imageClassName || 'h-full w-full object-cover'}
     />
   );
