@@ -61,6 +61,7 @@ export const COMMODITY_IMAGE_DATASET: CommodityImageRecord[] = [
   { key: 'cotton', name: 'Cotton', category: 'Cash Crops', aliases: ['cotton', 'kapas'], emoji: '☁️', imagePath: '/images/commodities/cotton.jpg' },
   { key: 'coffee', name: 'Coffee', category: 'Cash Crops', aliases: ['coffee bean', 'coffee beans', 'coffee'], emoji: '🫘', imagePath: '/images/commodities/coffee.jpg' },
   { key: 'tea', name: 'Tea', category: 'Cash Crops', aliases: ['tea leaves', 'tea'], emoji: '🍃', imagePath: '/images/commodities/tea.jpg' },
+  { key: 'green_chilli', name: 'Green Chilli', category: 'Vegetables', aliases: ['green chilli', 'green chili', 'milagai'], emoji: '🌶️', imagePath: '/images/commodities/green_chilli.jpg' },
 ];
 
 function normalizeCommodityName(value: string): string {
