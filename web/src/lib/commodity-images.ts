@@ -18,9 +18,8 @@ export interface CommodityImageRecord {
 }
 
 export const COMMODITY_IMAGE_DATASET: CommodityImageRecord[] = [
-  { key: 'rice', name: 'Rice', category: 'Cereals', aliases: ['rice', 'paddy', 'raw rice', 'rice grain', 'arisi', 'nel'], emoji: '🌾', imagePath: '/images/commodities/rice.jpg', imageUrl: 'https://images.unsplash.com/photo-1705147271933-5c7052f15a90?auto=format&fit=crop&w=1200&q=85' },
+  { key: 'rice', name: 'Rice', category: 'Cereals', aliases: ['rice', 'basmati rice', 'paddy', 'raw rice', 'rice grain', 'arisi', 'nel'], emoji: '🌾', imagePath: '/images/commodities/rice.jpg', imageUrl: 'https://images.unsplash.com/photo-1705147271933-5c7052f15a90?auto=format&fit=crop&w=1200&q=85' },
   { key: 'wheat', name: 'Wheat', category: 'Cereals', aliases: ['wheat', 'wheat grain', 'gehun', 'godhumai'], emoji: '🌾', imagePath: '/images/commodities/wheat.jpg' },
-  { key: 'banana', name: 'Banana', category: 'Fruits', aliases: ['banana', 'vazhai pazham', 'kela'], emoji: '🍌', imagePath: '/images/commodities/banana.jpg', imageUrl: 'https://images.unsplash.com/photo-1528279335935-f486951a6adf?auto=format&fit=crop&w=1200&q=85' },
   { key: 'maize', name: 'Maize', category: 'Cereals', aliases: ['maize', 'corn', 'maize grain', 'makkacholam'], emoji: '🌽', imagePath: '/images/commodities/maize.jpg' },
   { key: 'bajra', name: 'Pearl Millet', category: 'Cereals', aliases: ['bajra', 'pearl millet', 'kambu'], emoji: '🌾', imagePath: '/images/commodities/bajra.jpg' },
   { key: 'jowar', name: 'Sorghum', category: 'Cereals', aliases: ['jowar', 'sorghum', 'cholam'], emoji: '🌾', imagePath: '/images/commodities/jowar.jpg' },
@@ -43,14 +42,14 @@ export const COMMODITY_IMAGE_DATASET: CommodityImageRecord[] = [
   { key: 'cabbage', name: 'Cabbage', category: 'Vegetables', aliases: ['cabbage'], emoji: '🥬', imagePath: '/images/commodities/cabbage.jpg' },
   { key: 'cauliflower', name: 'Cauliflower', category: 'Vegetables', aliases: ['cauliflower'], emoji: '🥦', imagePath: '/images/commodities/cauliflower.jpg' },
   { key: 'carrot', name: 'Carrot', category: 'Vegetables', aliases: ['carrot'], emoji: '🥕', imagePath: '/images/commodities/carrot.jpg' },
-  { key: 'green_chilli', name: 'Green Chilli', category: 'Vegetables', aliases: ['green chilli', 'green chili', 'chilli', 'chili', 'milagai'], emoji: '🌶️', imagePath: '/images/commodities/green_chilli.jpg' },
+  { key: 'green_chilli', name: 'Green Chilli', category: 'Vegetables', aliases: ['green chilli', 'green chili', 'milagai'], emoji: '🌶️', imagePath: '/images/commodities/green_chilli.jpg' },
   { key: 'garlic', name: 'Garlic', category: 'Vegetables', aliases: ['garlic', 'poondu', 'lahsun'], emoji: '🧄', imagePath: '/images/commodities/garlic.jpg' },
   { key: 'ginger', name: 'Ginger', category: 'Spices', aliases: ['ginger', 'inji', 'adrak'], emoji: '🫚', imagePath: '/images/commodities/ginger.jpg' },
   { key: 'turmeric', name: 'Turmeric', category: 'Spices', aliases: ['turmeric', 'haldi', 'manjal'], emoji: '🟠', imagePath: '/images/commodities/turmeric.jpg' },
   { key: 'red_chilli', name: 'Red Chilli', category: 'Spices', aliases: ['red chilli', 'red chili', 'dry chilli', 'dry chili'], emoji: '🌶️', imagePath: '/images/commodities/red_chilli.jpg', imageUrl: 'https://images.unsplash.com/photo-1783067893308-d77e435bfe14?auto=format&fit=crop&w=1200&q=85' },
   { key: 'coriander', name: 'Coriander Seed', category: 'Spices', aliases: ['coriander seed', 'coriander', 'dhania', 'kothamalli seed'], emoji: '🌿', imagePath: '/images/commodities/coriander.jpg' },
   { key: 'cumin', name: 'Cumin Seed', category: 'Spices', aliases: ['cumin', 'jeera'], emoji: '🌿', imagePath: '/images/commodities/cumin.jpg' },
-  { key: 'banana', name: 'Banana', category: 'Fruits', aliases: ['banana', 'vazhai pazham', 'kela'], emoji: '🍌', imagePath: '/images/commodities/banana.jpg' },
+  { key: 'banana', name: 'Green Banana', category: 'Fruits', aliases: ['banana', 'green banana', 'vazhai pazham', 'kela'], emoji: '🍌', imagePath: '/images/commodities/banana.jpg', imageUrl: 'https://images.unsplash.com/photo-1528279335935-f486951a6adf?auto=format&fit=crop&w=1200&q=85' },
   { key: 'mango', name: 'Mango', category: 'Fruits', aliases: ['mango', 'maampazham', 'aam'], emoji: '🥭', imagePath: '/images/commodities/mango.jpg' },
   { key: 'grapes', name: 'Grapes', category: 'Fruits', aliases: ['grapes', 'draksha'], emoji: '🍇', imagePath: '/images/commodities/grapes.jpg' },
   { key: 'orange', name: 'Orange', category: 'Fruits', aliases: ['orange', 'santra'], emoji: '🍊', imagePath: '/images/commodities/orange.jpg' },
@@ -61,7 +60,6 @@ export const COMMODITY_IMAGE_DATASET: CommodityImageRecord[] = [
   { key: 'cotton', name: 'Cotton', category: 'Cash Crops', aliases: ['cotton', 'kapas'], emoji: '☁️', imagePath: '/images/commodities/cotton.jpg' },
   { key: 'coffee', name: 'Coffee', category: 'Cash Crops', aliases: ['coffee bean', 'coffee beans', 'coffee'], emoji: '🫘', imagePath: '/images/commodities/coffee.jpg' },
   { key: 'tea', name: 'Tea', category: 'Cash Crops', aliases: ['tea leaves', 'tea'], emoji: '🍃', imagePath: '/images/commodities/tea.jpg' },
-  { key: 'green_chilli', name: 'Green Chilli', category: 'Vegetables', aliases: ['green chilli', 'green chili', 'milagai'], emoji: '🌶️', imagePath: '/images/commodities/green_chilli.jpg' },
 ];
 
 function normalizeCommodityName(value: string): string {
@@ -77,9 +75,14 @@ function normalizeCommodityName(value: string): string {
 
 const aliasIndex = new Map<string, CommodityImageRecord>();
 for (const record of COMMODITY_IMAGE_DATASET) {
+  // Preserve deliberate specialized mappings (e.g. green/red chilli and green banana).
+  const aliases = [...record.aliases].sort((a, b) => b.length - a.length);
   aliasIndex.set(normalizeCommodityName(record.name), record);
   aliasIndex.set(normalizeCommodityName(record.key.replace(/_/g, ' ')), record);
-  for (const alias of record.aliases) aliasIndex.set(normalizeCommodityName(alias), record);
+  for (const alias of aliases) {
+    const normalized = normalizeCommodityName(alias);
+    if (normalized && !aliasIndex.has(normalized)) aliasIndex.set(normalized, record);
+  }
 }
 
 export function resolveCommodityImageRecord(...candidates: Array<string | null | undefined>): CommodityImageRecord | null {
@@ -88,14 +91,11 @@ export function resolveCommodityImageRecord(...candidates: Array<string | null |
     if (!normalized) continue;
     const exact = aliasIndex.get(normalized);
     if (exact) return exact;
-    // Only match whole-word aliases; do not let "green chilli" resolve to chilli
-    // inside an unrelated commodity name.
-    for (const record of COMMODITY_IMAGE_DATASET) {
-      if (record.aliases.some((alias) => {
-        const normalizedAlias = normalizeCommodityName(alias);
-        return normalizedAlias.length >= 4 && ` ${normalized} `.includes(` ${normalizedAlias} `);
-      })) return record;
-    }
+    const matches = COMMODITY_IMAGE_DATASET.flatMap((record) => record.aliases
+      .map((alias) => ({ record, alias: normalizeCommodityName(alias) }))
+      .filter(({ alias }) => alias.length >= 4 && ` ${normalized} `.includes(` ${alias} `)))
+      .sort((a, b) => b.alias.length - a.alias.length);
+    if (matches.length) return matches[0].record;
   }
   return null;
 }
