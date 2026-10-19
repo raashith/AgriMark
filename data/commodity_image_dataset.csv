@@ -1,0 +1,43 @@
+commodity_key,canonical_name,category,aliases,commons_search_terms,image_file
+rice,Rice,Cereals,"paddy;raw rice;rice grain;arisi;nel","rice grains paddy India",rice.jpg
+wheat,Wheat,Cereals,"wheat grain;gehun;godhumai","wheat grain India",wheat.jpg
+maize,Maize,Cereals,"corn;maize grain;makkacholam","maize corn cob India",maize.jpg
+bajra,Pearl Millet,Cereals,"bajra;pearl millet;kambu","pearl millet bajra grain India",bajra.jpg
+jowar,Sorghum,Cereals,"jowar;sorghum;cholam","sorghum jowar grain India",jowar.jpg
+ragi,Finger Millet,Cereals,"ragi;finger millet;kezhvaragu","finger millet ragi grain India",ragi.jpg
+chana,Chickpea,Pulses,"chana;gram;bengal gram;kondakadalai","chickpea chana gram India",chana.jpg
+tur,Arhar Dal,Pulses,"arhar;tur;toor;red gram;thuvaram paruppu","pigeon pea red gram India",tur.jpg
+moong,Green Gram,Pulses,"moong;green gram;paasi payaru","mung bean green gram India",moong.jpg
+urad,Black Gram,Pulses,"urad;black gram;ulundhu","black gram urad India",urad.jpg
+masoor,Red Lentil,Pulses,"masoor;red lentil","red lentils masoor India",masoor.jpg
+groundnut,Groundnut,Oilseeds,"groundnut;peanut;verkadalai","groundnuts peanuts in shell India",groundnut.jpg
+mustard,Mustard Seed,Oilseeds,"mustard;mustard seed;sarson","mustard seeds India",mustard.jpg
+soybean,Soybean,Oilseeds,"soybean;soya","soybeans seeds India",soybean.jpg
+sunflower,Sunflower Seed,Oilseeds,"sunflower;sunflower seed","sunflower seeds India",sunflower.jpg
+sesame,Sesame Seed,Oilseeds,"sesame;gingelly;ellu;til","sesame seeds India",sesame.jpg
+onion,Onion,Vegetables,"onion;vengayam;pyaz","fresh onions India market",onion.jpg
+tomato,Tomato,Vegetables,"tomato;thakkali","fresh tomatoes India market",tomato.jpg
+potato,Potato,Vegetables,"potato;urulai kizhangu;aloo","fresh potatoes India market",potato.jpg
+brinjal,Brinjal,Vegetables,"brinjal;eggplant;aubergine;kathirikai","fresh brinjal eggplant India",brinjal.jpg
+okra,Okra,Vegetables,"okra;lady finger;vendakkai;bhindi","fresh okra lady finger India",okra.jpg
+cabbage,Cabbage,Vegetables,"cabbage","fresh cabbage vegetable India",cabbage.jpg
+cauliflower,Cauliflower,Vegetables,"cauliflower","fresh cauliflower India",cauliflower.jpg
+carrot,Carrot,Vegetables,"carrot","fresh carrots India market",carrot.jpg
+green_chilli,Green Chilli,Vegetables,"green chilli;chili;milagai","fresh green chilli peppers India",green_chilli.jpg
+garlic,Garlic,Vegetables,"garlic;poondu;lahsun","fresh garlic bulbs India",garlic.jpg
+ginger,Ginger,Spices,"ginger;inji;adrak","fresh ginger root India",ginger.jpg
+turmeric,Turmeric,Spices,"turmeric;haldi;manjal","turmeric fingers rhizome India",turmeric.jpg
+red_chilli,Red Chilli,Spices,"red chilli;dry chilli;milagai","dried red chilli peppers India",red_chilli.jpg
+coriander,Coriander Seed,Spices,"coriander;dhania;kothamalli seed","coriander seeds India",coriander.jpg
+cumin,Cumin Seed,Spices,"cumin;jeera","cumin seeds India",cumin.jpg
+banana,Banana,Fruits,"banana;vazhai pazham;kela","fresh banana bunch India",banana.jpg
+mango,Mango,Fruits,"mango;maampazham;aam","fresh mangoes India market",mango.jpg
+grapes,Grapes,Fruits,"grapes;draksha","fresh grapes bunch India",grapes.jpg
+orange,Orange,Fruits,"orange;santra","fresh oranges India market",orange.jpg
+papaya,Papaya,Fruits,"papaya;pappali","fresh papaya fruit India",papaya.jpg
+watermelon,Watermelon,Fruits,"watermelon;tharpoosani","watermelon whole sliced India",watermelon.jpg
+coconut,Coconut,Fruits,"coconut;thengai","fresh coconuts India",coconut.jpg
+sugarcane,Sugarcane,Cash Crops,"sugarcane;karumbu","sugarcane stalks India",sugarcane.jpg
+cotton,Cotton,Cash Crops,"cotton;kapas","raw cotton bolls India",cotton.jpg
+coffee,Coffee,Cash Crops,"coffee beans;coffee","raw coffee beans India",coffee.jpg
+tea,Tea,Cash Crops,"tea leaves;tea","fresh tea leaves India",tea.jpg

@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { Listing } from '@/types';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { CommodityImage } from '@/components/ui/CommodityImage';
 import {
   Search, ShoppingCart, MapPin, PackageCheck, X, Minus, Plus,
   CheckCircle2, AlertCircle, SlidersHorizontal
@@ -202,10 +203,24 @@ export default function BuyerMarketPage() {
             const min = getMin(item);
             const price = getPrice(item);
             return (
-              <article key={item.id} className="group rounded-2xl border border-[#1e2d26] bg-[#121a16] p-4 transition hover:-translate-y-0.5 hover:border-emerald-800/70">
-                <div className="mb-4 flex h-32 items-center justify-center rounded-xl border border-[#1e2d26] bg-gradient-to-br from-[#183326] to-[#0a0f0d]">
-                  <span className="text-4xl">{categoryFor(name) === 'Fruits' ? '🍎' : categoryFor(name) === 'Grains' ? '🌾' : categoryFor(name) === 'Pulses' ? '🫘' : '🥬'}</span>
+              <article key={item.id} className="group overflow-hidden rounded-2xl border border-[#1e2d26] bg-[#121a16] transition hover:-translate-y-0.5 hover:border-emerald-800/70 hover:shadow-xl">
+                <div className="relative h-44 overflow-hidden border-b border-[#1e2d26] bg-[#0a0f0d] sm:h-48">
+                  <CommodityImage
+                    name={item.crop_name}
+                    title={item.title}
+                    category={item.crop_category || categoryFor(name)}
+                    className="h-full w-full"
+                    imageClassName="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute left-3 top-3 rounded-full border border-emerald-700/70 bg-emerald-950/90 px-2.5 py-1 text-[10px] font-bold text-emerald-200 backdrop-blur">
+                    {item.quality_grade || 'Verified'}
+                  </div>
+                  <div className="absolute bottom-3 right-3 rounded-full border border-white/10 bg-black/80 px-2.5 py-1 text-[10px] font-semibold text-emerald-300 backdrop-blur">
+                    <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    Available now
+                  </div>
                 </div>
+                <div className="p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="text-base font-bold text-white">{name}</h2>
@@ -229,9 +244,10 @@ export default function BuyerMarketPage() {
                   <span>Minimum order: {min} kg</span>
                   <span className="text-emerald-500">Available now</span>
                 </div>
-                <button onClick={() => openOrder(item)} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-500">
+                <button onClick={() => openOrder(item)} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-xs font-bold text-white transition hover:bg-emerald-500">
                   <ShoppingCart className="h-4 w-4" /> Order this produce
                 </button>
+                </div>
               </article>
             );
           })}
