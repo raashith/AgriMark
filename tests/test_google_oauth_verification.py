@@ -213,19 +213,18 @@ def test_no_hardcoded_google_client_id_in_source():
     assert len(matched_files) == 0, f"Found hardcoded Google client ID in source files: {matched_files}"
 
 
-def test_no_accounts_google_hostname_restriction_in_auth_tsx():
-    """Verify web/src/lib/auth.tsx does NOT restrict returned OAuth URL hostname to accounts.google.com."""
+def test_google_signin_uses_firebase_popup_without_manual_redirect():
+    """The current app uses Firebase's popup flow, not a hand-built OAuth redirect URL."""
     with open('web/src/lib/auth.tsx', 'r', encoding='utf-8') as f:
         content = f.read()
 
-    assert "oauthUrl.hostname !== 'accounts.google.com'" not in content, \
-        "Fragile hostname check accounts.google.com must be removed because Supabase returns its own authorization URL first."
-    assert "Invalid OAuth redirect host returned." not in content
-    assert "['https:', 'http:'].includes(oauthUrl.protocol)" in content or \
-           '["https:", "http:"].includes(oauthUrl.protocol)' in content
-    assert "window.location.assign(oauthUrl.toString())" in content or \
-           "window.location.assign(data.url)" in content or \
-           "window.location.assign" in content
+    assert "const provider = getGoogleProvider();" in content
+    assert "signInWithPopup(getFirebaseAuth(), provider)" in content
+    assert "provider.addScope('https://www.googleapis.com/auth/userinfo.email')" in content
+    login_start = content.index("const loginWithGoogle")
+    register_start = content.index("const register", login_start)
+    google_login_implementation = content[login_start:register_start]
+    assert "oauthUrl" not in google_login_implementation
 
 
 

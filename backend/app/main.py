@@ -7,6 +7,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from .api.v1.ai import router as ai_router
 from .api.v1.ai_chat import router as ai_chat_router
+from .api.v1.admin import router as admin_router
 from .api.v1.ai_voice import router as ai_voice_router
 from .api.v1.auth import router as auth_router
 from .api.v1.auth_firebase import router as firebase_auth_router
@@ -69,6 +70,7 @@ app.include_router(health_router, prefix="/api/v1")
 app.include_router(readiness_router, prefix="/api/v1")
 app.include_router(ai_router, prefix="/api/v1")
 app.include_router(ai_chat_router, prefix="/api/v1")
+app.include_router(admin_router, prefix="/api/v1")
 app.include_router(ai_voice_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(firebase_auth_router, prefix="/api/v1")

@@ -1,150 +1,248 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { dataService } from '@/lib/data-service';
-import { useToast } from '@/components/ui/Toast';
-import { Skeleton } from '@/components/ui/Skeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { UserProfile } from '@/types';
-import { ShieldCheck, Users, Activity, CheckCircle2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import {
+  Activity, AlertTriangle, ArrowRight, Boxes, CheckCircle2, Clock3,
+  Database, RefreshCw, ShieldCheck, ShoppingBag, Users, Warehouse,
+} from 'lucide-react';
+
+type RecentListing = { id: string; title: string | null; status: string | null; created_at: string | null };
+type RecentOrder = { id: string; status: string | null; created_at: string | null };
+type AuditEvent = { id: string; action: string | null; created_at: string | null };
+type OverviewResponse = {
+  metrics: { users: number | null; farmers: number | null; active_listings: number | null; orders: number | null };
+  recent_listings: RecentListing[];
+  recent_orders: RecentOrder[];
+  audit_events: AuditEvent[];
+  latest_market_date: string | null;
+  source_errors: string[];
+};
+type DashboardData = {
+  users: number | null;
+  farmers: number | null;
+  activeListings: number | null;
+  orders: number | null;
+  recentListings: RecentListing[];
+  recentOrders: RecentOrder[];
+  auditEvents: AuditEvent[];
+  latestMarketDate: string | null;
+  errors: string[];
+};
+
+const initialData: DashboardData = {
+  users: null, farmers: null, activeListings: null, orders: null,
+  recentListings: [], recentOrders: [], auditEvents: [], latestMarketDate: null, errors: [],
+};
+
+function formatDate(value?: string | null) {
+  if (!value) return 'Date unavailable';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function MetricCard({ label, value, detail, icon: Icon }: {
+  label: string; value: number | null; detail: string; icon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm text-gray-400">{label}</p>
+          <p className="mt-2 text-3xl font-extrabold text-white tabular-nums">{value === null ? '—' : value.toLocaleString('en-IN')}</p>
+        </div>
+        <span className="rounded-xl bg-emerald-950/70 p-3 text-emerald-300"><Icon className="h-5 w-5" /></span>
+      </div>
+      <p className="mt-3 text-xs text-gray-500">{detail}</p>
+    </div>
+  );
+}
 
 export default function AdminDashboardPage() {
-  const { showSuccess } = useToast();
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [activeListingsCount, setActiveListingsCount] = useState<number>(0);
-  const [totalOrderVolume, setTotalOrderVolume] = useState<number>(0);
+  const { user, isLoading: authLoading } = useAuth();
+  const [data, setData] = useState<DashboardData>(initialData);
   const [loading, setLoading] = useState(true);
+  const [lastChecked, setLastChecked] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadAdminData() {
-      try {
-        const [{ data: profilesData }, listings, orders] = await Promise.all([
-          supabase.from('profiles').select('*'),
-          dataService.getListings(),
-          dataService.getOrders(),
-        ]);
-
-        if (profilesData) setUsers(profilesData as UserProfile[]);
-        setActiveListingsCount(listings.length);
-
-        const totalVol = orders.reduce((acc, o) => acc + (o.total_price || o.total_amount || 0), 0);
-        setTotalOrderVolume(totalVol);
-      } catch {
-      } finally {
-        setLoading(false);
-      }
+  const loadAdminData = useCallback(async () => {
+    if (authLoading) return;
+    if (!user || user.role !== 'admin') {
+      setData({ ...initialData, errors: ['Admin authentication required'] });
+      setLoading(false);
+      return;
     }
-    loadAdminData();
-  }, []);
-
-  const handleApproveKYC = async (userId: string) => {
+    setLoading(true);
     try {
-      await dataService.updateProfile({ id: userId, kyc_status: 'verified' });
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, kyc_status: 'verified' } : u))
-      );
-      showSuccess('KYC Verified', 'User verification status updated to Verified.');
-    } catch {}
-  };
+      const overview = await api.getAdminOperationsOverview() as OverviewResponse;
+      setData({
+        users: overview.metrics?.users ?? null,
+        farmers: overview.metrics?.farmers ?? null,
+        activeListings: overview.metrics?.active_listings ?? null,
+        orders: overview.metrics?.orders ?? null,
+        recentListings: overview.recent_listings || [],
+        recentOrders: overview.recent_orders || [],
+        auditEvents: overview.audit_events || [],
+        latestMarketDate: overview.latest_market_date || null,
+        errors: (overview.source_errors || []).map((source) => source + ': source unavailable or access denied'),
+      });
+    } catch (error) {
+      console.error('[AgriMark admin dashboard] overview request failed', error);
+      setData({
+        ...initialData,
+        errors: [error instanceof Error ? error.message : 'Admin overview service is unavailable'],
+      });
+    } finally {
+      setLastChecked(new Date().toISOString());
+      setLoading(false);
+    }
+  }, [authLoading, user]);
+
+  useEffect(() => { void loadAdminData(); }, [loadAdminData]);
+
+  const healthyChecks = [
+    { label: 'User profiles', ok: data.users !== null },
+    { label: 'Marketplace listings', ok: data.activeListings !== null },
+    { label: 'Buyer orders', ok: data.orders !== null },
+    { label: 'Audit trail', ok: data.users !== null && !data.errors.some((error) => error.startsWith('admin_audit_log:')) },
+    { label: 'Mandi data', ok: data.latestMarketDate !== null },
+  ];
+  const passedChecks = healthyChecks.filter((check) => check.ok).length;
 
   return (
-    <ProtectedRoute allowedRoles={['admin']}>
-      <div className="space-y-6">
-        <div className="bg-[#121a16] border border-[#1e2d26] p-6 md:p-8 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xl">
+    <ProtectedRoute allowedRoles={['admin']} requireAuth>
+      <div className="mx-auto max-w-7xl space-y-6">
+        <section className="flex flex-col justify-between gap-4 rounded-3xl border border-[#1e2d26] bg-[#121a16] p-6 shadow-xl md:flex-row md:items-center md:p-8">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-950/80 border border-purple-800/60 rounded-full text-xs font-mono font-bold text-purple-300">
-              <ShieldCheck className="w-4 h-4 text-purple-400" /> Admin Command Center
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-800 bg-emerald-950/70 px-3 py-1 text-xs font-bold text-emerald-300">
+              <ShieldCheck className="h-4 w-4" /> AgriMark Pilot Operations
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-white">
-              Platform Administration & Verification Portal
-            </h1>
-            <p className="text-xs text-gray-300 max-w-xl">
-              Strictly protected administration console for user KYC verification, listing moderation, dispute resolution, and system audit logs.
-            </p>
+            <h1 className="text-2xl font-extrabold text-white md:text-3xl">Admin Command Center</h1>
+            <p className="max-w-2xl text-sm text-gray-400">Monitor real marketplace records, buyer orders, mandi-data freshness and operational gaps. Failed data sources are shown as unavailable—not as zero.</p>
+          </div>
+          <button onClick={() => void loadAdminData()} disabled={loading} className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-700 px-4 py-2.5 text-sm font-semibold text-emerald-200 hover:bg-emerald-950 disabled:opacity-50">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh data
+          </button>
+        </section>
+
+        {data.errors.length > 0 && (
+          <section role="alert" className="rounded-2xl border border-amber-700/70 bg-amber-950/30 p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+              <div className="min-w-0 flex-1">
+                <h2 className="font-bold text-amber-100">Some operational data could not be loaded</h2>
+                <p className="mt-1 text-sm text-amber-200/80">This is a data-source or permission issue to investigate. The dashboard does not substitute sample values.</p>
+                <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-amber-100/80">
+                  {data.errors.map((error) => <li key={error} className="break-words">{error}</li>)}
+                </ul>
+              </div>
+            </div>
+          </section>
+        )}
+
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="Registered profiles" value={data.users} detail="Count from the profiles table" icon={Users} />
+          <MetricCard label="Farmer profiles" value={data.farmers} detail="Profiles with farmer role" icon={Warehouse} />
+          <MetricCard label="Active listings" value={data.activeListings} detail="Listings currently marked active" icon={Boxes} />
+          <MetricCard label="Marketplace orders" value={data.orders} detail="Order count from marketplace_orders" icon={ShoppingBag} />
+        </section>
+
+        <section className="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5 md:p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 text-lg font-bold text-white"><ShoppingBag className="h-5 w-5 text-emerald-300" /> Recent buyer orders</h2>
+                <p className="mt-1 text-xs text-gray-500">Latest records from the canonical marketplace_orders table</p>
+              </div>
+              <Link href="/buyer/orders" className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-300 hover:text-emerald-200">Orders view <ArrowRight className="h-3.5 w-3.5" /></Link>
+            </div>
+            {loading ? <p className="py-8 text-center text-sm text-gray-400">Loading live orders…</p> : data.orders === null ? (
+              <div className="rounded-xl border border-dashed border-amber-800 p-5 text-sm text-amber-200">Order records are unavailable. Check the production schema, RLS policies and database connection before pilot transactions.</div>
+            ) : data.recentOrders.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-[#26372e] p-5 text-sm text-gray-400">No order records found in the connected database. No sample orders are displayed.</p>
+            ) : (
+              <div className="divide-y divide-[#24332b]">
+                {data.recentOrders.map((order) => (
+                  <div key={order.id} className="flex items-center justify-between gap-3 py-3">
+                    <div className="min-w-0"><p className="truncate font-mono text-sm text-white">{order.id}</p><p className="mt-1 text-xs text-gray-500">{formatDate(order.created_at)}</p></div>
+                    <span className="shrink-0 rounded-full border border-emerald-800 bg-emerald-950/60 px-2.5 py-1 text-[10px] font-bold uppercase text-emerald-200">{order.status || 'unknown'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          <span className="px-3.5 py-1.5 bg-emerald-950 border border-emerald-700 text-emerald-400 text-xs font-mono font-bold rounded-full flex items-center gap-1.5">
-            <Activity className="w-4 h-4" /> System Health: Operational
-          </span>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          {loading ? (
-            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)
-          ) : (
-            <>
-              <div className="p-4 bg-[#121a16] border border-[#1e2d26] rounded-2xl space-y-1">
-                <span className="text-xs text-gray-400 font-mono">Registered Users</span>
-                <p className="text-2xl font-black text-white">{users.length}</p>
-              </div>
-              <div className="p-4 bg-[#121a16] border border-[#1e2d26] rounded-2xl space-y-1">
-                <span className="text-xs text-gray-400 font-mono">Verified Farmers</span>
-                <p className="text-2xl font-black text-emerald-400">
-                  {users.filter((u) => u.role === 'farmer' && u.kyc_status === 'verified').length}
-                </p>
-              </div>
-              <div className="p-4 bg-[#121a16] border border-[#1e2d26] rounded-2xl space-y-1">
-                <span className="text-xs text-gray-400 font-mono">Active Listings</span>
-                <p className="text-2xl font-black text-white">{activeListingsCount}</p>
-              </div>
-              <div className="p-4 bg-[#121a16] border border-[#1e2d26] rounded-2xl space-y-1">
-                <span className="text-xs text-gray-400 font-mono">Total Order Vol</span>
-                <p className="text-2xl font-black text-purple-400">₹{totalOrderVolume.toLocaleString()}</p>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* User Verification Queue */}
-        <div className="bg-[#121a16] border border-[#1e2d26] rounded-3xl p-6 space-y-4 shadow-lg">
-          <h3 className="font-bold text-base text-white flex items-center gap-2">
-            <Users className="w-5 h-5 text-emerald-400" /> User Verification & Role Audit Queue
-          </h3>
-
-          {loading ? (
-            <Skeleton className="h-40 rounded-2xl" />
-          ) : users.length === 0 ? (
-            <EmptyState
-              title="No Registered Users Found"
-              description="Users will appear in the verification queue once registered."
-            />
-          ) : (
-            <div className="space-y-3">
-              {users.map((u) => (
-                <div key={u.id} className="p-4 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl flex items-center justify-between gap-4">
-                  <div>
-                    <h4 className="font-bold text-sm text-white">{u.full_name || 'Anonymous User'}</h4>
-                    <p className="text-xs text-gray-400 font-mono">
-                      {u.email || u.phone || 'No Contact Info'} • <span className="uppercase text-emerald-400">{u.role}</span>
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <span className={`px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase rounded-full border ${
-                      u.kyc_status === 'verified'
-                        ? 'bg-emerald-950 border-emerald-800 text-emerald-300'
-                        : 'bg-amber-950 border-amber-800 text-amber-300'
-                    }`}>
-                      {u.kyc_status || 'unverified'}
-                    </span>
-
-                    {u.kyc_status !== 'verified' && (
-                      <button
-                        onClick={() => handleApproveKYC(u.id)}
-                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition flex items-center gap-1"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Approve KYC
-                      </button>
-                    )}
-                  </div>
+          <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5 md:p-6">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-white"><Activity className="h-5 w-5 text-emerald-300" /> Pilot readiness checks</h2>
+            <p className="mt-1 text-xs text-gray-500">Availability checks only; these do not replace end-to-end testing.</p>
+            <div className="mt-4 space-y-3">
+              {healthyChecks.map((check) => (
+                <div key={check.label} className="flex items-center justify-between gap-3 rounded-xl bg-[#0a0f0d] p-3">
+                  <span className="text-sm text-gray-200">{check.label}</span>
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${check.ok ? 'text-emerald-300' : 'text-amber-300'}`}>
+                    {check.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                    {check.ok ? 'Available' : 'Check required'}
+                  </span>
                 </div>
               ))}
+              <div className="rounded-xl border border-[#26372e] p-3">
+                <div className="flex items-center justify-between text-sm"><span className="text-gray-300">Data sources available</span><strong className="text-white">{passedChecks}/{healthyChecks.length}</strong></div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#25332b]"><div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${(passedChecks / healthyChecks.length) * 100}%` }} /></div>
+              </div>
+              <div className="rounded-xl bg-[#0a0f0d] p-3">
+                <p className="text-xs text-gray-500">Latest stored mandi observation</p>
+                <p className="mt-1 text-sm font-semibold text-white">{data.latestMarketDate ? formatDate(data.latestMarketDate) : 'Unavailable — investigate data source'}</p>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        </section>
+
+        <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5 md:p-6">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-white"><Boxes className="h-5 w-5 text-emerald-300" /> Recently created listings</h2>
+            <div className="mt-4">
+              {loading ? <p className="py-6 text-sm text-gray-400">Loading listings…</p> : data.recentListings.length === 0 ? <p className="rounded-xl border border-dashed border-[#26372e] p-4 text-sm text-gray-400">No listing records are available to display.</p> : (
+                <div className="divide-y divide-[#24332b]">
+                  {data.recentListings.map((listing) => (
+                    <div key={listing.id} className="flex items-center justify-between gap-3 py-3">
+                      <div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{listing.title || 'Untitled listing'}</p><p className="mt-1 text-xs text-gray-500">{formatDate(listing.created_at)}</p></div>
+                      <span className="rounded-full border border-[#34483b] px-2.5 py-1 text-[10px] font-bold uppercase text-gray-300">{listing.status || 'unknown'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <Link href="/buyer/marketplace" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-emerald-300 hover:text-emerald-200">Open marketplace <ArrowRight className="h-4 w-4" /></Link>
+          </div>
+
+          <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-5 md:p-6">
+            <h2 className="flex items-center gap-2 text-lg font-bold text-white"><Database className="h-5 w-5 text-emerald-300" /> Recent audit activity</h2>
+            <p className="mt-1 text-xs text-gray-500">Recent actions from admin_audit_log, when available to the current admin session.</p>
+            <div className="mt-4">
+              {loading ? <p className="py-6 text-sm text-gray-400">Loading audit events…</p> : data.errors.some((error) => error.startsWith('admin_audit_log:')) ? (
+                <p className="rounded-xl border border-dashed border-amber-800 p-4 text-sm text-amber-200">Audit events could not be read. Verify the table and access policy; do not treat this as an empty audit trail.</p>
+              ) : data.auditEvents.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-[#26372e] p-4 text-sm text-gray-400">No audit events returned by the connected data source.</p>
+              ) : (
+                <div className="divide-y divide-[#24332b]">
+                  {data.auditEvents.map((event) => (
+                    <div key={event.id} className="flex items-start gap-3 py-3">
+                      <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                      <div className="min-w-0"><p className="break-words text-sm text-white">{event.action || 'Unlabelled action'}</p><p className="mt-1 text-xs text-gray-500">{formatDate(event.created_at)}</p></div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <footer className="flex flex-col gap-1 border-t border-[#1e2d26] pt-4 text-xs text-gray-500 sm:flex-row sm:items-center sm:justify-between">
+          <span>Data is read from the connected AgriMark database; unavailable sources are flagged, never replaced with demo values.</span>
+          <span>Last checked: {lastChecked ? formatDate(lastChecked) : 'Not checked yet'}</span>
+        </footer>
       </div>
     </ProtectedRoute>
   );

@@ -110,6 +110,8 @@ def list_offers(user: AuthenticatedUser = Depends(get_current_user)):
 
 @router.post("/orders", status_code=201)
 def create_order(request: OrderCreate, user: AuthenticatedUser = Depends(get_current_user)):
+    if user.role not in {"buyer", "fpo"}:
+        raise HTTPException(status_code=403, detail="Buyer or FPO access is required to place an order")
     try:
         result = get_supabase().rpc(
             "create_marketplace_order_atomic",
