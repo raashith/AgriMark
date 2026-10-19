@@ -14,6 +14,7 @@ export interface CommodityImageRecord {
   aliases: string[];
   emoji: string;
   imagePath: string;
+  imageUrl?: string;
 }
 
 export const COMMODITY_IMAGE_DATASET: CommodityImageRecord[] = [
