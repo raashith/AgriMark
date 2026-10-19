@@ -1,0 +1,57 @@
+[
+  {
+    "key": "rice",
+    "name": "Rice",
+    "image_path": "/images/commodities/rice.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:Basmati_Rice_India,_raw.jpg",
+    "author": "cookbookman17",
+    "license": "CC BY 2.0",
+    "license_url": "https://creativecommons.org/licenses/by/2.0/",
+    "review_status": "curated_source_and_license_checked"
+  },
+  {
+    "key": "banana",
+    "name": "Banana",
+    "image_path": "/images/commodities/banana.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:Green_Bananas.jpg",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "review_status": "curated_source_and_license_checked"
+  },
+  {
+    "key": "onion",
+    "name": "Onion",
+    "image_path": "/images/commodities/onion.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:Onion.jpg",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "review_status": "curated_source_and_license_checked"
+  },
+  {
+    "key": "tomato",
+    "name": "Tomato",
+    "image_path": "/images/commodities/tomato.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:Vegetable_tomatoes.jpg",
+    "license": "Public domain",
+    "license_url": "https://commons.wikimedia.org/wiki/Commons:Licensing",
+    "review_status": "curated_source_and_license_checked"
+  },
+  {
+    "key": "potato",
+    "name": "Potato",
+    "image_path": "/images/commodities/potato.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:Potatoes_in_Coop.jpg",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "review_status": "curated_source_and_license_checked"
+  },
+  {
+    "key": "red_chilli",
+    "name": "Red Chilli",
+    "image_path": "/images/commodities/red_chilli.jpg",
+    "source_page_url": "https://commons.wikimedia.org/wiki/File:Dried_Chilli.jpg",
+    "license": "CC BY-SA 2.5",
+    "license_url": "https://creativecommons.org/licenses/by-sa/2.5/",
+    "review_status": "curated_source_and_license_checked"
+  }
+]
