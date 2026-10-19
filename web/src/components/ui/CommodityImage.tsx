@@ -21,7 +21,6 @@ export function CommodityImage({
   const record = resolveCommodityImageRecord(name, title);
   const [imageFailed, setImageFailed] = useState(false);
   const imageSrc = record?.imageUrl || (record ? `/images/commodities/${record.key}.jpg` : '');
-  const imageSrc = `/images/commodities/${record?.key || ''}.jpg`;
   useEffect(() => { setImageFailed(false); }, [record?.key]);
 
   if (!record || imageFailed) {
