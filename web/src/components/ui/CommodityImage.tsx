@@ -20,6 +20,7 @@ export function CommodityImage({
 }: CommodityImageProps) {
   const record = resolveCommodityImageRecord(name, title);
   const [imageFailed, setImageFailed] = useState(false);
+  const imageSrc = `/images/commodities/${record?.key || ''}.jpg`;
   useEffect(() => { setImageFailed(false); }, [record?.key]);
 
   if (!record || imageFailed) {
@@ -43,7 +44,7 @@ export function CommodityImage({
 
   return (
     <img
-      src={record.imageUrl || record.imagePath}
+      src={imageSrc}
       alt={record.name}
       loading="lazy"
       decoding="async"
