@@ -19,13 +19,13 @@ export function CommodityImage({
   imageClassName = '',
 }: CommodityImageProps) {
   const record = resolveCommodityImageRecord(name, title);
-  const [imageFailed, setImageFailed] = useState(false);
-  const imageSrc = imageFailed
-    ? (record ? `/images/commodities/${record.key}.jpg` : '')
-    : (record?.imageUrl || (record ? `/images/commodities/${record.key}.jpg` : ''));
-  useEffect(() => { setImageFailed(false); }, [record?.key]);
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const imageSources = [record?.imageUrl, record ? record.imagePath : null].filter(
+    (source): source is string => Boolean(source),
+  );
+  useEffect(() => { setSourceIndex(0); }, [record?.key]);
 
-  if (!record || imageFailed) {
+  if (!record || sourceIndex >= imageSources.length) {
     const label = record?.name || name || title || category || 'Produce';
     return (
       <div
@@ -46,14 +46,11 @@ export function CommodityImage({
 
   return (
     <img
-      src={imageSrc}
+      src={imageSources[sourceIndex]}
       alt={record.name}
       loading="lazy"
       decoding="async"
-      onError={() => {
-        if (!imageFailed && record?.imageUrl) setImageFailed(true);
-        else setImageFailed(true);
-      }}
+      onError={() => setSourceIndex((current) => current + 1)}
       className={imageClassName || 'h-full w-full object-cover'}
     />
   );
