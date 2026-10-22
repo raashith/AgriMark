@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
@@ -96,7 +97,7 @@ def update_buyer_profile(request: BuyerProfileUpdate, user: AuthenticatedUser = 
     _require_role(user, "buyer", "admin")
     buyer = _buyer_profile(user, create=True)
     payload = request.model_dump()
-    payload["updated_at"] = "now()"
+    payload["updated_at"] = datetime.now(timezone.utc).isoformat()
     try:
         result = _db().table("buyer_profiles").update(payload).eq("id", buyer["id"]).eq("user_id", str(user.id)).execute()
         return _single(result, "Buyer profile not found")
