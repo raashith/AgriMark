@@ -204,3 +204,79 @@ export function getActiveSelectedAddressSync(): DeliveryAddress | null {
     return null;
   }
 }
+
+
+export async function updateDeliveryAddress(
+  addressId: string,
+  changes: Partial<Omit<DeliveryAddress, 'id' | 'user_id' | 'created_at' | 'updated_at'>>
+): Promise<DeliveryAddress> {
+  const userId = getCurrentUserId();
+  const existing = await getDeliveryAddresses();
+  const current = existing.find((addr) => addr.id === addressId);
+  if (!current) throw new Error('Address not found.');
+
+  const updated: DeliveryAddress = { ...current, ...changes, updated_at: new Date().toISOString() };
+  if (!userId || current.user_id === 'local_user') {
+    const next = existing.map((addr) => addr.id === addressId ? updated : addr);
+    persistAddressesLocally(next);
+    const selected = getActiveSelectedAddressSync();
+    if (selected?.id === addressId) localStorage.setItem(ADDRESS_STORAGE_KEY, JSON.stringify(updated));
+    return updated;
+  }
+
+  const { data, error } = await supabase
+    .from('delivery_addresses')
+    .update({
+      label: updated.label,
+      full_name: updated.full_name,
+      phone: updated.phone,
+      house_number: updated.house_number,
+      street: updated.street,
+      area: updated.area,
+      landmark: updated.landmark,
+      city: updated.city,
+      state: updated.state,
+      postal_code: updated.postal_code,
+      delivery_instructions: updated.delivery_instructions,
+      updated_at: updated.updated_at,
+    })
+    .eq('id', addressId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  const saved = data as DeliveryAddress;
+  persistAddressesLocally(existing.map((addr) => addr.id === addressId ? saved : addr));
+  const selected = getActiveSelectedAddressSync();
+  if (selected?.id === addressId) localStorage.setItem(ADDRESS_STORAGE_KEY, JSON.stringify(saved));
+  return saved;
+}
+
+export async function deleteDeliveryAddress(addressId: string): Promise<void> {
+  const userId = getCurrentUserId();
+  const existing = await getDeliveryAddresses();
+  const target = existing.find((addr) => addr.id === addressId);
+  if (!target) return;
+
+  if (userId && target.user_id !== 'local_user') {
+    const { error } = await supabase
+      .from('delivery_addresses')
+      .delete()
+      .eq('id', addressId)
+      .eq('user_id', userId);
+    if (error) throw new Error(error.message);
+  }
+
+  const remaining = existing.filter((addr) => addr.id !== addressId);
+  persistAddressesLocally(remaining);
+  const selected = getActiveSelectedAddressSync();
+  if (selected?.id === addressId) {
+    const next = remaining.find((addr) => addr.is_default) || remaining[0];
+    if (next) {
+      localStorage.setItem(ADDRESS_STORAGE_KEY, JSON.stringify(next));
+    } else {
+      localStorage.removeItem(ADDRESS_STORAGE_KEY);
+    }
+  }
+}
