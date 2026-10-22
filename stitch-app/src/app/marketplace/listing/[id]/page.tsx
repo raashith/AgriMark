@@ -1,107 +1,25 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { CardPanel } from '@/components/ui/CardPanel';
 import { MetricCard } from '@/components/ui/MetricCard';
-import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/InputControls';
-import { ShieldCheck, MapPin, Package, ShoppingCart, ArrowRight, Award, FileText } from 'lucide-react';
+import { ShieldCheck, MapPin, Package, ShoppingCart, ArrowRight } from 'lucide-react';
 
-export default function ListingDetailsPage({ params }: { params: { id: string } }) {
-  const listing = {
-    id: params.id || 'LST-9921',
-    crop: 'Red Onion (Bhima Super)',
-    quantityKg: 10000,
-    pricePerKg: 26,
-    mandiRefPrice: 24.5,
-    grade: 'Grade A',
-    seller: 'Ramesh Patil',
-    farmName: 'Shree Ganesh Krishi Farm',
-    district: 'Nashik',
-    state: 'Maharashtra',
-    trustScore: 98,
-    moisturePct: 11.5,
-    curingHours: 48,
-    rorNumber: '712/99B-2026',
-    assayTag: 'NABL-NSK-2026-9921',
-    description: 'NABL Certified Grade A Red Onion lot. Harvested on 2026-09-01 from Shree Ganesh Krishi Farm. Cured for 48 hours with 11.5% moisture content. Free of sprouting or fungal damage.',
-  };
-
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title={`${listing.crop} (${listing.grade})`}
-        subtitle={`Listing #${listing.id} • Sourced from ${listing.farmName}, ${listing.district}, ${listing.state}`}
-        badge="NABL Assayed"
-        action={
-          <Link href={`/checkout/${listing.id}`}>
-            <Button size="lg" variant="accent">
-              <ShoppingCart className="w-5 h-5" />
-              <span>Proceed to Escrow Checkout</span>
-            </Button>
-          </Link>
-        }
-      />
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <MetricCard title="Asking Price" value={`₹${listing.pricePerKg} / kg`} subtitle={`Mandi Ref: ₹${listing.mandiRefPrice}`} icon={<ShoppingCart className="w-5 h-5" />} />
-        <MetricCard title="Available Quantity" value={`${listing.quantityKg.toLocaleString()} kg`} subtitle="Minimum Order: 500 kg" icon={<Package className="w-5 h-5" />} />
-        <MetricCard title="Moisture & Curing" value={`${listing.moisturePct}%`} subtitle={`${listing.curingHours} Hours Sun Cured`} icon={<FileText className="w-5 h-5" />} />
-        <MetricCard title="Farmer Trust Score" value={`${listing.trustScore}%`} subtitle="100% On-Time Fulfillment" icon={<Award className="w-5 h-5" />} />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-6">
-          <CardPanel title="Lot Specifications & Quality Passport">
-            <div className="space-y-4 text-xs text-[#19201D]">
-              <p className="text-sm leading-relaxed text-gray-700">{listing.description}</p>
-
-              <div className="grid grid-cols-2 gap-3 p-4 bg-[#F6F4ED] rounded-xl border border-[#E7E5DC]">
-                <div>
-                  <span className="text-gray-500 block">NABL LAB ASSAY TAG</span>
-                  <span className="font-mono font-bold text-[#1B4D3E] text-sm">{listing.assayTag}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 block">CADASTRAL 7/12 ROR</span>
-                  <span className="font-bold text-[#19201D] text-sm">{listing.rorNumber}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 block">VARIETY / CULTIVAR</span>
-                  <span className="font-bold text-[#19201D]">Bhima Super Red</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 block">BULB SIZE DISTRIBUTION</span>
-                  <span className="font-bold text-[#19201D]">55mm - 70mm (Uniform)</span>
-                </div>
-              </div>
-            </div>
-          </CardPanel>
-        </div>
-
-        <div className="space-y-6">
-          <CardPanel title="Bharat Mandi Escrow Guarantee">
-            <div className="space-y-3 text-xs">
-              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl space-y-1">
-                <div className="font-bold flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-700" /> 100% Payment Protected
-                </div>
-                <p>Funds are held in Bharat Mandi Escrow until cold-chain delivery & weight verification at receiving bay.</p>
-              </div>
-
-              <div className="pt-2">
-                <Link href={`/checkout/${listing.id}`}>
-                  <Button size="md" className="w-full">
-                    <span>Buy Now / Create Escrow</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </CardPanel>
-        </div>
-      </div>
-    </div>
-  );
+type Listing = { id:string; title:string; pricePerUnit:number; currency:string; minOrderQuantity:number; availableKg:number; grade:string; sellerName:string; cropName:string; district:string; state:string };
+export default function ListingDetailsPage() {
+  const params = useParams<{id:string}>();
+  const [listing,setListing] = useState<Listing|null>(null);
+  const [loading,setLoading] = useState(true);
+  const [message,setMessage] = useState('');
+  useEffect(()=>{const load=async()=>{try{const response=await fetch('/api/marketplace/listings',{cache:'no-store'});const body=await response.json();if(!response.ok)throw new Error(body.error||'Could not load listing.');const item=(body.listings||[]).find((x:Listing)=>x.id===params.id);if(!item)throw new Error('This listing is no longer active or available.');setListing(item);}catch(err){setMessage(err instanceof Error?err.message:'Could not load listing.');}finally{setLoading(false);}};void load();},[params.id]);
+  const money=(amount:number)=>'₹'+amount.toLocaleString('en-IN',{maximumFractionDigits:2});
+  return <div className="space-y-6">
+    {loading?<CardPanel><div className="h-48 animate-pulse rounded-xl bg-gray-100"/></CardPanel>:listing?<><PageHeader title={listing.title} subtitle={`Offered by ${listing.sellerName} · ${[listing.district,listing.state].filter(Boolean).join(', ')||'Location not provided'}`} action={<Link href={`/checkout/${listing.id}`}><Button size="lg"><ShoppingCart className="h-4 w-4"/> Buy / Place Order</Button></Link>}/>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-3"><MetricCard title="Asking Price" value={money(listing.pricePerUnit)+' / kg'} subtitle={listing.currency} icon={<ShoppingCart className="h-5 w-5"/>}/><MetricCard title="Available Quantity" value={listing.availableKg.toLocaleString()+' kg'} subtitle={`Minimum ${listing.minOrderQuantity.toLocaleString()} kg`} icon={<Package className="h-5 w-5"/>}/><MetricCard title="Produce Grade" value={listing.grade} subtitle="From seller's lot record" icon={<ShieldCheck className="h-5 w-5"/>}/></div>
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-3"><div className="space-y-6 md:col-span-2"><CardPanel title="Listing details"><h2 className="text-lg font-bold text-[#19201D]">{listing.cropName||listing.title}</h2><p className="mt-2 text-sm leading-relaxed text-gray-600">This listing is loaded from AgriMark’s live marketplace database. Available quantity and the minimum order are checked again when the order is submitted.</p><p className="mt-4 flex items-center gap-2 text-sm text-gray-500"><MapPin className="h-4 w-4 text-[#1B4D3E]"/>{[listing.district,listing.state].filter(Boolean).join(', ')||'Seller has not shared location'}</p></CardPanel></div><CardPanel title="Order protection"><div className="space-y-4"><div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900"><div className="mb-1 flex items-center gap-2 font-bold"><ShieldCheck className="h-4 w-4"/>Inventory validation</div>Orders require a signed-in buyer and are reserved server-side to prevent overselling.</div><Link href={`/checkout/${listing.id}`}><Button className="w-full" size="md">Continue to checkout <ArrowRight className="h-4 w-4"/></Button></Link></div></CardPanel></div></>:<CardPanel title="Listing unavailable"><p className="text-sm text-gray-600">{message}</p><div className="mt-4"><Link className="text-sm font-semibold text-[#1B4D3E] underline" href="/marketplace">Back to marketplace</Link></div></CardPanel>}
+  </div>;
 }
