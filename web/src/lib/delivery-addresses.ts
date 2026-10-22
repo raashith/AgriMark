@@ -68,12 +68,9 @@ export async function saveDeliveryAddress(
   address: Omit<DeliveryAddress, 'id' | 'user_id' | 'created_at' | 'updated_at'>
 ): Promise<DeliveryAddress> {
   const userId = getCurrentUserId();
-
-  const tempId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `addr_${Date.now()}`;
   const now = new Date().toISOString();
-
   const newAddress: DeliveryAddress = {
-    id: tempId,
+    id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `addr_${Date.now()}`,
     user_id: userId || 'local_user',
     label: address.label || 'Home',
     full_name: address.full_name,
@@ -94,58 +91,51 @@ export async function saveDeliveryAddress(
     updated_at: now,
   };
 
+  // Guests/local demo users have no authenticated Supabase identity to satisfy RLS.
   if (!userId) {
     saveLocalAddress(newAddress);
     return newAddress;
   }
 
-  try {
-    if (newAddress.is_default) {
-      await supabase
-        .from('delivery_addresses')
-        .update({ is_default: false })
-        .eq('user_id', userId);
-    }
-
-    const { data, error } = await supabase
+  // Do not silently report a local-only fallback as a successful database save.
+  // A missing returned row is handled explicitly instead of PostgREST's .single() error.
+  if (newAddress.is_default) {
+    const { error: clearError } = await supabase
       .from('delivery_addresses')
-      .insert([
-        {
-          user_id: userId,
-          label: newAddress.label,
-          full_name: newAddress.full_name,
-          phone: newAddress.phone,
-          house_number: newAddress.house_number,
-          street: newAddress.street,
-          area: newAddress.area,
-          landmark: newAddress.landmark,
-          city: newAddress.city,
-          state: newAddress.state,
-          postal_code: newAddress.postal_code,
-          latitude: newAddress.latitude,
-          longitude: newAddress.longitude,
-          location_accuracy: newAddress.location_accuracy,
-          is_default: newAddress.is_default,
-          delivery_instructions: newAddress.delivery_instructions,
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) {
-      console.warn('[AgriMark Addresses] Insert fallback to local due to error:', error.message);
-      saveLocalAddress(newAddress);
-      return newAddress;
-    }
-
-    const saved = data as DeliveryAddress;
-    saveLocalAddress(saved);
-    return saved;
-  } catch (err) {
-    console.warn('[AgriMark Addresses] Remote save error:', err);
-    saveLocalAddress(newAddress);
-    return newAddress;
+      .update({ is_default: false })
+      .eq('user_id', userId);
+    if (clearError) throw new Error(`Could not update the default address: ${clearError.message}`);
   }
+
+  const { data, error } = await supabase
+    .from('delivery_addresses')
+    .insert({
+      user_id: userId,
+      label: newAddress.label,
+      full_name: newAddress.full_name,
+      phone: newAddress.phone,
+      house_number: newAddress.house_number,
+      street: newAddress.street,
+      area: newAddress.area,
+      landmark: newAddress.landmark,
+      city: newAddress.city,
+      state: newAddress.state,
+      postal_code: newAddress.postal_code,
+      latitude: newAddress.latitude,
+      longitude: newAddress.longitude,
+      location_accuracy: newAddress.location_accuracy,
+      is_default: newAddress.is_default,
+      delivery_instructions: newAddress.delivery_instructions,
+    })
+    .select()
+    .maybeSingle();
+
+  if (error) throw new Error(`Supabase could not save this address: ${error.message}`);
+  if (!data) throw new Error('Supabase did not return the saved address. Check the signed-in user and delivery_addresses INSERT policy.');
+
+  const saved = data as DeliveryAddress;
+  saveLocalAddress(saved);
+  return saved;
 }
 
 export async function setDefaultAddress(addressId: string): Promise<void> {
