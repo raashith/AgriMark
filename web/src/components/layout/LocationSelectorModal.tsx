@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { DeliveryAddress } from '@/types';
-import { getDeliveryAddresses, setDefaultAddress, saveDeliveryAddress, updateDeliveryAddress, deleteDeliveryAddress } from '@/lib/delivery-addresses';
+import { getDeliveryAddresses, setDefaultAddress, updateDeliveryAddress, deleteDeliveryAddress } from '@/lib/delivery-addresses';
 import { MapPin, Check, Plus, Navigation, X, Home, Sprout, Building, Pencil, Trash2 } from 'lucide-react';
 
 interface LocationSelectorModalProps {
@@ -182,7 +182,7 @@ export const LocationSelectorModal: React.FC<LocationSelectorModalProps> = ({
             ) : addresses.length === 0 ? (
               <div className="p-4 bg-[#0a0f0d] border border-dashed border-[#1e2d26] rounded-2xl text-center text-xs text-gray-400">No saved delivery addresses found.</div>
             ) : addresses.map((addr) => {
-              const isSelected = currentAddress?.id ? currentAddress.id === addr.id : Boolean(addr.is_default);
+              const isSelected = currentAddress ? currentAddress.id === addr.id : addresses.find((item) => item.is_default)?.id === addr.id || (!addresses.some((item) => item.is_default) && addresses[0]?.id === addr.id);
               const IconComp = addr.label === 'Farm' ? Sprout : addr.label === 'Other' ? Building : Home;
               return (
                 <div key={addr.id} className={`p-3.5 rounded-2xl border transition flex items-start justify-between gap-2 ${isSelected ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300' : 'bg-[#0a0f0d] border-[#1e2d26] text-gray-300'}`}>
