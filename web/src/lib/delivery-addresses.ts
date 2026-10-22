@@ -35,10 +35,19 @@ export async function getDeliveryAddresses(): Promise<DeliveryAddress[]> {
     }
 
     const addresses = (data as DeliveryAddress[]) || [];
-    if (addresses.length > 0) {
-      persistAddressesLocally(addresses);
+    const localAddresses = getStoredAddressesLocally();
+
+    // If the remote table is empty (or an insert previously fell back to local storage),
+    // keep locally saved addresses visible rather than replacing the list with an empty result.
+    if (addresses.length === 0) {
+      return localAddresses;
     }
-    return addresses;
+
+    // Merge local-only addresses that are not yet present remotely; prefer remote rows by id.
+    const remoteIds = new Set(addresses.map((address) => address.id));
+    const merged = [...addresses, ...localAddresses.filter((address) => !remoteIds.has(address.id))];
+    persistAddressesLocally(merged);
+    return merged;
   } catch (err) {
     console.warn('[AgriMark Addresses] Fetch failed:', err);
     return getStoredAddressesLocally();
