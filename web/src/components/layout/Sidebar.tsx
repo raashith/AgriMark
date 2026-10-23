@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import {
   Sprout, LayoutDashboard, MapPin, Calendar, Eye, Layers, ShoppingBag,
   ShoppingCart, TrendingUp, CloudSun, FileText, CheckSquare, ShieldCheck,
-  Bot, Settings, Building2, Truck, Users, ChevronLeft, PackageCheck, Navigation,
+  Bot, Settings, Building2, Truck, Users, PackageCheck, Navigation,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
