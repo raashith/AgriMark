@@ -17,6 +17,7 @@ interface AuthContextType {
   loginWithPhoneOtp: (phone: string) => Promise<void>;
   verifyPhoneOtp: (phone: string, token: string) => Promise<UserProfile>;
   loginWithGoogle: (requestedRole?: UserRole) => Promise<UserProfile>;
+  activateRole: (requestedRole: UserRole) => Promise<UserProfile>;
   register: (data: any) => Promise<UserProfile>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
@@ -42,6 +43,7 @@ const AuthContext = createContext<AuthContextType>({
   loginWithPhoneOtp: async () => { throw new Error('Not initialized'); },
   verifyPhoneOtp: async () => { throw new Error('Not initialized'); },
   loginWithGoogle: async () => { throw new Error('Not initialized'); },
+  activateRole: async () => { throw new Error('Not initialized'); },
   register: async () => { throw new Error('Not initialized'); },
   logout: async () => {},
   isAuthenticated: false,
@@ -164,10 +166,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       provider.addScope('email');
       provider.addScope('profile');
       provider.addScope('https://www.googleapis.com/auth/userinfo.email');
+      if (typeof provider.setCustomParameters === 'function') {
+        provider.setCustomParameters({ prompt: 'select_account' });
+      }
       const result = await signInWithPopup(getFirebaseAuth(), provider);
       return await syncFirebaseUser(result.user, requestedRole);
     } catch (error) {
       throw new Error(formatAuthError(error instanceof Error ? error.message : 'Google sign-in failed.'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const activateRole = async (requestedRole: UserRole): Promise<UserProfile> => {
+    setIsLoading(true);
+    try {
+      const allowedRoles: UserRole[] = ['farmer', 'buyer', 'fpo', 'logistics', 'service_provider'];
+      if (!allowedRoles.includes(requestedRole)) throw new Error('Please choose a valid AgriMark role.');
+      const currentUser = getFirebaseAuth().currentUser;
+      if (!currentUser) throw new Error('Your session has expired. Please sign in again.');
+      return await syncFirebaseUser(currentUser, requestedRole);
+    } catch (error) {
+      throw new Error(formatAuthError(error instanceof Error ? error.message : 'Unable to change workspace.'));
     } finally {
       setIsLoading(false);
     }
@@ -268,6 +288,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginWithPhoneOtp,
         verifyPhoneOtp,
         loginWithGoogle,
+        activateRole,
         register,
         logout,
         isAuthenticated: !!user,
