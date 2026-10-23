@@ -20,7 +20,7 @@ function getRoleRoute(role?: string | null): string {
 }
 
 export default function LoginPage() {
-  const { user, isAuthenticated, isLoading: authLoading, login, loginWithGoogle } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, login, loginWithGoogle, activateRole } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState('');
@@ -30,24 +30,27 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
 
-  useEffect(() => {
-    if (!authLoading && user && isAuthenticated) {
-      const params = new URLSearchParams(window.location.search);
-      // When arriving already signed in, honor an explicit role intent from this page.
-      const requestedRole = params.get('role');
-      if (requestedRole === 'buyer' || requestedRole === 'farmer' || requestedRole === 'fpo' || requestedRole === 'logistics') {
-        setRole(requestedRole);
-        return;
-      }
-      router.replace(getRoleRoute(user.role));
-    }
-  }, [authLoading, user, isAuthenticated, router]);
+
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const urlError = params.get('error');
     if (urlError) setError(formatAuthError(urlError));
   }, []);
+
+  const continueToSelectedRole = async () => {
+    if (loading || authLoading) return;
+    setError('');
+    setLoading(true);
+    try {
+      await activateRole(role);
+      router.replace(getRoleRoute(role));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to open the selected workspace.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -153,6 +156,46 @@ export default function LoginPage() {
           </div>
         </div>
         <form onSubmit={submit} className="space-y-4">
+        <div className="space-y-2">
+          <label className="block text-xs font-mono font-bold uppercase text-gray-400">Choose your workspace</label>
+          <p className="text-xs text-gray-500">One AgriMark account can have more than one role.</p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { id: 'farmer', label: 'Farmer' },
+              { id: 'buyer', label: 'Buyer' },
+              { id: 'fpo', label: 'FPO / Co-op' },
+              { id: 'logistics', label: 'Logistics Partner' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                aria-pressed={role === item.id}
+                onClick={() => setRole(item.id as typeof role)}
+                className={role === item.id
+                  ? 'p-3 rounded-xl border border-emerald-500 bg-emerald-950/80 text-emerald-300 font-semibold flex items-center justify-between'
+                  : 'p-3 rounded-xl border border-[#1e2d26] bg-[#0a0f0d] text-gray-400 font-semibold flex items-center justify-between hover:border-emerald-800'}
+              >
+                <span>{item.label}</span>
+                {role === item.id && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+              </button>
+            ))}
+          </div>
+        </div>
+        {isAuthenticated && user ? (
+          <div className="space-y-3 rounded-2xl border border-emerald-800/60 bg-emerald-950/30 p-4">
+            <div className="text-sm font-semibold text-emerald-200">Signed in as {user.full_name || user.email || 'AgriMark user'}</div>
+            <p className="text-xs text-gray-400">Continue with this account to open the selected workspace. Your Farmer and Buyer access share one account.</p>
+            <button
+              type="button"
+              onClick={continueToSelectedRole}
+              disabled={loading || authLoading}
+              className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-950/80 text-white font-extrabold rounded-2xl shadow-lg transition flex items-center justify-center gap-2 text-sm"
+            >
+              <span>{loading ? 'Opening workspace…' : 'Continue as ' + (role === 'farmer' ? 'Farmer' : role === 'buyer' ? 'Buyer' : role === 'fpo' ? 'FPO' : 'Logistics')}</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
           <div className="space-y-2">
             <label className="block text-xs font-mono font-bold uppercase text-gray-400">Email</label>
             <div className="relative">
@@ -214,6 +257,7 @@ export default function LoginPage() {
             Continue with Google as {role === 'farmer' ? 'Farmer' : role === 'buyer' ? 'Buyer' : role === 'fpo' ? 'FPO' : 'Logistics'}
           </button>
         </form>
+        )}
 
         <div className="pt-4 border-t border-[#1e2d26]/60 text-center text-[11px] text-gray-500 flex items-center justify-center gap-1.5">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
