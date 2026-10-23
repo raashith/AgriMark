@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/refresh-agmarknet-latest-once.yml
+      - scripts/data/ingest_agmarknet.py
 
 permissions:
   contents: read
