@@ -9,7 +9,40 @@ type Row={id:number;commodity_code:string;mandi_code:string|null;state_code:stri
 const nf=new Intl.NumberFormat('en-IN',{maximumFractionDigits:0}); const ru=(n:number)=>'₹'+nf.format(n); const dt=(s:string)=>s?new Date(s+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'—';
 export default function MarketPricesPage(){
  const [rows,S]=useState<Row[]>([]),[commodities,SC]=useState<Opt[]>([]),[states,SS]=useState<Opt[]>([]),[mandis,SM]=useState<Opt[]>([]),[commodity,C]=useState(''),[state,T]=useState(''),[mandi,M]=useState(''),[search,Q]=useState(''),[loading,L]=useState(true),[error,E]=useState(''),[updated,U]=useState('');
- const load=useCallback(async()=>{L(true);E('');try{const a=await Promise.all([supabase.from('national_commodities').select('code,name').order('name').limit(2000),supabase.from('national_states').select('state_code,state_name').order('state_name').limit(1000),supabase.from('national_mandis').select('mandi_code,mandi_name,state_code').order('mandi_name').limit(5000)]);for(const x of a)if(x.error)throw x.error;const cs=(a[0].data||[]).map((r:any)=>({code:r.code,name:r.name})),ss=(a[1].data||[]).map((r:any)=>({code:r.state_code,name:r.state_name})),ms=(a[2].data||[]).map((r:any)=>({code:r.mandi_code,name:r.mandi_name,state_code:r.state_code}));SC(cs);SS(ss);SM(ms);const pages=await Promise.all(Array.from({length:12},(_,i)=>supabase.from('national_market_price_observations').select('id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source').order('observation_date',{ascending:false}).order('id',{ascending:false}).range(i*1000,i*1000+999)));const bad=pages.find(p=>p.error);if(bad?.error)throw bad.error;const cm=new Map(cs.map((r:Opt)=>[r.code,r.name])),stm=new Map(ss.map((r:Opt)=>[r.code,r.name])),mm=new Map(ms.map((r:Opt)=>[r.code,r.name]));S(pages.flatMap(p=>p.data||[]).map((r:any)=>({...r,modal_price:Number(r.modal_price)||0,min_price:Number(r.min_price)||0,max_price:Number(r.max_price)||0,arrival_quantity:r.arrival_quantity==null?null:Number(r.arrival_quantity),commodity_name:cm.get(r.commodity_code)||r.commodity_code,mandi_name:mm.get(r.mandi_code)||r.mandi_code||'Mandi unavailable',state_name:stm.get(r.state_code)||r.state_code||'India'})));U(new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));}catch(e){E(e instanceof Error?e.message:'Could not load market observations');}finally{L(false);}},[]);
+ const load=useCallback(async()=>{
+  L(true);E('');
+  const controller=new AbortController();
+  const timeout=window.setTimeout(()=>controller.abort(),12000);
+  try{
+   const [commoditiesResult,statesResult,mandisResult,observationsResult]=await Promise.all([
+    supabase.from('national_commodities').select('code,name').order('name').limit(1000).abortSignal(controller.signal),
+    supabase.from('national_states').select('state_code,state_name').order('state_name').limit(100).abortSignal(controller.signal),
+    supabase.from('national_mandis').select('mandi_code,mandi_name,state_code').order('mandi_name').limit(2000).abortSignal(controller.signal),
+    // Keep the first paint fast: fetch the newest 1,000 real observations.
+    // The previous implementation launched 12 simultaneous 1,000-row queries
+    // on every visit, which could stall the whole page on PostgREST.
+    supabase.from('national_market_price_observations').select('id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source').order('observation_date',{ascending:false}).order('id',{ascending:false}).limit(1000).abortSignal(controller.signal)
+   ]);
+   const failure=[commoditiesResult,statesResult,mandisResult,observationsResult].find(result=>result.error);
+   if(failure?.error)throw failure.error;
+   const cs=(commoditiesResult.data||[]).map((r:any)=>({code:r.code,name:r.name}));
+   const ss=(statesResult.data||[]).map((r:any)=>({code:r.state_code,name:r.state_name}));
+   const ms=(mandisResult.data||[]).map((r:any)=>({code:r.mandi_code,name:r.mandi_name,state_code:r.state_code}));
+   const rawRows=observationsResult.data||[];
+   const cm=new Map(cs.map((r:Opt)=>[r.code,r.name]));
+   const stm=new Map(ss.map((r:Opt)=>[r.code,r.name]));
+   const mm=new Map(ms.map((r:Opt)=>[r.code,r.name]));
+   SC(cs);SS(ss);SM(ms);
+   S(rawRows.map((r:any)=>({...r,modal_price:Number(r.modal_price)||0,min_price:Number(r.min_price)||0,max_price:Number(r.max_price)||0,arrival_quantity:r.arrival_quantity==null?null:Number(r.arrival_quantity),commodity_name:cm.get(r.commodity_code)||r.commodity_code,mandi_name:mm.get(r.mandi_code)||r.mandi_code||'Mandi unavailable',state_name:stm.get(r.state_code)||r.state_code||'India'})));
+   U(new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+   if(rawRows.length===0)E('The database returned no market observations. Check public read access (RLS) for national_market_price_observations.');
+  }catch(e){
+   const err=e as {message?:string;name?:string;code?:string};
+   E(err.name==='AbortError'?'Market data request timed out. Please retry.':err.message||'Could not load market observations. Please retry.');
+  }finally{
+   window.clearTimeout(timeout);L(false);
+  }
+ },[]);
  useEffect(()=>{void load()},[load]);
  const filtered=useMemo(()=>rows.filter(r=>(!commodity||r.commodity_code===commodity)&&(!state||r.state_code===state)&&(!mandi||r.mandi_code===mandi)&&(!search||r.commodity_name.toLowerCase().includes(search.toLowerCase())||r.mandi_name.toLowerCase().includes(search.toLowerCase()))),[rows,commodity,state,mandi,search]);
  const latest=filtered[0], dates=[...new Set(filtered.map(r=>r.observation_date))].sort();
