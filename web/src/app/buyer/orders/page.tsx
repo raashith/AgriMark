@@ -1,71 +1,307 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/lib/i18n';
 import { api } from '@/lib/api';
 import { MarketplaceOrder } from '@/types';
-import { ShoppingBag, Truck, CheckCircle2, Clock } from 'lucide-react';
+import { CommodityImage } from '@/components/ui/CommodityImage';
+import {
+  ShoppingBag, Truck, CheckCircle2, Clock, Search, PackageCheck,
+  SlidersHorizontal, XCircle, ClipboardList, ArrowUpRight, RefreshCw,
+} from 'lucide-react';
+
+type OrderFilter = 'all' | 'pending' | 'processing' | 'in_transit' | 'delivered' | 'cancelled';
+
+const filters: { id: OrderFilter; label: string; icon: React.ElementType }[] = [
+  { id: 'all', label: 'All Orders', icon: ClipboardList },
+  { id: 'pending', label: 'Pending', icon: Clock },
+  { id: 'processing', label: 'Processing', icon: PackageCheck },
+  { id: 'in_transit', label: 'In Transit', icon: Truck },
+  { id: 'delivered', label: 'Delivered', icon: CheckCircle2 },
+  { id: 'cancelled', label: 'Cancelled', icon: XCircle },
+];
+
+function orderStatus(order: MarketplaceOrder): OrderFilter {
+  const raw = String(order.status || '').toLowerCase().replace(/[\s-]+/g, '_');
+  if (raw === 'delivered' || raw === 'complete' || raw === 'completed') return 'delivered';
+  if (['in_transit', 'dispatched', 'shipped', 'out_for_delivery', 'ready_for_dispatch'].includes(raw)) return 'in_transit';
+  if (['processing', 'confirmed', 'accepted', 'packed', 'preparing'].includes(raw)) return 'processing';
+  if (['cancelled', 'canceled', 'rejected', 'refunded'].includes(raw)) return 'cancelled';
+  return 'pending';
+}
+
+function statusLabel(status: OrderFilter) {
+  return ({ all: 'All orders', pending: 'Pending', processing: 'Processing', in_transit: 'In transit', delivered: 'Delivered', cancelled: 'Cancelled' })[status];
+}
+
+function statusStyles(status: OrderFilter) {
+  if (status === 'delivered') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300';
+  if (status === 'in_transit') return 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300';
+  if (status === 'processing') return 'border-sky-500/30 bg-sky-500/10 text-sky-300';
+  if (status === 'cancelled') return 'border-rose-500/30 bg-rose-500/10 text-rose-300';
+  return 'border-amber-500/30 bg-amber-500/10 text-amber-300';
+}
+
+function formatDate(value?: string) {
+  if (!value) return 'Date unavailable';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Date unavailable';
+  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
+}
+
+function currency(value: number) {
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value || 0);
+}
 
 export default function BuyerOrdersPage() {
   const { t } = useI18n();
   const [orders, setOrders] = useState<MarketplaceOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState<OrderFilter>('all');
+  const [selectedOrder, setSelectedOrder] = useState<MarketplaceOrder | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
-  const fetchOrders = async () => {
+  const fetchOrders = async (showRefresh = false) => {
+    if (showRefresh) setRefreshing(true);
+    else setLoading(true);
     try {
-      const res = await api.getOrders();
-      setOrders(res);
-    } catch (e) {
-      console.error(e);
+      const result = await api.getOrders();
+      setOrders(Array.isArray(result) ? result : []);
+    } catch (error) {
+      console.error('Unable to load marketplace orders', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
+  useEffect(() => { void fetchOrders(); }, []);
+
+  const counts = useMemo(() => {
+    const result: Record<OrderFilter, number> = { all: orders.length, pending: 0, processing: 0, in_transit: 0, delivered: 0, cancelled: 0 };
+    orders.forEach((order) => { result[orderStatus(order)] += 1; });
+    return result;
+  }, [orders]);
+
+  const visibleOrders = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return orders.filter((order) => {
+      const matchesFilter = activeFilter === 'all' || orderStatus(order) === activeFilter;
+      const searchable = [order.id, order.listing_title, order.listing_id, order.seller_name, order.status]
+        .filter(Boolean).join(' ').toLowerCase();
+      return matchesFilter && (!needle || searchable.includes(needle));
+    });
+  }, [orders, activeFilter, search]);
+
+  const totalSpent = useMemo(() => orders
+    .filter((order) => orderStatus(order) !== 'cancelled')
+    .reduce((sum, order) => sum + Number(order.total_price ?? order.total_amount ?? 0), 0), [orders]);
+
+  const statusOrder: OrderFilter[] = ['pending', 'processing', 'in_transit', 'delivered'];
+
+  const amountFor = (order: MarketplaceOrder) => Number(order.total_price ?? order.total_amount ?? 0);
+  const quantityFor = (order: MarketplaceOrder) => Number(order.quantity_kg ?? order.quantity ?? 0);
+  const priceFor = (order: MarketplaceOrder) => Number(order.unit_price || (quantityFor(order) ? amountFor(order) / quantityFor(order) : 0));
+  const cropFor = (order: MarketplaceOrder) => order.listing_title || 'Fresh Produce';
+
+  const openDetails = (order: MarketplaceOrder) => setSelectedOrder(order);
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-100 flex items-center gap-2">
-          <ShoppingBag className="w-6 h-6 text-emerald-400" /> My Marketplace Orders
-        </h1>
-        <p className="text-sm text-gray-400">Track order fulfillment, atomic inventory reservations, and delivery status.</p>
-      </div>
+    <div className="mx-auto w-full max-w-[1500px] space-y-6 pb-8">
+      <section className="relative isolate overflow-hidden rounded-3xl border border-emerald-900/70 bg-gradient-to-br from-[#10251b] via-[#0b1711] to-[#07100c] p-5 shadow-[0_24px_80px_rgba(0,0,0,.2)] sm:p-7 lg:p-8">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-20 h-72 w-72 rounded-full bg-emerald-400/10 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 right-1/4 h-64 w-64 rounded-full bg-teal-500/[0.07] blur-3xl" />
+        <div className="relative flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+          <div className="max-w-3xl">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-700/50 bg-emerald-950/60 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[.16em] text-emerald-300">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.8)]" />
+              Buyer workspace
+            </div>
+            <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-[42px]">
+              My Marketplace <span className="text-emerald-400">Orders</span>
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400 sm:text-base">
+              One clear view of your produce purchases, order progress, and delivery status.
+            </p>
+          </div>
+          <button type="button" onClick={() => void fetchOrders(true)} disabled={refreshing || loading}
+            className="inline-flex w-full items-center justify-center gap-2 self-start rounded-xl border border-emerald-800/70 bg-black/20 px-4 py-3 text-sm font-semibold text-emerald-100 transition hover:border-emerald-500 hover:bg-emerald-950/60 disabled:opacity-60 lg:w-auto lg:self-auto">
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /> Refresh orders
+          </button>
+        </div>
+        <div className="relative mt-7 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-white/[0.07] bg-black/25 p-4 backdrop-blur">
+            <div className="flex items-center gap-2 text-xs font-medium text-gray-400"><ShoppingBag className="h-4 w-4 text-emerald-400" /> Total orders</div>
+            <div className="mt-2 text-3xl font-black tracking-tight text-white">{orders.length}</div>
+            <div className="mt-1 text-xs text-gray-500">All purchases in your account</div>
+          </div>
+          <div className="rounded-2xl border border-white/[0.07] bg-black/25 p-4 backdrop-blur">
+            <div className="flex items-center gap-2 text-xs font-medium text-gray-400"><Truck className="h-4 w-4 text-cyan-300" /> On the way</div>
+            <div className="mt-2 text-3xl font-black tracking-tight text-white">{counts.in_transit}</div>
+            <div className="mt-1 text-xs text-gray-500">Orders moving toward delivery</div>
+          </div>
+          <div className="rounded-2xl border border-white/[0.07] bg-black/25 p-4 backdrop-blur">
+            <div className="flex items-center gap-2 text-xs font-medium text-gray-400"><PackageCheck className="h-4 w-4 text-amber-300" /> Order value</div>
+            <div className="mt-2 text-3xl font-black tracking-tight text-white">{currency(totalSpent)}</div>
+            <div className="mt-1 text-xs text-gray-500">Excludes cancelled orders</div>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4 rounded-2xl border border-[#1d3026] bg-[#0c1510] p-3 sm:p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Filter orders by status">
+            {filters.map(({ id, label, icon: Icon }) => (
+              <button key={id} type="button" role="tab" aria-selected={activeFilter === id} onClick={() => setActiveFilter(id)}
+                className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-bold transition sm:text-sm ${activeFilter === id ? 'border-emerald-400 bg-emerald-500 text-[#04130b] shadow-[0_4px_22px_rgba(16,185,129,.18)]' : 'border-[#23392e] bg-[#0b130f] text-gray-300 hover:border-emerald-700 hover:text-emerald-100'}`}>
+                <Icon className="h-4 w-4" /> {label}
+                <span className={`rounded-md px-1.5 py-0.5 text-[10px] ${activeFilter === id ? 'bg-black/10 text-[#04130b]' : 'bg-white/[0.06] text-gray-400'}`}>{counts[id]}</span>
+              </button>
+            ))}
+          </div>
+          <div className="relative w-full shrink-0 lg:max-w-sm">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-400" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by crop name or order ID..."
+              aria-label="Search orders by crop name or order ID"
+              className="w-full rounded-xl border border-[#254034] bg-[#060d09] py-3 pl-10 pr-10 text-sm text-gray-100 outline-none transition placeholder:text-gray-600 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/10" />
+            {search && <button type="button" aria-label="Clear search" onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"><XCircle className="h-4 w-4" /></button>}
+          </div>
+        </div>
+        <div className="flex items-center justify-between px-1 text-xs text-gray-500">
+          <span>Showing <strong className="text-gray-300">{visibleOrders.length}</strong> of {orders.length} orders</span>
+          <span className="hidden items-center gap-1 sm:inline-flex"><SlidersHorizontal className="h-3.5 w-3.5" /> Filter by status or search</span>
+        </div>
+      </section>
 
       {loading ? (
-        <p className="text-sm text-gray-400 text-center py-8">{t('loading')}</p>
-      ) : orders.length === 0 ? (
-        <div className="p-8 bg-[#121a16] border border-dashed border-[#1e2d26] rounded-2xl text-center text-sm text-gray-400">
-          No orders placed yet. Browse the marketplace to place your first order.
-        </div>
+        <section aria-label="Loading orders" className="space-y-3">
+          {[0, 1, 2].map((row) => <div key={row} className="h-44 animate-pulse rounded-2xl border border-[#1d3026] bg-gradient-to-r from-[#101a14] via-[#15241a] to-[#101a14]" />)}
+        </section>
+      ) : visibleOrders.length === 0 ? (
+        <section className="rounded-3xl border border-dashed border-[#294436] bg-[#0d1711] px-6 py-14 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-700/50 bg-emerald-950/60 text-emerald-300"><ShoppingBag className="h-7 w-7" /></div>
+          <h2 className="mt-4 text-lg font-bold text-white">{orders.length === 0 ? 'No orders yet' : 'No matching orders'}</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-400">
+            {orders.length === 0 ? 'Your purchases will appear here after you place an order in the marketplace.' : 'Try another status filter or search for a different crop or order ID.'}
+          </p>
+          {(search || activeFilter !== 'all') && <button type="button" onClick={() => { setSearch(''); setActiveFilter('all'); }} className="mt-5 rounded-xl border border-emerald-700 bg-emerald-950/50 px-4 py-2.5 text-sm font-semibold text-emerald-200 hover:bg-emerald-900/60">Clear filters</button>}
+        </section>
       ) : (
-        <div className="space-y-4">
-          {orders.map((order) => (
-            <div key={order.id} className="bg-[#121a16] border border-[#1e2d26] p-5 rounded-2xl shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div className="space-y-1 font-mono">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs uppercase font-bold text-emerald-400">Order ID: {order.id.slice(0, 8)}...</span>
-                  <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${
-                    order.status === 'delivered'
-                      ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
-                      : 'bg-amber-950 text-amber-300 border-amber-800'
-                  }`}>
-                    {order.status}
-                  </span>
-                </div>
-                <p className="text-sm font-bold text-gray-100">Quantity: {order.quantity_kg} KG</p>
-                <p className="text-xs text-gray-400">Total Price: ₹{order.total_price}</p>
-              </div>
+        <section className="space-y-4" aria-label="Marketplace orders">
+          {visibleOrders.map((order) => {
+            const status = orderStatus(order);
+            const statusIndex = statusOrder.indexOf(status);
+            const progress = status === 'cancelled' ? -1 : Math.max(0, statusIndex);
+            const quantity = quantityFor(order);
+            const total = amountFor(order);
+            const imageName = cropFor(order);
+            return (
+              <article key={order.id} className="group overflow-hidden rounded-2xl border border-[#20382b] bg-gradient-to-r from-[#111c15] via-[#0d1711] to-[#0a120d] shadow-[0_10px_35px_rgba(0,0,0,.14)] transition duration-200 hover:border-emerald-700/80 hover:shadow-[0_15px_40px_rgba(16,185,129,.06)]">
+                <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(220px,1.1fr)_minmax(170px,.8fr)_minmax(150px,.65fr)_minmax(260px,1.2fr)_auto] lg:items-center lg:gap-5">
+                  <div className="flex min-w-0 items-center gap-4">
+                    <div className="h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 sm:h-28 sm:w-28">
+                      <CommodityImage name={imageName} title={imageName} className="h-full w-full" imageClassName="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="truncate text-lg font-extrabold text-white">{imageName}</h2>
+                      <p className="mt-1 truncate text-sm text-gray-400">{order.seller_name ? `Sold by ${order.seller_name}` : 'Direct farm purchase'}</p>
+                      <span className="mt-2 inline-flex rounded-full border border-emerald-800/60 bg-emerald-950/50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-300">{order.unit || 'Produce'}</span>
+                    </div>
+                  </div>
 
-              <div className="flex items-center gap-3 text-xs text-gray-400">
-                <Truck className="w-4 h-4 text-emerald-400" />
-                <span>Status: {order.status.toUpperCase()}</span>
+                  <div className="grid grid-cols-2 gap-3 border-t border-white/[0.06] pt-3 sm:grid-cols-2 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-gray-500">Order ID</p>
+                      <p title={order.id} className="mt-1 truncate font-mono text-sm font-bold text-gray-100">{order.id.slice(0, 8).toUpperCase()}…</p>
+                      <p className="mt-3 text-[11px] text-gray-500">Order date</p>
+                      <p className="mt-1 text-xs text-gray-300">{formatDate(order.created_at)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-gray-500">Quantity</p>
+                      <p className="mt-1 text-lg font-extrabold text-white">{quantity.toLocaleString('en-IN', { maximumFractionDigits: 2 })} <span className="text-xs font-semibold text-gray-400">kg</span></p>
+                      <p className="mt-3 text-[11px] text-gray-500">Unit price</p>
+                      <p className="mt-1 text-xs font-semibold text-emerald-300">{currency(priceFor(order))}/kg</p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/[0.06] pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+                    <p className="text-[11px] text-gray-500">Total price</p>
+                    <p className="mt-1 text-2xl font-black tracking-tight text-emerald-300">{currency(total)}</p>
+                    <span className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${statusStyles(status)}`}>{statusLabel(status)}</span>
+                  </div>
+
+                  <div className="border-t border-white/[0.06] pt-4 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+                    {status === 'cancelled' ? (
+                      <div className="rounded-xl border border-rose-500/20 bg-rose-500/[0.06] p-3 text-sm text-rose-200"><XCircle className="mb-1 h-5 w-5" /> This order was cancelled.</div>
+                    ) : (
+                      <div>
+                        <div className="mb-4 flex items-center justify-between gap-2">
+                          <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide ${statusStyles(status)}`}>
+                            {status === 'delivered' ? <CheckCircle2 className="h-3.5 w-3.5" /> : status === 'in_transit' ? <Truck className="h-3.5 w-3.5" /> : status === 'processing' ? <PackageCheck className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
+                            {statusLabel(status)}
+                          </span>
+                          <span className="text-[10px] text-gray-500">{status === 'delivered' ? 'Complete' : `Step ${progress + 1} of 4`}</span>
+                        </div>
+                        <div className="flex items-start">
+                          {statusOrder.map((step, index) => {
+                            const isComplete = index < progress || status === 'delivered';
+                            const isCurrent = index === progress && status !== 'delivered';
+                            return (
+                              <React.Fragment key={step}>
+                                <div className="flex min-w-0 flex-1 flex-col items-center">
+                                  <div className={`z-10 flex h-6 w-6 items-center justify-center rounded-full border ${isComplete ? 'border-emerald-400 bg-emerald-400 text-[#062015]' : isCurrent ? 'border-emerald-300 bg-emerald-300/20 text-emerald-200 shadow-[0_0_15px_rgba(52,211,153,.22)]' : 'border-[#33483c] bg-[#101a14] text-gray-600'}`}>
+                                    {isComplete ? <CheckCircle2 className="h-4 w-4" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+                                  </div>
+                                  <span className={`mt-2 text-center text-[9px] leading-4 sm:text-[10px] ${isComplete || isCurrent ? 'font-semibold text-emerald-300' : 'text-gray-500'}`}>{['Placed', 'Confirmed', 'In transit', 'Delivered'][index]}</span>
+                                </div>
+                                {index < statusOrder.length - 1 && <div className={`mt-3 h-0.5 flex-1 ${index < progress || status === 'delivered' ? 'bg-emerald-400' : 'bg-[#293b30]'}`} />}
+                              </React.Fragment>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end border-t border-white/[0.06] pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
+                    <button type="button" onClick={() => openDetails(order)} className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/80 bg-emerald-950/35 px-4 py-3 text-sm font-bold text-emerald-100 transition hover:bg-emerald-500 hover:text-[#05140c] sm:w-auto">
+                      View details <ArrowUpRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </section>
+      )}
+
+      {selectedOrder && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="order-details-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedOrder(null); }}>
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-emerald-800/70 bg-[#0d1711] p-5 shadow-2xl sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[.15em] text-emerald-400">Order details</p>
+                <h2 id="order-details-title" className="mt-1 text-2xl font-black text-white">{cropFor(selectedOrder)}</h2>
+                <p className="mt-1 font-mono text-xs text-gray-500">{selectedOrder.id}</p>
               </div>
+              <button type="button" aria-label="Close order details" onClick={() => setSelectedOrder(null)} className="rounded-xl border border-white/10 p-2 text-gray-400 hover:bg-white/5 hover:text-white"><XCircle className="h-5 w-5" /></button>
             </div>
-          ))}
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-white/[0.06] bg-black/20 p-3"><p className="text-xs text-gray-500">Quantity</p><p className="mt-1 text-lg font-bold text-white">{quantityFor(selectedOrder).toLocaleString('en-IN', { maximumFractionDigits: 2 })} kg</p></div>
+              <div className="rounded-xl border border-white/[0.06] bg-black/20 p-3"><p className="text-xs text-gray-500">Total</p><p className="mt-1 text-lg font-bold text-emerald-300">{currency(amountFor(selectedOrder))}</p></div>
+              <div className="rounded-xl border border-white/[0.06] bg-black/20 p-3"><p className="text-xs text-gray-500">Unit price</p><p className="mt-1 text-lg font-bold text-white">{currency(priceFor(selectedOrder))}/kg</p></div>
+              <div className="rounded-xl border border-white/[0.06] bg-black/20 p-3"><p className="text-xs text-gray-500">Placed on</p><p className="mt-1 text-sm font-bold text-white">{formatDate(selectedOrder.created_at)}</p></div>
+            </div>
+            <div className="mt-3 rounded-xl border border-white/[0.06] bg-black/20 p-3">
+              <p className="text-xs text-gray-500">Order status</p>
+              <span className={`mt-2 inline-flex rounded-full border px-3 py-1.5 text-xs font-bold uppercase ${statusStyles(orderStatus(selectedOrder))}`}>{statusLabel(orderStatus(selectedOrder))}</span>
+              <p className="mt-3 text-sm text-gray-400">Seller: <span className="text-gray-200">{selectedOrder.seller_name || 'Seller details unavailable'}</span></p>
+              <p className="mt-1 break-words text-sm text-gray-400">Delivery address: <span className="text-gray-200">{selectedOrder.delivery_address || 'No delivery address recorded on this order.'}</span></p>
+              <p className="mt-1 text-sm text-gray-400">Payment: <span className="capitalize text-gray-200">{selectedOrder.payment_status || 'Not provided'}</span></p>
+            </div>
+            <button type="button" onClick={() => setSelectedOrder(null)} className="mt-5 w-full rounded-xl bg-emerald-500 px-4 py-3 font-bold text-[#06150d] transition hover:bg-emerald-400">Done</button>
+          </div>
         </div>
       )}
     </div>
