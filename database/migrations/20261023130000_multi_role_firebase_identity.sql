@@ -107,9 +107,12 @@ begin
   end if;
 
   -- Membership is additive: switching Farmer -> Buyer does not remove Farmer.
-  insert into public.profile_roles (profile_id, role)
-  values (v_profile_id, v_role)
-  on conflict (profile_id, role) do nothing;
+  -- Existing admin profiles are preserved, but admin is never a self-assignable membership.
+  if v_role = any(v_allowed_roles) then
+    insert into public.profile_roles (profile_id, role)
+    values (v_profile_id, v_role)
+    on conflict (profile_id, role) do nothing;
+  end if;
 
   if v_role = 'buyer' then
     insert into public.buyer_profiles (user_id)
