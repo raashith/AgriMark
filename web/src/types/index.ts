@@ -173,6 +173,8 @@ export interface MarketplaceOrder {
   id: string;
   listing_id: string;
   listing_title?: string;
+  crop_name?: string | null;
+  quality_grade?: string | null;
   buyer_id: string;
   buyer_name?: string;
   seller_id: string;
@@ -185,7 +187,8 @@ export interface MarketplaceOrder {
   total_price?: number;
   status: 'pending' | 'confirmed' | 'in_transit' | 'delivered' | 'cancelled';
   payment_status?: 'pending' | 'escrowed' | 'released' | 'refunded';
-  delivery_address?: string;
+  delivery_address?: string | { formatted_address?: string; [key: string]: unknown } | null;
+  cancellation_reason?: string | null;
   created_at?: string;
 }
 
