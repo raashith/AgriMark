@@ -68,6 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email: firebaseUser.email,
       phone: phone || firebaseUser.phoneNumber,
       full_name: firebaseUser.displayName,
+      avatar_url: firebaseUser.photoURL,
       requested_role: requestedRole || null,
     }, idToken);
     if (typeof window !== 'undefined') localStorage.setItem('agrimark_user', JSON.stringify(response.user));
