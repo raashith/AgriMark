@@ -58,6 +58,9 @@ begin
     raise exception 'Unsupported AgriMark role.';
   end if;
 
+  -- Serialize simultaneous login and auth-state refresh callbacks for the same UID.
+  perform pg_advisory_xact_lock(hashtextextended(p_firebase_uid, 0));
+
   select fi.profile_id into v_profile_id
   from public.firebase_identities fi
   where fi.firebase_uid = p_firebase_uid
@@ -92,7 +95,7 @@ begin
       returning profile_id into v_profile_id;
   else
     update public.profiles p
-      set full_name = coalesce(nullif(trim(p.full_name), ''), nullif(trim(p_full_name), ''), p_email),
+      set full_name = coalesce(nullif(trim(p.full_name), ''), nullif(trim(p_full_name), ''), case when p_email like '%@%' then split_part(p_email, '@', 1) else null end),
           phone = coalesce(p.phone, p_phone),
           role = v_role,
           updated_at = now()
