@@ -56,6 +56,8 @@ export default function BuyerMarketPage() {
   const getPrice = (item: Listing) => item.price_per_kg ?? item.price_per_unit ?? 0;
   const getQty = (item: Listing) => item.quantity_available_kg ?? 0;
   const getMin = (item: Listing) => item.min_order_quantity_kg ?? item.min_order_quantity ?? 1;
+  // If remaining stock is below the seller's normal minimum, allow the buyer to clear the remaining stock.
+  const getEffectiveMin = (item: Listing) => Math.min(getMin(item), getQty(item));
   const getLocation = (item: Listing) => item.location || 'Location not provided';
 
   const states = useMemo(() => ['All States', ...Array.from(new Set(items.map((item) => {
@@ -78,13 +80,13 @@ export default function BuyerMarketPage() {
 
   const openOrder = (item: Listing) => {
     setSelected(item);
-    setQuantity(getMin(item));
+    setQuantity(getEffectiveMin(item));
     setMessage('');
   };
 
   const submitOrder = async () => {
     if (!selected) return;
-    const min = getMin(selected);
+    const min = getEffectiveMin(selected);
     const max = getQty(selected);
     if (quantity < min || quantity > max) {
       setMessage(`Order between ${min} KG and ${max} KG.`);
@@ -231,7 +233,7 @@ export default function BuyerMarketPage() {
           {filtered.map((item) => {
             const name = getName(item);
             const qty = getQty(item);
-            const min = getMin(item);
+            const min = getEffectiveMin(item);
             const price = getPrice(item);
             return (
               <article key={item.id} className={`group overflow-hidden rounded-2xl border border-[#1e2d26] bg-[#121a16] transition hover:border-emerald-800/70 hover:shadow-xl ${view === 'list' ? 'flex flex-col sm:flex-row' : 'flex flex-col'}`}>
@@ -295,7 +297,7 @@ export default function BuyerMarketPage() {
             <div className="grid grid-cols-3 gap-2 text-xs">
               <div className="rounded-xl bg-[#0a0f0d] p-3"><p className="text-gray-500">Price</p><p className="mt-1 font-bold text-emerald-400">₹{getPrice(selected)}/kg</p></div>
               <div className="rounded-xl bg-[#0a0f0d] p-3"><p className="text-gray-500">Stock</p><p className="mt-1 font-bold text-white">{getQty(selected)} kg</p></div>
-              <div className="rounded-xl bg-[#0a0f0d] p-3"><p className="text-gray-500">Minimum</p><p className="mt-1 font-bold text-white">{getMin(selected)} kg</p></div>
+              <div className="rounded-xl bg-[#0a0f0d] p-3"><p className="text-gray-500">Minimum</p><p className="mt-1 font-bold text-white">{getEffectiveMin(selected)} kg</p></div>
             </div>
 
             <div className="mt-4">
