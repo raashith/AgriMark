@@ -225,7 +225,9 @@ export async function updateDeliveryAddress(
   if (!current) throw new Error('Address not found.');
 
   const updated: DeliveryAddress = { ...current, ...changes, updated_at: new Date().toISOString() };
-  if (!userId || current.user_id === 'local_user') {
+
+  // Temporary IDs and guest addresses exist only in browser storage; do not send them to PostgREST.
+  if (!userId || current.user_id === 'local_user' || addressId.startsWith('addr_')) {
     const next = existing.map((addr) => addr.id === addressId ? updated : addr);
     persistAddressesLocally(next);
     const selected = getActiveSelectedAddressSync();
@@ -252,9 +254,13 @@ export async function updateDeliveryAddress(
     .eq('id', addressId)
     .eq('user_id', userId)
     .select()
-    .single();
+    .maybeSingle();
 
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(`Could not update saved address: ${error.message}`);
+  if (!data) {
+    throw new Error('No saved database address was updated. This address may exist only in browser storage, or your signed-in account may not own it. Please add it again and save successfully before editing.');
+  }
+
   const saved = data as DeliveryAddress;
   persistAddressesLocally(existing.map((addr) => addr.id === addressId ? saved : addr));
   const selected = getActiveSelectedAddressSync();
