@@ -32,6 +32,13 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!authLoading && user && isAuthenticated) {
+      const params = new URLSearchParams(window.location.search);
+      // When arriving already signed in, honor an explicit role intent from this page.
+      const requestedRole = params.get('role');
+      if (requestedRole === 'buyer' || requestedRole === 'farmer' || requestedRole === 'fpo' || requestedRole === 'logistics') {
+        setRole(requestedRole);
+        return;
+      }
       router.replace(getRoleRoute(user.role));
     }
   }, [authLoading, user, isAuthenticated, router]);
