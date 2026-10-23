@@ -11,13 +11,14 @@ function getApiKey() {
     || '';
 }
 
-async function queryTable(table: string, select: string, order: string, limit: number) {
+async function queryTable(table: string, select: string, order: string, limit: number, extraParams: Record<string, string> = {}) {
   const key = getApiKey();
   if (!key) throw new Error('Supabase public key is missing from the Vercel production environment.');
   const url = new URL(`${SUPABASE_URL}/rest/v1/${table}`);
   url.searchParams.set('select', select);
   if (order) url.searchParams.set('order', order);
   url.searchParams.set('limit', String(limit));
+  for (const [key, value] of Object.entries(extraParams)) url.searchParams.set(key, value);
   const response = await fetch(url, {
     headers: { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' },
     cache: 'no-store',
@@ -34,12 +35,23 @@ export async function GET() {
   try {
     // Price observations are the source of truth. Lookup tables are optional
     // enrichments, so a lookup schema mismatch cannot blank the price dashboard.
-    const observations = await queryTable(
-      'national_market_price_observations',
-      'id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source',
-      'observation_date.desc,id.desc',
-      1000,
-    );
+    // Load all rows in bounded PostgREST pages instead of silently capping at 1,000.
+    const observationSelect = 'id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source';
+    const PAGE_SIZE = 1000;
+    const observations: any[] = [];
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const page = await queryTable(
+        'national_market_price_observations',
+        observationSelect,
+        'observation_date.desc,id.desc',
+        PAGE_SIZE,
+        { offset: String(offset) },
+      );
+      if (!Array.isArray(page)) throw new Error('Supabase returned an unexpected market observation payload.');
+      observations.push(...page);
+      if (page.length < PAGE_SIZE) break;
+      if (offset >= 100000) throw new Error('Stopped paging after 101,000 market rows. Narrow the API scope for larger datasets.');
+    }
     if (!Array.isArray(observations)) throw new Error('Supabase returned an unexpected market observation payload.');
     if (observations.length === 0) {
       return NextResponse.json({
@@ -49,9 +61,9 @@ export async function GET() {
     }
 
     const [commodities, states, mandis] = await Promise.allSettled([
-      queryTable('national_commodities', 'code,name', 'name.asc', 1000),
-      queryTable('national_states', 'state_code,state_name', 'state_name.asc', 100),
-      queryTable('national_mandis', 'mandi_code,mandi_name,state_code', 'mandi_name.asc', 2000),
+      queryTable('national_commodities', 'code,name', 'name.asc', 5000),
+      queryTable('national_states', 'state_code,state_name', 'state_name.asc', 1000),
+      queryTable('national_mandis', 'mandi_code,mandi_name,state_code', 'mandi_name.asc', 5000),
     ]);
     const cs = commodities.status === 'fulfilled' ? commodities.value : [];
     const ss = states.status === 'fulfilled' ? states.value : [];
