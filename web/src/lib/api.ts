@@ -159,6 +159,7 @@ export const api = {
       email?: string | null;
       phone?: string | null;
       full_name?: string | null;
+      avatar_url?: string | null;
       requested_role?: string | null;
     },
     idToken: string,
