@@ -20,9 +20,12 @@ export default function MarketPricesPage(){
    const rawRows=payload.rows||[];
    if(!rawRows.length)throw new Error(payload.error||'The market data API returned no observations.');
    S(rawRows as Row[]);
-   SC((payload.commodities||[]).map((r:any)=>({code:r.code,name:r.name})));
-   SS((payload.states||[]).map((r:any)=>({code:r.state_code,name:r.state_name})));
-   SM((payload.mandis||[]).map((r:any)=>({code:r.mandi_code,name:r.mandi_name,state_code:r.state_code})));
+   const commodityOptions=(payload.commodities||[]).map((r:any)=>({code:r.code,name:r.name}));
+   const stateOptions=(payload.states||[]).map((r:any)=>({code:r.state_code||r.code,name:r.state_name||r.name}));
+   const mandiOptions=(payload.mandis||[]).map((r:any)=>({code:r.mandi_code||r.code,name:r.mandi_name||r.name,state_code:r.state_code}));
+   SC([...new Map(commodityOptions.map((r:Opt)=>[r.code,r])).values()]);
+   SS([...new Map(stateOptions.map((r:Opt)=>[r.code,r])).values()]);
+   SM([...new Map(mandiOptions.map((r:Opt)=>[r.code,r])).values()]);
    U(new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
    if(payload.warnings?.length)E(payload.warnings.join(' '));
   }catch(e){
