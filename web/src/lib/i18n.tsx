@@ -556,6 +556,7 @@ if (process.env.NODE_ENV !== 'production') {
 // Keep original DOM copy so changing languages never translates a translation.
 // This bridges existing hard-coded labels while screens are migrated to use t(key).
 const originalTextNodes = new WeakMap<Text, string>();
+const lastTranslatedTextNodes = new WeakMap<Text, string>();
 const originalAttributes = new WeakMap<Element, Map<string, string>>();
 const translatableAttributes = ['placeholder', 'title', 'aria-label'];
 
@@ -624,7 +625,14 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const translateText = (node: Text) => {
       const parent = node.parentElement;
       if (!parent || skipTags.has(parent.tagName) || parent.closest('[data-no-translate],input,textarea,[contenteditable="true"]')) return;
-      const original = originalTextNodes.get(node) ?? node.nodeValue ?? '';
+      const currentValue = node.nodeValue ?? '';
+      const previousTranslated = lastTranslatedTextNodes.get(node);
+      if (originalTextNodes.has(node) && previousTranslated !== undefined && currentValue !== previousTranslated) {
+        // React reused this text node for new dynamic content; treat it as fresh source text.
+        originalTextNodes.set(node, currentValue);
+        lastTranslatedTextNodes.delete(node);
+      }
+      const original = originalTextNodes.get(node) ?? currentValue;
       if (!originalTextNodes.has(node)) originalTextNodes.set(node, original);
       const trimmed = original.trim();
       if (!trimmed) return;
@@ -637,6 +645,7 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const trailing = original.match(/\s*$/)?.[0] || '';
       const next = `${leading}${translated}${trailing}`;
       if (node.nodeValue !== next) node.nodeValue = next;
+      lastTranslatedTextNodes.set(node, next);
     };
 
     const translateElement = (element: Element) => {
