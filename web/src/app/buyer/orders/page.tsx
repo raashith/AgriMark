@@ -145,7 +145,7 @@ export default function BuyerOrdersPage() {
     const cropName = String(order.crop_name || '').trim();
     if (cropName) return cropName;
     const title = String(order.listing_title || '').trim();
-    if (!title || /^(fresh produce|produce lot|grade\s+[a-z0-9]+\\s+(produce|produce lot))$/i.test(title)) return 'Produce listing';
+    if (!title || /^(fresh produce|produce lot|grade\s+[a-z0-9]+\s+(produce|produce lot))$/i.test(title)) return 'Produce listing';
     return title;
   };
 
