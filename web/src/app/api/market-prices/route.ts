@@ -53,12 +53,8 @@ export async function GET() {
       if (offset >= 100000) throw new Error('Stopped paging after 101,000 market rows. Narrow the API scope for larger datasets.');
     }
     if (!Array.isArray(observations)) throw new Error('Supabase returned an unexpected market observation payload.');
-    if (observations.length === 0) {
-      return NextResponse.json({
-        ok: true, rows: [], commodities: [], states: [], mandis: [],
-        error: 'The public database query returned zero market observations. Verify the production key and SELECT policy.',
-      }, { headers: { 'Cache-Control': 'no-store' } });
-    }
+    // Do not return early when the primary table is empty: imported CSV staging
+    // rows are also a valid source for the market-price dashboard.
 
     // CSV imports are kept with the original market labels in a staging table;
     // merge them into the same read model so all imported records are visible.
