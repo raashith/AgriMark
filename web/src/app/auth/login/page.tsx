@@ -155,110 +155,111 @@ export default function LoginPage() {
             ))}
           </div>
         </div>
-        <form onSubmit={submit} className="space-y-4">
-        <div className="space-y-2">
-          <label className="block text-xs font-mono font-bold uppercase text-gray-400">Choose your workspace</label>
-          <p className="text-xs text-gray-500">One AgriMark account can have more than one role.</p>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { id: 'farmer', label: 'Farmer' },
-              { id: 'buyer', label: 'Buyer' },
-              { id: 'fpo', label: 'FPO / Co-op' },
-              { id: 'logistics', label: 'Logistics Partner' },
-            ].map((item) => (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="block text-xs font-mono font-bold uppercase text-gray-400">Choose your workspace</label>
+            <p className="text-xs text-gray-500">One AgriMark account can have more than one role.</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: 'farmer', label: 'Farmer' },
+                { id: 'buyer', label: 'Buyer' },
+                { id: 'fpo', label: 'FPO / Co-op' },
+                { id: 'logistics', label: 'Logistics Partner' },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-pressed={role === item.id}
+                  onClick={() => setRole(item.id as typeof role)}
+                  className={role === item.id
+                    ? 'p-3 rounded-xl border border-emerald-500 bg-emerald-950/80 text-emerald-300 font-semibold flex items-center justify-between'
+                    : 'p-3 rounded-xl border border-[#1e2d26] bg-[#0a0f0d] text-gray-400 font-semibold flex items-center justify-between hover:border-emerald-800'}
+                >
+                  <span>{item.label}</span>
+                  {role === item.id && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                </button>
+              ))}
+            </div>
+          </div>
+          {isAuthenticated && user ? (
+            <div className="space-y-3 rounded-2xl border border-emerald-800/60 bg-emerald-950/30 p-4">
+              <div className="text-sm font-semibold text-emerald-200">Signed in as {user.full_name || user.email || 'AgriMark user'}</div>
+              <p className="text-xs text-gray-400">Continue with this account to open the selected workspace. Your Farmer and Buyer access share one account.</p>
               <button
-                key={item.id}
                 type="button"
-                aria-pressed={role === item.id}
-                onClick={() => setRole(item.id as typeof role)}
-                className={role === item.id
-                  ? 'p-3 rounded-xl border border-emerald-500 bg-emerald-950/80 text-emerald-300 font-semibold flex items-center justify-between'
-                  : 'p-3 rounded-xl border border-[#1e2d26] bg-[#0a0f0d] text-gray-400 font-semibold flex items-center justify-between hover:border-emerald-800'}
+                onClick={continueToSelectedRole}
+                disabled={loading || authLoading}
+                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-950/80 text-white font-extrabold rounded-2xl shadow-lg transition flex items-center justify-center gap-2 text-sm"
               >
-                <span>{item.label}</span>
-                {role === item.id && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                <span>{loading ? 'Opening workspace…' : 'Continue as ' + (role === 'farmer' ? 'Farmer' : role === 'buyer' ? 'Buyer' : role === 'fpo' ? 'FPO' : 'Logistics')}</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <form onSubmit={submit} className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-xs font-mono font-bold uppercase text-gray-400">Email</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-gray-500 absolute left-3.5 top-4" />
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full pl-10 pr-4 py-3.5 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl text-white focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-mono font-bold uppercase text-gray-400">Password</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-4 text-[#0a0f0d]" />
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Your password"
+                    className="w-full pl-10 pr-4 py-3.5 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl text-white focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end -mt-2">
+                <button type="button" onClick={resetPassword} disabled={loading || authLoading} className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 hover:underline disabled:text-gray-600">
+                  Forgot password?
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || authLoading}
+                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-950/80 disabled:text-gray-500 text-white font-extrabold rounded-2xl shadow-lg transition flex items-center justify-center gap-2 text-sm"
+              >
+                <span>{loading ? 'Signing in…' : 'Sign in as ' + (role === 'farmer' ? 'Farmer' : role === 'buyer' ? 'Buyer' : role === 'fpo' ? 'FPO' : 'Logistics')}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center gap-3 text-[11px] text-gray-500">
+                <div className="h-px bg-[#1e2d26] flex-1" />
+                <span>OR</span>
+                <div className="h-px bg-[#1e2d26] flex-1" />
+              </div>
+
+              <button
+                type="button"
+                onClick={google}
+                disabled={loading || authLoading}
+                className="w-full py-4 bg-white hover:bg-gray-100 disabled:bg-gray-300 text-gray-900 font-extrabold rounded-2xl shadow-lg transition flex items-center justify-center gap-2 text-sm"
+              >
+                Continue with Google as {role === 'farmer' ? 'Farmer' : role === 'buyer' ? 'Buyer' : role === 'fpo' ? 'FPO' : 'Logistics'}
+              </button>
+            </form>
+          )}
         </div>
-        {isAuthenticated && user ? (
-          <div className="space-y-3 rounded-2xl border border-emerald-800/60 bg-emerald-950/30 p-4">
-            <div className="text-sm font-semibold text-emerald-200">Signed in as {user.full_name || user.email || 'AgriMark user'}</div>
-            <p className="text-xs text-gray-400">Continue with this account to open the selected workspace. Your Farmer and Buyer access share one account.</p>
-            <button
-              type="button"
-              onClick={continueToSelectedRole}
-              disabled={loading || authLoading}
-              className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-950/80 text-white font-extrabold rounded-2xl shadow-lg transition flex items-center justify-center gap-2 text-sm"
-            >
-              <span>{loading ? 'Opening workspace…' : 'Continue as ' + (role === 'farmer' ? 'Farmer' : role === 'buyer' ? 'Buyer' : role === 'fpo' ? 'FPO' : 'Logistics')}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <label className="block text-xs font-mono font-bold uppercase text-gray-400">Email</label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-gray-500 absolute left-3.5 top-4" />
-              <input
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full pl-10 pr-4 py-3.5 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl text-white focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="block text-xs font-mono font-bold uppercase text-gray-400">Password</label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-4" />
-              <input
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Your password"
-                className="w-full pl-10 pr-4 py-3.5 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl text-white focus:border-emerald-500 focus:outline-none"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end -mt-2">
-            <button type="button" onClick={resetPassword} disabled={loading || authLoading} className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 hover:underline disabled:text-gray-600">
-              Forgot password?
-            </button>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading || authLoading}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-950/80 disabled:text-gray-500 text-white font-extrabold rounded-2xl shadow-lg transition flex items-center justify-center gap-2 text-sm"
-          >
-            <span>{loading ? 'Signing in…' : 'Sign in as ' + (role === 'farmer' ? 'Farmer' : role === 'buyer' ? 'Buyer' : role === 'fpo' ? 'FPO' : 'Logistics')}</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
-
-          <div className="flex items-center gap-3 text-[11px] text-gray-500">
-            <div className="h-px bg-[#1e2d26] flex-1" />
-            <span>OR</span>
-            <div className="h-px bg-[#1e2d26] flex-1" />
-          </div>
-
-          <button
-            type="button"
-            onClick={google}
-            disabled={loading || authLoading}
-            className="w-full py-4 bg-white hover:bg-gray-100 disabled:bg-gray-300 text-gray-900 font-extrabold rounded-2xl shadow-lg transition flex items-center justify-center gap-2 text-sm"
-          >
-            Continue with Google as {role === 'farmer' ? 'Farmer' : role === 'buyer' ? 'Buyer' : role === 'fpo' ? 'FPO' : 'Logistics'}
-          </button>
-        </form>
-        )}
-
         <div className="pt-4 border-t border-[#1e2d26]/60 text-center text-[11px] text-gray-500 flex items-center justify-center gap-1.5">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
           <span>Secured by Firebase Authentication</span>
