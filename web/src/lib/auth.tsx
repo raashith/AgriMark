@@ -16,7 +16,8 @@ interface AuthContextType {
   sendPhoneOtp: (phone: string) => Promise<void>;
   loginWithPhoneOtp: (phone: string) => Promise<void>;
   verifyPhoneOtp: (phone: string, token: string) => Promise<UserProfile>;
-  loginWithGoogle: () => Promise<UserProfile>;
+  loginWithGoogle: (requestedRole?: UserRole) => Promise<UserProfile>;
+  activateRole: (requestedRole: UserRole) => Promise<UserProfile>;
   register: (data: any) => Promise<UserProfile>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
@@ -42,6 +43,7 @@ const AuthContext = createContext<AuthContextType>({
   loginWithPhoneOtp: async () => { throw new Error('Not initialized'); },
   verifyPhoneOtp: async () => { throw new Error('Not initialized'); },
   loginWithGoogle: async () => { throw new Error('Not initialized'); },
+  activateRole: async () => { throw new Error('Not initialized'); },
   register: async () => { throw new Error('Not initialized'); },
   logout: async () => {},
   isAuthenticated: false,
@@ -128,10 +130,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const email = String(credentials.email || credentials.phone_or_email || '').trim().toLowerCase();
       const password = String(credentials.password || '');
+      const allowedRoles: UserRole[] = ['farmer', 'buyer', 'fpo', 'logistics', 'service_provider'];
+      const requestedRole = typeof credentials.role === 'string' && allowedRoles.includes(credentials.role as UserRole)
+        ? credentials.role as UserRole
+        : null;
       if (!email || !email.includes('@')) throw new Error('Enter a valid email address.');
       if (!password) throw new Error('Enter your password.');
+      if (credentials.role && !requestedRole) throw new Error('Please choose a valid AgriMark role.');
       const result = await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
-      return await syncFirebaseUser(result.user);
+      return await syncFirebaseUser(result.user, requestedRole);
     } catch (error) {
       throw new Error(formatAuthError(error instanceof Error ? error.message : 'Unable to authenticate.'));
     } finally {
@@ -149,18 +156,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithPhoneOtp = sendPhoneOtp;
 
-  const loginWithGoogle = async (): Promise<UserProfile> => {
+  const loginWithGoogle = async (requestedRole: UserRole = 'farmer'): Promise<UserProfile> => {
     setIsLoading(true);
     try {
+      const allowedRoles: UserRole[] = ['farmer', 'buyer', 'fpo', 'logistics', 'service_provider'];
+      if (!allowedRoles.includes(requestedRole)) throw new Error('Please choose a valid AgriMark role.');
       const provider = getGoogleProvider();
       provider.addScope('openid');
       provider.addScope('email');
       provider.addScope('profile');
       provider.addScope('https://www.googleapis.com/auth/userinfo.email');
+      if (typeof provider.setCustomParameters === 'function') {
+        provider.setCustomParameters({ prompt: 'select_account' });
+      }
       const result = await signInWithPopup(getFirebaseAuth(), provider);
-      return await syncFirebaseUser(result.user, 'farmer');
+      return await syncFirebaseUser(result.user, requestedRole);
     } catch (error) {
       throw new Error(formatAuthError(error instanceof Error ? error.message : 'Google sign-in failed.'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const activateRole = async (requestedRole: UserRole): Promise<UserProfile> => {
+    setIsLoading(true);
+    try {
+      const allowedRoles: UserRole[] = ['farmer', 'buyer', 'fpo', 'logistics', 'service_provider'];
+      if (!allowedRoles.includes(requestedRole)) throw new Error('Please choose a valid AgriMark role.');
+      const currentUser = getFirebaseAuth().currentUser;
+      if (!currentUser) throw new Error('Your session has expired. Please sign in again.');
+      return await syncFirebaseUser(currentUser, requestedRole);
+    } catch (error) {
+      throw new Error(formatAuthError(error instanceof Error ? error.message : 'Unable to change workspace.'));
     } finally {
       setIsLoading(false);
     }
@@ -169,16 +196,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (data: any): Promise<UserProfile> => {
     setIsLoading(true);
     try {
-      if (data.role === 'admin') throw new Error('Self-registration as admin is prohibited.');
+      const allowedRoles: UserRole[] = ['farmer', 'buyer', 'fpo', 'logistics', 'service_provider'];
+      const requestedRole = typeof data.role === 'string' && allowedRoles.includes(data.role as UserRole)
+        ? data.role as UserRole
+        : null;
+      if (!requestedRole) {
+        if (data.role === 'admin') throw new Error('Self-registration as admin is prohibited.');
+        throw new Error('Please choose a valid AgriMark role.');
+      }
       const email = String(data.email || '').trim().toLowerCase();
       const password = String(data.password || '');
       if (!email || !email.includes('@')) throw new Error('Enter a valid email address.');
       if (password.length < 6) throw new Error('Password must contain at least 6 characters.');
 
-      const result = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
-      const displayName = String(data.full_name || '').trim();
-      if (displayName) await updateProfile(result.user, { displayName });
-      return await syncFirebaseUser(result.user, data.role || 'farmer', data.phone || data.phone_number || null);
+      let firebaseUser: User;
+      try {
+        firebaseUser = (await createUserWithEmailAndPassword(getFirebaseAuth(), email, password)).user;
+        const displayName = String(data.full_name || '').trim();
+        if (displayName && !firebaseUser.displayName) await updateProfile(firebaseUser, { displayName });
+      } catch (error) {
+        const code = error && typeof error === 'object' && 'code' in error
+          ? String((error as { code?: unknown }).code)
+          : '';
+        if (code !== 'auth/email-already-in-use') throw error;
+
+        // Authenticate with the existing credentials and reuse the same identity/profile.
+        try {
+          firebaseUser = (await signInWithEmailAndPassword(getFirebaseAuth(), email, password)).user;
+          const displayName = String(data.full_name || '').trim();
+          if (displayName && !firebaseUser.displayName) await updateProfile(firebaseUser, { displayName });
+        } catch {
+          throw new Error('This email already has an AgriMark account. Use its existing password to add another role, or choose “Continue with Google” if the account was created with Google.');
+        }
+      }
+
+      return await syncFirebaseUser(firebaseUser, requestedRole, data.phone || data.phone_number || null);
+    } catch (error) {
+      throw new Error(formatAuthError(error instanceof Error ? error.message : 'Registration failed.'));
     } finally {
       setIsLoading(false);
     }
@@ -234,6 +288,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginWithPhoneOtp,
         verifyPhoneOtp,
         loginWithGoogle,
+        activateRole,
         register,
         logout,
         isAuthenticated: !!user,

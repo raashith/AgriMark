@@ -1,7 +1,5 @@
 import logging
 
-from uuid import uuid4
-
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
@@ -46,7 +44,12 @@ def sync_firebase_profile(request: FirebaseSyncRequest):
         )
 
     allowed_roles = {"farmer", "buyer", "fpo", "logistics", "service_provider"}
-    role = request.requested_role if request.requested_role in allowed_roles else "farmer"
+    role = request.requested_role if request.requested_role in allowed_roles else None
+    if request.requested_role is not None and role is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported AgriMark role.",
+        )
 
     email = request.email or decoded.get("email")
     phone = request.phone or decoded.get("phone_number")

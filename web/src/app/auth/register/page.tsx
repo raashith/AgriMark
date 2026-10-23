@@ -25,7 +25,7 @@ export default function RegisterPage() {
   const formatRegistrationError = (message: string) => {
     const normalized = message.toLowerCase();
     if (normalized.includes('email-already-in-use') || normalized.includes('email already in use')) {
-      return 'An account with this email already exists. Please use Log in instead, or reset your password if you do not remember it.';
+      return 'This email already has an account. Use its existing password to add another role, or choose Google if the account was created with Google.';
     }
     if (normalized.includes('weak-password')) {
       return 'Choose a stronger password with at least 6 characters.';
@@ -81,8 +81,8 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const user = await loginWithGoogle();
-      router.push(routeForRole(user.role));
+      const user = await loginWithGoogle(role);
+      router.push(routeForRole(role || user.role));
     } catch (err: any) {
       setError(String(err?.message || 'Google sign-in failed.'));
     } finally {
@@ -116,6 +116,7 @@ export default function RegisterPage() {
                 key={item.id}
                 type="button"
                 onClick={() => setRole(item.id as UserRole)}
+                aria-pressed={role === item.id}
                 className={`p-3 rounded-xl border text-sm font-semibold flex items-center justify-between transition ${role === item.id ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300' : 'bg-[#0a0f0d] border-[#1e2d26] text-gray-400 hover:border-gray-700'}`}
               >
                 <span>{item.label}</span>
