@@ -5,9 +5,11 @@ import { useI18n } from '@/lib/i18n';
 import { api } from '@/lib/api';
 import { MarketplaceOrder } from '@/types';
 import { CommodityImage } from '@/components/ui/CommodityImage';
+import { useToast } from '@/components/ui/Toast';
 import {
   ShoppingBag, Truck, CheckCircle2, Clock, Search, PackageCheck,
   SlidersHorizontal, XCircle, ClipboardList, ArrowUpRight, RefreshCw,
+  MapPin, Pencil, Save, Ban,
 } from 'lucide-react';
 
 type OrderFilter = 'all' | 'pending' | 'processing' | 'in_transit' | 'delivered' | 'cancelled';
@@ -53,14 +55,50 @@ function currency(value: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value || 0);
 }
 
+function addressText(value: MarketplaceOrder['delivery_address']): string {
+  if (!value) return '';
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object') return addressText(parsed as MarketplaceOrder['delivery_address']);
+    } catch {}
+    return trimmed;
+  }
+  if (typeof value !== 'object') return '';
+  if (typeof value.formatted_address === 'string') return value.formatted_address;
+  const fields = ['full_name', 'phone', 'house_number', 'street', 'area', 'landmark', 'city', 'state', 'postal_code'];
+  return fields
+    .map((key) => value[key])
+    .filter((part): part is string => typeof part === 'string' && Boolean(part.trim()))
+    .join(', ');
+}
+
+function canEditDeliveryAddress(order: MarketplaceOrder): boolean {
+  const raw = String(order.status || '').toLowerCase().replace(/[\s-]+/g, '_');
+  return !['dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivered', 'cancelled', 'canceled', 'rejected'].includes(raw);
+}
+
+function canCancelOrder(order: MarketplaceOrder): boolean {
+  const raw = String(order.status || '').toLowerCase().replace(/[\s-]+/g, '_');
+  return raw === 'placed';
+}
+
 export default function BuyerOrdersPage() {
   const { t } = useI18n();
+  const { showSuccess, showError } = useToast();
   const [orders, setOrders] = useState<MarketplaceOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<OrderFilter>('all');
   const [selectedOrder, setSelectedOrder] = useState<MarketplaceOrder | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [addressDraft, setAddressDraft] = useState('');
+  const [savingAddress, setSavingAddress] = useState(false);
+  const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [cancellingOrder, setCancellingOrder] = useState(false);
 
   const fetchOrders = async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
@@ -103,9 +141,65 @@ export default function BuyerOrdersPage() {
   const amountFor = (order: MarketplaceOrder) => Number(order.total_price ?? order.total_amount ?? 0);
   const quantityFor = (order: MarketplaceOrder) => Number(order.quantity_kg ?? order.quantity ?? 0);
   const priceFor = (order: MarketplaceOrder) => Number(order.unit_price || (quantityFor(order) ? amountFor(order) / quantityFor(order) : 0));
-  const cropFor = (order: MarketplaceOrder) => order.listing_title || 'Fresh Produce';
+  const cropFor = (order: MarketplaceOrder) => {
+    const cropName = String(order.crop_name || '').trim();
+    if (cropName) return cropName;
+    const title = String(order.listing_title || '').trim();
+    if (!title || /^(fresh produce|produce lot|grade\s+[a-z0-9]+\s+(produce|produce lot))$/i.test(title)) return 'Produce listing';
+    return title;
+  };
 
-  const openDetails = (order: MarketplaceOrder) => setSelectedOrder(order);
+  const openDetails = (order: MarketplaceOrder) => {
+    setSelectedOrder(order);
+    setAddressDraft(addressText(order.delivery_address));
+    setEditingAddress(false);
+    setCancelConfirm(false);
+  };
+
+  const saveAddress = async () => {
+    if (!selectedOrder) return;
+    const normalized = addressDraft.trim();
+    if (normalized.length < 5) {
+      showError('Delivery address is required', 'Enter a complete address before saving.');
+      return;
+    }
+    setSavingAddress(true);
+    try {
+      const updated = await api.updateOrderAddress(selectedOrder.id, normalized);
+      const savedAddress = updated.delivery_address ?? { formatted_address: normalized };
+      setOrders((current) => current.map((order) => order.id === selectedOrder.id ? { ...order, delivery_address: savedAddress } : order));
+      setSelectedOrder((current) => current && current.id === selectedOrder.id ? { ...current, delivery_address: savedAddress } : current);
+      setAddressDraft(addressText(savedAddress));
+      setEditingAddress(false);
+      showSuccess('Delivery address updated', 'The new address has been saved to this order.');
+    } catch (error) {
+      showError('Unable to update address', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setSavingAddress(false);
+    }
+  };
+
+  const cancelSelectedOrder = async () => {
+    if (!selectedOrder) return;
+    setCancellingOrder(true);
+    try {
+      const updated = await api.cancelOrder(selectedOrder.id, 'Cancelled by buyer');
+      const cancelled: MarketplaceOrder = {
+        ...selectedOrder,
+        status: updated.status || 'cancelled',
+        cancellation_reason: updated.cancellation_reason || 'Cancelled by buyer',
+      };
+      setOrders((current) => current.map((order) => order.id === selectedOrder.id ? { ...order, ...cancelled } : order));
+      setSelectedOrder(cancelled);
+      setCancelConfirm(false);
+      showSuccess('Order cancelled', 'The reserved quantity has been returned to available inventory.');
+      void fetchOrders(true);
+    } catch (error) {
+      showError('Unable to cancel order', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setCancellingOrder(false);
+    }
+  };
 
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-6 pb-8">
@@ -206,7 +300,7 @@ export default function BuyerOrdersPage() {
                     <div className="min-w-0">
                       <h2 className="truncate text-lg font-extrabold text-white">{imageName}</h2>
                       <p className="mt-1 truncate text-sm text-gray-400">{order.seller_name ? `Sold by ${order.seller_name}` : 'Direct farm purchase'}</p>
-                      <span className="mt-2 inline-flex rounded-full border border-emerald-800/60 bg-emerald-950/50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-300">{order.unit || 'Produce'}</span>
+                      <span className="mt-2 inline-flex rounded-full border border-emerald-800/60 bg-emerald-950/50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-300">{order.quality_grade || order.unit || 'Produce listing'}</span>
                     </div>
                   </div>
 
@@ -287,7 +381,11 @@ export default function BuyerOrdersPage() {
               </div>
               <button type="button" aria-label="Close order details" onClick={() => setSelectedOrder(null)} className="rounded-xl border border-white/10 p-2 text-gray-400 hover:bg-white/5 hover:text-white"><XCircle className="h-5 w-5" /></button>
             </div>
-            <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="mt-5 overflow-hidden rounded-2xl border border-white/[0.06] bg-black/20">
+              <CommodityImage name={cropFor(selectedOrder)} title={cropFor(selectedOrder)} className="h-36 w-full" imageClassName="h-36 w-full object-cover" />
+              <div className="px-3 py-2 text-sm font-bold text-gray-200">{cropFor(selectedOrder)}{selectedOrder.quality_grade ? ` · ${selectedOrder.quality_grade}` : ''}</div>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-3">
               <div className="rounded-xl border border-white/[0.06] bg-black/20 p-3"><p className="text-xs text-gray-500">Quantity</p><p className="mt-1 text-lg font-bold text-white">{quantityFor(selectedOrder).toLocaleString('en-IN', { maximumFractionDigits: 2 })} kg</p></div>
               <div className="rounded-xl border border-white/[0.06] bg-black/20 p-3"><p className="text-xs text-gray-500">Total</p><p className="mt-1 text-lg font-bold text-emerald-300">{currency(amountFor(selectedOrder))}</p></div>
               <div className="rounded-xl border border-white/[0.06] bg-black/20 p-3"><p className="text-xs text-gray-500">Unit price</p><p className="mt-1 text-lg font-bold text-white">{currency(priceFor(selectedOrder))}/kg</p></div>
@@ -297,10 +395,52 @@ export default function BuyerOrdersPage() {
               <p className="text-xs text-gray-500">Order status</p>
               <span className={`mt-2 inline-flex rounded-full border px-3 py-1.5 text-xs font-bold uppercase ${statusStyles(orderStatus(selectedOrder))}`}>{statusLabel(orderStatus(selectedOrder))}</span>
               <p className="mt-3 text-sm text-gray-400">Seller: <span className="text-gray-200">{selectedOrder.seller_name || 'Seller details unavailable'}</span></p>
-              <p className="mt-1 break-words text-sm text-gray-400">Delivery address: <span className="text-gray-200">{selectedOrder.delivery_address || 'No delivery address recorded on this order.'}</span></p>
-              <p className="mt-1 text-sm text-gray-400">Payment: <span className="capitalize text-gray-200">{selectedOrder.payment_status || 'Not provided'}</span></p>
+              <div className="mt-2 rounded-xl border border-white/[0.06] bg-[#08110c] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400"><MapPin className="h-4 w-4 text-emerald-400" /> Delivery address</p>
+                  {!editingAddress && canEditDeliveryAddress(selectedOrder) && (
+                    <button type="button" onClick={() => { setAddressDraft(addressText(selectedOrder.delivery_address)); setEditingAddress(true); setCancelConfirm(false); }} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-800/70 px-2.5 py-1.5 text-xs font-bold text-emerald-200 hover:bg-emerald-950/70">
+                      <Pencil className="h-3.5 w-3.5" /> Edit
+                    </button>
+                  )}
+                </div>
+                {editingAddress ? (
+                  <div className="mt-3 space-y-2">
+                    <textarea value={addressDraft} onChange={(event) => setAddressDraft(event.target.value)} rows={4} maxLength={1000} autoFocus placeholder="Enter full delivery address, landmark, town, district and PIN code" className="w-full resize-y rounded-xl border border-emerald-800/70 bg-[#050b07] p-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-emerald-400" />
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => { setEditingAddress(false); setAddressDraft(addressText(selectedOrder.delivery_address)); }} disabled={savingAddress} className="flex-1 rounded-xl border border-white/10 px-3 py-2.5 text-sm font-semibold text-gray-300 hover:bg-white/5 disabled:opacity-60">Discard</button>
+                      <button type="button" onClick={() => void saveAddress()} disabled={savingAddress || addressDraft.trim().length < 5} className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-3 py-2.5 text-sm font-bold text-[#06150d] hover:bg-emerald-400 disabled:opacity-60">
+                        <Save className="h-4 w-4" /> {savingAddress ? 'Saving…' : 'Save address'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-2 whitespace-pre-line break-words text-sm text-gray-200">{addressText(selectedOrder.delivery_address) || 'No delivery address saved yet. Choose Edit to add one.'}</p>
+                )}
+              </div>
+              <p className="mt-3 text-sm text-gray-400">Payment: <span className="capitalize text-gray-200">{selectedOrder.payment_status || 'Not provided'}</span></p>
+              {selectedOrder.cancellation_reason && <p className="mt-2 text-sm text-rose-300">Cancellation note: {selectedOrder.cancellation_reason}</p>}
             </div>
-            <button type="button" onClick={() => setSelectedOrder(null)} className="mt-5 w-full rounded-xl bg-emerald-500 px-4 py-3 font-bold text-[#06150d] transition hover:bg-emerald-400">Done</button>
+            {cancelConfirm && (
+              <div className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/[0.07] p-3">
+                <p className="text-sm font-bold text-rose-100">Cancel this order?</p>
+                <p className="mt-1 text-xs leading-5 text-rose-100/70">This can only be done before the seller accepts it. The reserved stock will be returned to inventory.</p>
+                <div className="mt-3 flex gap-2">
+                  <button type="button" onClick={() => setCancelConfirm(false)} disabled={cancellingOrder} className="flex-1 rounded-xl border border-white/10 px-3 py-2.5 text-sm font-semibold text-gray-300 hover:bg-white/5 disabled:opacity-60">Keep order</button>
+                  <button type="button" onClick={() => void cancelSelectedOrder()} disabled={cancellingOrder} className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-rose-500 disabled:opacity-60">
+                    <Ban className="h-4 w-4" /> {cancellingOrder ? 'Cancelling…' : 'Confirm cancel'}
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {canCancelOrder(selectedOrder) && !cancelConfirm && (
+                <button type="button" onClick={() => { setCancelConfirm(true); setEditingAddress(false); }} className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-500/50 px-4 py-3 font-bold text-rose-200 transition hover:bg-rose-500/10">
+                  <Ban className="h-4 w-4" /> Cancel order
+                </button>
+              )}
+              <button type="button" onClick={() => { setSelectedOrder(null); setEditingAddress(false); setCancelConfirm(false); }} className="rounded-xl bg-emerald-500 px-4 py-3 font-bold text-[#06150d] transition hover:bg-emerald-400">Done</button>
+            </div>
           </div>
         </div>
       )}

@@ -305,6 +305,16 @@ export const api = {
       body: JSON.stringify(data),
     }),
   getOrders: () => request<MarketplaceOrder[]>('/marketplace/orders'),
+  updateOrderAddress: (orderId: string, deliveryAddress: string) =>
+    request<MarketplaceOrder>(`/marketplace/orders/${encodeURIComponent(orderId)}/address`, {
+      method: 'PATCH',
+      body: JSON.stringify({ delivery_address: deliveryAddress }),
+    }),
+  cancelOrder: (orderId: string, reason?: string) =>
+    request<MarketplaceOrder>(`/marketplace/orders/${encodeURIComponent(orderId)}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason || 'Cancelled by buyer' }),
+    }),
   createRFQ: (data: any) =>
     request<any>('/marketplace/rfqs', {
       method: 'POST',
