@@ -552,6 +552,42 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
+
+// Keep original DOM copy so changing languages never translates a translation.
+// This bridges existing hard-coded labels while screens are migrated to use t(key).
+const originalTextNodes = new WeakMap<Text, string>();
+const lastTranslatedTextNodes = new WeakMap<Text, string>();
+const originalAttributes = new WeakMap<Element, Map<string, string>>();
+const translatableAttributes = ['placeholder', 'title', 'aria-label'];
+
+function getPhraseMap(language: Language): Map<string, string> {
+  const phraseMap = new Map<string, string>();
+  const english = translations.en;
+  const localized = translations[language] || english;
+  Object.keys(english).forEach((key) => {
+    const source = english[key]?.trim();
+    const target = localized[key]?.trim();
+    if (source && target && source !== target) phraseMap.set(source, target);
+  });
+  // Common labels that appear throughout screens but were not consistently
+  // using the translation hook yet. Keep exact-match translation to avoid
+  // altering names, addresses, product descriptions, or other user content.
+  const extra: Record<Language, Record<string, string>> = {
+    en: {},
+    ta: { 'Dashboard': 'முகப்பு', 'Settings': 'அமைப்புகள்', 'Search': 'தேடுக', 'Refresh': 'புதுப்பி', 'Save': 'சேமி', 'Edit': 'திருத்து', 'Delete': 'நீக்கு', 'Back': 'பின் செல்ல', 'Next': 'அடுத்து', 'Previous': 'முந்தைய', 'Submit': 'சமர்ப்பி', 'Cancel': 'ரத்து செய்', 'Close': 'மூடு', 'Loading...': 'ஏற்றப்படுகிறது...', 'No records found': 'பதிவுகள் எதுவும் இல்லை', 'No data available': 'தரவு கிடைக்கவில்லை', 'Status': 'நிலை', 'Actions': 'செயல்கள்', 'View details': 'விவரங்களைப் பார்க்க', 'View all': 'அனைத்தையும் பார்க்க', 'Notifications': 'அறிவிப்புகள்', 'Select Language': 'மொழியைத் தேர்ந்தெடுக்கவும்', 'English': 'ஆங்கிலம்', 'Orders': 'ஆர்டர்கள்', 'Market': 'சந்தை', 'Home': 'முகப்பு', 'Profile': 'சுயவிவரம்', 'Logout': 'வெளியேறு' },
+    hi: { 'Dashboard': 'डैशबोर्ड', 'Settings': 'सेटिंग्स', 'Search': 'खोजें', 'Refresh': 'रीफ़्रेश करें', 'Save': 'सहेजें', 'Edit': 'संपादित करें', 'Delete': 'हटाएँ', 'Back': 'वापस', 'Next': 'अगला', 'Previous': 'पिछला', 'Submit': 'जमा करें', 'Cancel': 'रद्द करें', 'Close': 'बंद करें', 'Loading...': 'लोड हो रहा है...', 'No records found': 'कोई रिकॉर्ड नहीं मिला', 'No data available': 'कोई डेटा उपलब्ध नहीं है', 'Status': 'स्थिति', 'Actions': 'कार्रवाई', 'View details': 'विवरण देखें', 'View all': 'सभी देखें', 'Notifications': 'सूचनाएँ', 'Select Language': 'भाषा चुनें', 'English': 'अंग्रेज़ी', 'Orders': 'ऑर्डर', 'Market': 'बाज़ार', 'Home': 'होम', 'Profile': 'प्रोफ़ाइल', 'Logout': 'लॉग आउट' },
+    te: { 'Dashboard': 'డాష్‌బోర్డ్', 'Settings': 'సెట్టింగ్‌లు', 'Search': 'వెతకండి', 'Refresh': 'రిఫ్రెష్', 'Save': 'సేవ్ చేయండి', 'Edit': 'సవరించండి', 'Delete': 'తొలగించండి', 'Back': 'వెనక్కి', 'Next': 'తదుపరి', 'Previous': 'మునుపటి', 'Submit': 'సమర్పించండి', 'Cancel': 'రద్దు చేయండి', 'Close': 'మూసివేయండి', 'Loading...': 'లోడ్ అవుతోంది...', 'No records found': 'రికార్డులు కనబడలేదు', 'No data available': 'డేటా అందుబాటులో లేదు', 'Status': 'స్థితి', 'Actions': 'చర్యలు', 'View details': 'వివరాలు చూడండి', 'View all': 'అన్నీ చూడండి', 'Notifications': 'నోటిఫికేషన్‌లు', 'Select Language': 'భాషను ఎంచుకోండి', 'English': 'ఆంగ్లం', 'Orders': 'ఆర్డర్‌లు', 'Market': 'మార్కెట్', 'Home': 'హోమ్', 'Profile': 'ప్రొఫైల్', 'Logout': 'లాగ్ అవుట్' },
+    kn: { 'Dashboard': 'ಡ್ಯಾಶ್‌ಬೋರ್ಡ್', 'Settings': 'ಸೆಟ್ಟಿಂಗ್‌ಗಳು', 'Search': 'ಹುಡುಕಿ', 'Refresh': 'ರಿಫ್ರೆಶ್', 'Save': 'ಉಳಿಸಿ', 'Edit': 'ತಿದ್ದು', 'Delete': 'ಅಳಿಸಿ', 'Back': 'ಹಿಂದಕ್ಕೆ', 'Next': 'ಮುಂದೆ', 'Previous': 'ಹಿಂದಿನ', 'Submit': 'ಸಲ್ಲಿಸಿ', 'Cancel': 'ರದ್ದುಮಾಡಿ', 'Close': 'ಮುಚ್ಚಿ', 'Loading...': 'ಲೋಡ್ ಆಗುತ್ತಿದೆ...', 'No records found': 'ಯಾವುದೇ ದಾಖಲೆಗಳು ಕಂಡುಬಂದಿಲ್ಲ', 'No data available': 'ಡೇಟಾ ಲಭ್ಯವಿಲ್ಲ', 'Status': 'ಸ್ಥಿತಿ', 'Actions': 'ಕ್ರಿಯೆಗಳು', 'View details': 'ವಿವರಗಳನ್ನು ನೋಡಿ', 'View all': 'ಎಲ್ಲವನ್ನೂ ನೋಡಿ', 'Notifications': 'ಅಧಿಸೂಚನೆಗಳು', 'Select Language': 'ಭಾಷೆ ಆಯ್ಕೆಮಾಡಿ', 'English': 'ಇಂಗ್ಲಿಷ್', 'Orders': 'ಆರ್ಡರ್‌ಗಳು', 'Market': 'ಮಾರುಕಟ್ಟೆ', 'Home': 'ಮುಖಪುಟ', 'Profile': 'ಪ್ರೊಫೈಲ್', 'Logout': 'ಲಾಗ್ ಔಟ್' },
+    ml: { 'Dashboard': 'ഡാഷ്ബോർഡ്', 'Settings': 'ക്രമീകരണങ്ങൾ', 'Search': 'തിരയുക', 'Refresh': 'പുതുക്കുക', 'Save': 'സേവ് ചെയ്യുക', 'Edit': 'തിരുത്തുക', 'Delete': 'ഇല്ലാതാക്കുക', 'Back': 'തിരികെ', 'Next': 'അടുത്തത്', 'Previous': 'മുമ്പത്തേത്', 'Submit': 'സമർപ്പിക്കുക', 'Cancel': 'റദ്ദാക്കുക', 'Close': 'അടയ്ക്കുക', 'Loading...': 'ലോഡുചെയ്യുന്നു...', 'No records found': 'രേഖകളൊന്നും കണ്ടെത്തിയില്ല', 'No data available': 'ഡാറ്റ ലഭ്യമല്ല', 'Status': 'സ്ഥിതി', 'Actions': 'നടപടികൾ', 'View details': 'വിശദാംശങ്ങൾ കാണുക', 'View all': 'എല്ലാം കാണുക', 'Notifications': 'അറിയിപ്പുകൾ', 'Select Language': 'ഭാഷ തിരഞ്ഞെടുക്കുക', 'English': 'ഇംഗ്ലീഷ്', 'Orders': 'ഓർഡറുകൾ', 'Market': 'വിപണി', 'Home': 'ഹോം', 'Profile': 'പ്രൊഫൈൽ', 'Logout': 'ലോഗ് ഔട്ട്' },
+    mr: { 'Dashboard': 'डॅशबोर्ड', 'Settings': 'सेटिंग्ज', 'Search': 'शोधा', 'Refresh': 'रिफ्रेश करा', 'Save': 'जतन करा', 'Edit': 'संपादित करा', 'Delete': 'हटवा', 'Back': 'मागे', 'Next': 'पुढे', 'Previous': 'मागील', 'Submit': 'सबमिट करा', 'Cancel': 'रद्द करा', 'Close': 'बंद करा', 'Loading...': 'लोड होत आहे...', 'No records found': 'कोणतीही नोंद सापडली नाही', 'No data available': 'डेटा उपलब्ध नाही', 'Status': 'स्थिती', 'Actions': 'कृती', 'View details': 'तपशील पहा', 'View all': 'सर्व पहा', 'Notifications': 'सूचना', 'Select Language': 'भाषा निवडा', 'English': 'इंग्रजी', 'Orders': 'ऑर्डर्स', 'Market': 'बाजार', 'Home': 'मुख्यपृष्ठ', 'Profile': 'प्रोफाइल', 'Logout': 'लॉग आउट' },
+    bn: { 'Dashboard': 'ড্যাশবোর্ড', 'Settings': 'সেটিংস', 'Search': 'খুঁজুন', 'Refresh': 'রিফ্রেশ', 'Save': 'সংরক্ষণ করুন', 'Edit': 'সম্পাদনা', 'Delete': 'মুছুন', 'Back': 'ফিরে যান', 'Next': 'পরবর্তী', 'Previous': 'আগের', 'Submit': 'জমা দিন', 'Cancel': 'বাতিল', 'Close': 'বন্ধ করুন', 'Loading...': 'লোড হচ্ছে...', 'No records found': 'কোনও রেকর্ড পাওয়া যায়নি', 'No data available': 'কোনও ডেটা নেই', 'Status': 'অবস্থা', 'Actions': 'কার্যকলাপ', 'View details': 'বিস্তারিত দেখুন', 'View all': 'সব দেখুন', 'Notifications': 'বিজ্ঞপ্তি', 'Select Language': 'ভাষা নির্বাচন করুন', 'English': 'ইংরেজি', 'Orders': 'অর্ডার', 'Market': 'বাজার', 'Home': 'হোম', 'Profile': 'প্রোফাইল', 'Logout': 'লগ আউট' },
+    gu: { 'Dashboard': 'ડેશબોર્ડ', 'Settings': 'સેટિંગ્સ', 'Search': 'શોધો', 'Refresh': 'રિફ્રેશ કરો', 'Save': 'સાચવો', 'Edit': 'ફેરફાર કરો', 'Delete': 'કાઢી નાખો', 'Back': 'પાછળ', 'Next': 'આગળ', 'Previous': 'પહેલાંનું', 'Submit': 'સબમિટ કરો', 'Cancel': 'રદ કરો', 'Close': 'બંધ કરો', 'Loading...': 'લોડ થઈ રહ્યું છે...', 'No records found': 'કોઈ રેકોર્ડ મળ્યો નથી', 'No data available': 'ડેટા ઉપલબ્ધ નથી', 'Status': 'સ્થિતિ', 'Actions': 'ક્રિયાઓ', 'View details': 'વિગતો જુઓ', 'View all': 'બધું જુઓ', 'Notifications': 'સૂચનાઓ', 'Select Language': 'ભાષા પસંદ કરો', 'English': 'અંગ્રેજી', 'Orders': 'ઓર્ડર', 'Market': 'બજાર', 'Home': 'હોમ', 'Profile': 'પ્રોફાઇલ', 'Logout': 'લૉગ આઉટ' },
+    pa: { 'Dashboard': 'ਡੈਸ਼ਬੋਰਡ', 'Settings': 'ਸੈਟਿੰਗਾਂ', 'Search': 'ਖੋਜੋ', 'Refresh': 'ਤਾਜ਼ਾ ਕਰੋ', 'Save': 'ਸੰਭਾਲੋ', 'Edit': 'ਸੋਧੋ', 'Delete': 'ਮਿਟਾਓ', 'Back': 'ਪਿੱਛੇ', 'Next': 'ਅੱਗੇ', 'Previous': 'ਪਿਛਲਾ', 'Submit': 'ਜਮ੍ਹਾਂ ਕਰੋ', 'Cancel': 'ਰੱਦ ਕਰੋ', 'Close': 'ਬੰਦ ਕਰੋ', 'Loading...': 'ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ...', 'No records found': 'ਕੋਈ ਰਿਕਾਰਡ ਨਹੀਂ ਮਿਲਿਆ', 'No data available': 'ਕੋਈ ਡੇਟਾ ਉਪਲਬਧ ਨਹੀਂ', 'Status': 'ਸਥਿਤੀ', 'Actions': 'ਕਾਰਵਾਈਆਂ', 'View details': 'ਵੇਰਵੇ ਵੇਖੋ', 'View all': 'ਸਭ ਵੇਖੋ', 'Notifications': 'ਸੂਚਨਾਵਾਂ', 'Select Language': 'ਭਾਸ਼ਾ ਚੁਣੋ', 'English': 'ਅੰਗਰੇਜ਼ੀ', 'Orders': 'ਆਰਡਰ', 'Market': 'ਬਾਜ਼ਾਰ', 'Home': 'ਘਰ', 'Profile': 'ਪ੍ਰੋਫਾਈਲ', 'Logout': 'ਲੌਗ ਆਉਟ' },
+  };
+  Object.entries(extra[language] || {}).forEach(([source, target]) => phraseMap.set(source, target));
+  return phraseMap;
+}
+
 interface I18nContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
@@ -568,24 +604,100 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [language, setLanguageState] = useState<Language>('en');
 
   useEffect(() => {
-    const saved = localStorage.getItem('agrimark_lang') as Language | null;
-    const validCodes = SUPPORTED_LANGUAGES.map((l) => l.code);
-    if (saved && validCodes.includes(saved)) {
-      setLanguageState(saved);
-    } else {
-      setLanguageState('en');
-    }
+    const validCodes = SUPPORTED_LANGUAGES.map((item) => item.code);
+    const applySavedLanguage = () => {
+      const saved = localStorage.getItem('agrimark_lang') as Language | null;
+      setLanguageState(saved && validCodes.includes(saved) ? saved : 'en');
+    };
+    applySavedLanguage();
+    window.addEventListener('storage', applySavedLanguage);
+    return () => window.removeEventListener('storage', applySavedLanguage);
   }, []);
 
+  // Apply exact-match translations across the rendered app, including existing
+  // screens whose labels have not yet been migrated to use the t() hook.
+  useEffect(() => {
+    document.documentElement.lang = language;
+    const phrases = getPhraseMap(language);
+    const skipTags = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'CODE', 'PRE', 'TEXTAREA']);
+    let translating = false;
+
+    const translateText = (node: Text) => {
+      const parent = node.parentElement;
+      if (!parent || skipTags.has(parent.tagName) || parent.closest('[data-no-translate],input,textarea,[contenteditable="true"]')) return;
+      const currentValue = node.nodeValue ?? '';
+      const previousTranslated = lastTranslatedTextNodes.get(node);
+      if (originalTextNodes.has(node) && previousTranslated !== undefined && currentValue !== previousTranslated) {
+        // React reused this text node for new dynamic content; treat it as fresh source text.
+        originalTextNodes.set(node, currentValue);
+        lastTranslatedTextNodes.delete(node);
+      }
+      const original = originalTextNodes.get(node) ?? currentValue;
+      if (!originalTextNodes.has(node)) originalTextNodes.set(node, original);
+      const trimmed = original.trim();
+      if (!trimmed) return;
+      const translated = phrases.get(trimmed);
+      if (!translated) {
+        if (node.nodeValue !== original) node.nodeValue = original;
+        return;
+      }
+      const leading = original.match(/^\s*/)?.[0] || '';
+      const trailing = original.match(/\s*$/)?.[0] || '';
+      const next = `${leading}${translated}${trailing}`;
+      if (node.nodeValue !== next) node.nodeValue = next;
+      lastTranslatedTextNodes.set(node, next);
+    };
+
+    const translateElement = (element: Element) => {
+      if (element.closest('[data-no-translate]') || skipTags.has(element.tagName)) return;
+      let originals = originalAttributes.get(element);
+      if (!originals) {
+        originals = new Map<string, string>();
+        originalAttributes.set(element, originals);
+      }
+      translatableAttributes.forEach((attribute) => {
+        const current = element.getAttribute(attribute);
+        if (current == null) return;
+        if (!originals!.has(attribute)) originals!.set(attribute, current);
+        const original = originals!.get(attribute) || current;
+        element.setAttribute(attribute, phrases.get(original.trim()) || original);
+      });
+    };
+
+    const translateTree = (root: ParentNode) => {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let node: Node | null;
+      while ((node = walker.nextNode())) translateText(node as Text);
+      if (root instanceof Element) translateElement(root);
+      root.querySelectorAll?.('*').forEach(translateElement);
+    };
+
+    translating = true;
+    translateTree(document.body);
+    translating = false;
+    const observer = new MutationObserver((records) => {
+      if (translating) return;
+      translating = true;
+      records.forEach((record) => {
+        if (record.type === 'characterData' && record.target instanceof Text) translateText(record.target);
+        record.addedNodes.forEach((node) => {
+          if (node instanceof Text) translateText(node);
+          else if (node instanceof Element) translateTree(node);
+        });
+        if (record.type === 'attributes' && record.target instanceof Element) translateElement(record.target);
+      });
+      translating = false;
+    });
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: translatableAttributes });
+    return () => observer.disconnect();
+  }, [language]);
+
   const setLanguage = (lang: Language) => {
-    const validCodes = SUPPORTED_LANGUAGES.map((l) => l.code);
-    if (validCodes.includes(lang)) {
-      setLanguageState(lang);
-      localStorage.setItem('agrimark_lang', lang);
-    } else {
-      setLanguageState('en');
-      localStorage.setItem('agrimark_lang', 'en');
-    }
+    const validCodes = SUPPORTED_LANGUAGES.map((item) => item.code);
+    const next = validCodes.includes(lang) ? lang : 'en';
+    localStorage.setItem('agrimark_lang', next);
+    setLanguageState(next);
+    document.documentElement.lang = next;
   };
 
   const t = (key: string, params?: Record<string, string | number>): string => {
