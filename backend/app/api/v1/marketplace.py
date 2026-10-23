@@ -208,6 +208,9 @@ def update_order_address(
     status = str(current.data[0].get("status") or "").lower()
     if status in {"dispatched", "in_transit", "delivered", "cancelled", "rejected"}:
         raise HTTPException(status_code=409, detail="The delivery address can no longer be changed for this order.")
+    normalized_address = request.delivery_address.strip()
+    if len(normalized_address) < 5:
+        raise HTTPException(status_code=422, detail="Enter a complete delivery address.")
 
     try:
         # jsonb is the canonical column type; store a named payload so the UI
@@ -215,7 +218,7 @@ def update_order_address(
         result = (
             db.table("marketplace_orders")
             .update({
-                "delivery_address": {"formatted_address": request.delivery_address.strip()},
+                "delivery_address": {"formatted_address": normalized_address},
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             })
             .eq("id", str(order_id))
