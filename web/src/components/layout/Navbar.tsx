@@ -164,8 +164,8 @@ export const Navbar: React.FC = () => {
                     aria-label="Notifications"
                   >
                     <Bell className="w-5 h-5" />
-                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" />
-                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full" />
+                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
+                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full" />
                   </button>
 
                   {/* Notification Dropdown */}
@@ -204,18 +204,44 @@ export const Navbar: React.FC = () => {
                     }}
                     className="flex items-center gap-2 p-1.5 bg-[#0a0f0d] border border-[#1e2d26] hover:border-emerald-800 rounded-xl text-gray-200 transition"
                   >
-                    <div className="w-7 h-7 bg-emerald-950 border border-emerald-700/60 rounded-lg flex items-center justify-center text-xs font-bold text-emerald-400">
-                      {user?.full_name ? user.full_name[0].toUpperCase() : 'U'}
-                    </div>
-                    <span className="hidden sm:inline text-xs font-bold truncate max-w-[100px]">{user?.full_name?.split(' ')[0]}</span>
+                    {user?.avatar_url ? (
+                      // Render the Google account photo supplied by Firebase; fall back to initials when absent.
+                      <img
+                        src={user.avatar_url}
+                        alt={user.full_name ? `${user.full_name}'s profile photo` : 'Profile photo'}
+                        referrerPolicy="no-referrer"
+                        className="w-7 h-7 rounded-lg object-cover border border-emerald-700/60"
+                      />
+                    ) : (
+                      <div className="w-7 h-7 bg-emerald-950 border border-emerald-700/60 rounded-lg flex items-center justify-center text-xs font-bold text-emerald-400">
+                        {user?.full_name?.trim()?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                      </div>
+                    )}
+                    <span className="hidden sm:inline text-xs font-bold truncate max-w-[100px]">{user?.full_name?.trim()?.split(/\s+/)[0] || user?.email?.split('@')[0] || 'Account'}</span>
                     <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
                   </button>
 
                   {isProfileOpen && (
                     <div className="absolute right-0 mt-2 w-56 bg-[#121a16] border border-[#1e2d26] rounded-2xl shadow-2xl p-2 z-50 space-y-1 animate-fade-in">
                       <div className="p-3 bg-[#0a0f0d] rounded-xl border border-[#1e2d26]">
-                        <p className="text-xs font-bold text-white truncate">{user?.full_name}</p>
-                        <p className="text-[11px] text-gray-400 truncate">{user?.email || user?.phone}</p>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {user?.avatar_url ? (
+                            <img
+                              src={user.avatar_url}
+                              alt={user.full_name ? `${user.full_name}'s profile photo` : 'Profile photo'}
+                              referrerPolicy="no-referrer"
+                              className="w-10 h-10 rounded-full object-cover border border-emerald-700/60 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-emerald-950 border border-emerald-700/60 flex items-center justify-center text-sm font-bold text-emerald-400 shrink-0">
+                              {user?.full_name?.trim()?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-white truncate">{user?.full_name?.trim() || 'AgriMark account'}</p>
+                            <p className="text-[11px] text-gray-400 truncate">{user?.email || user?.phone}</p>
+                          </div>
+                        </div>
                         <span className="mt-1 inline-block text-[10px] font-mono font-bold uppercase text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-800/40">
                           {role}
                         </span>

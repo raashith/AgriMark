@@ -17,6 +17,7 @@ class FirebaseSyncRequest(BaseModel):
     email: str | None = None
     phone: str | None = None
     full_name: str | None = None
+    avatar_url: str | None = None
     requested_role: str | None = "farmer"
 
 
@@ -54,6 +55,7 @@ def sync_firebase_profile(request: FirebaseSyncRequest):
     email = request.email or decoded.get("email")
     phone = request.phone or decoded.get("phone_number")
     full_name = request.full_name or decoded.get("name")
+    avatar_url = request.avatar_url or decoded.get("picture")
 
     client = get_supabase()
 
@@ -114,6 +116,8 @@ def sync_firebase_profile(request: FirebaseSyncRequest):
     has_name = bool(profile.get("full_name") and str(profile.get("full_name")).strip())
 
     try:
+        profile.setdefault("email", email)
+        profile.setdefault("avatar_url", avatar_url)
         return {
             "user": ProfileResponse(**profile, needs_onboarding=not has_name).model_dump(),
         }
