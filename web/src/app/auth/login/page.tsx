@@ -216,7 +216,7 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <label className="block text-xs font-mono font-bold uppercase text-gray-400">Password</label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-4 text-[#0a0f0d]" />
+                  <Lock className="w-4 h-4 text-gray-500 absolute left-3.5 top-4" />
                   <input
                     type="password"
                     autoComplete="current-password"
