@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 class ProfileCreate(BaseModel):
     full_name: str | None = None
     phone: str | None = None
+    email: str | None = None
+    avatar_url: str | None = None
     role: str = "farmer"
 
 
