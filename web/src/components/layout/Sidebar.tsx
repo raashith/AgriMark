@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import {
   Sprout, LayoutDashboard, MapPin, Calendar, Eye, Layers, ShoppingBag,
   ShoppingCart, TrendingUp, CloudSun, FileText, CheckSquare, ShieldCheck,
-  Bot, Settings, Building2, Truck, Users, ChevronLeft, PackageCheck,
+  Bot, Settings, Building2, Truck, Users, PackageCheck, Navigation,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -16,7 +16,6 @@ export const Sidebar: React.FC = () => {
   const normalizedRole = String(role || user?.role || '').trim().toLowerCase();
   const isBuyerRoute = pathname === '/buyer' || pathname.startsWith('/buyer/');
   const isLogisticsRoute = pathname === '/logistics' || pathname.startsWith('/logistics/');
-  const [isOpen, setIsOpen] = useState(false);
 
   const farmerNav = [
     { label: 'Dashboard', href: '/farmer/dashboard', icon: LayoutDashboard },
@@ -51,7 +50,7 @@ export const Sidebar: React.FC = () => {
   const logisticsNav = [
     { label: 'Operations', href: '/logistics', icon: LayoutDashboard },
     { label: 'Delivery Board', href: '/logistics/deliveries', icon: PackageCheck },
-    { label: 'Live Routes', href: '/logistics/routes', icon: MapPin },
+    { label: 'Live Routes & Map', href: '/logistics/routes', icon: Navigation },
     { label: 'Fleet', href: '/logistics/fleet', icon: Truck },
     { label: 'Drivers', href: '/logistics/drivers', icon: Users },
     { label: 'Cold Chain', href: '/logistics/cold-chain', icon: CloudSun },
@@ -74,54 +73,48 @@ export const Sidebar: React.FC = () => {
   if (normalizedRole === 'logistics' || isLogisticsRoute) items = logisticsNav;
   if (normalizedRole === 'admin') items = adminNav;
 
-  useEffect(() => {
-    const handlePointerMove = (event: PointerEvent) => {
-      if (event.clientX <= 14) setIsOpen(true);
-    };
-    window.addEventListener('pointermove', handlePointerMove, { passive: true });
-    return () => window.removeEventListener('pointermove', handlePointerMove);
-  }, []);
+  const isItemActive = (href: string) => {
+    if (href === '/logistics') return pathname === href;
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
 
   return (
-    <>
-      <div aria-hidden="true" className="fixed left-0 top-0 z-[70] hidden lg:block w-3 h-screen" onMouseEnter={() => setIsOpen(true)} />
-      <aside
-        onMouseEnter={() => setIsOpen(true)}
-        onMouseLeave={() => setIsOpen(false)}
-        aria-label="AgriMark navigation"
-        className={[
-          'fixed left-0 top-16 z-[60] hidden lg:flex h-[calc(100vh-4rem)] w-64',
-          'flex-col bg-[#121a16] border-r border-[#1e2d26] p-4 space-y-6',
-          'shadow-[12px_0_40px_rgba(0,0,0,0.22)] transition-transform duration-200 ease-out',
-          isOpen ? 'translate-x-0' : '-translate-x-full',
-        ].join(' ')}
-      >
-        <div className="p-3.5 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl flex items-center gap-3">
-          <div className="w-10 h-10 bg-emerald-950 border border-emerald-700/60 rounded-xl flex items-center justify-center text-emerald-400 font-bold shrink-0">
-            {user?.full_name ? user.full_name[0].toUpperCase() : 'A'}
-          </div>
-          <div className="overflow-hidden">
-            <h4 className="font-bold text-sm text-white truncate">{user?.full_name || 'AgriMark User'}</h4>
-            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-400 px-2 py-0.5 bg-emerald-950/80 border border-emerald-800/40 rounded-full inline-block">
-              {role || 'Farmer'}
-            </span>
-          </div>
+    <aside
+      aria-label="AgriMark navigation"
+      className="sticky top-[4.25rem] hidden h-[calc(100vh-4.25rem)] w-64 shrink-0 flex-col border-r border-[#1e2d26] bg-[#0d1511] p-3 lg:flex"
+    >
+      <div className="mb-3 flex items-center gap-3 rounded-2xl border border-[#1e2d26] bg-[#0a0f0d] p-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-700/60 bg-emerald-950 font-bold text-emerald-400">
+          {user?.avatar_url ? <img src={user.avatar_url} alt="" referrerPolicy="no-referrer" className="h-full w-full rounded-xl object-cover" /> : (user?.full_name?.trim()?.[0]?.toUpperCase() || 'A')}
         </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto pr-1">
-          {items.map((item, idx) => {
-            const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
-            return (
-              <Link key={idx} href={item.href} className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition ${isActive ? 'bg-emerald-600 text-white font-bold shadow-md' : 'text-gray-300 hover:text-white hover:bg-[#18241f]'}`}>
-                <item.icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-emerald-400'}`} />
-                <span className="truncate">{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-        <button type="button" onClick={() => setIsOpen(false)} className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-[#18241f] hover:text-white transition" aria-label="Close navigation" title="Close navigation">
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-      </aside>
-    </>
+        <div className="min-w-0">
+          <h4 className="truncate text-sm font-bold text-white">{user?.full_name || 'AgriMark User'}</h4>
+          <span className="mt-1 inline-block rounded-full border border-emerald-800/40 bg-emerald-950/80 px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-400">
+            {role || 'Farmer'}
+          </span>
+        </div>
+      </div>
+      <div className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">Workspace</div>
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-1" aria-label="Workspace pages">
+        {items.map((item) => {
+          const active = isItemActive(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? 'page' : undefined}
+              className={`group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${active ? 'border-emerald-500/30 bg-emerald-600 text-white shadow-sm' : 'border-transparent text-gray-300 hover:border-[#294238] hover:bg-[#14221b] hover:text-white'}`}
+            >
+              <item.icon className={`h-4 w-4 shrink-0 ${active ? 'text-white' : 'text-emerald-400 group-hover:text-emerald-300'}`} />
+              <span className="truncate">{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="mt-3 rounded-xl border border-[#1e2d26] bg-[#0a0f0d] p-3">
+        <div className="flex items-center gap-2 text-[11px] font-semibold text-gray-300"><Sprout className="h-4 w-4 text-emerald-400" /> Farmer-first logistics</div>
+        <p className="mt-1 text-[10px] leading-4 text-gray-500">Track shipments and open routes in the map workspace.</p>
+      </div>
+    </aside>
   );
 };

@@ -12,32 +12,17 @@ import { usePathname } from 'next/navigation';
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
 
-  // Hide sidebar on public marketing / legal pages if not logged in or on specific public pages
   const isPublicPage = [
-    '/',
-    '/about',
-    '/contact',
-    '/help',
-    '/faq',
-    '/privacy',
-    '/terms',
-    '/cookies',
-    '/accessibility',
-    '/security',
-    '/refund-policy',
-    '/shipping-policy',
-    '/auth/login',
-    '/auth/register',
-    '/auth/onboarding',
+    '/', '/about', '/contact', '/help', '/faq', '/privacy', '/terms',
+    '/cookies', '/accessibility', '/security', '/refund-policy',
+    '/shipping-policy', '/auth/login', '/auth/register', '/auth/onboarding',
   ].includes(pathname);
 
   if (pathname === '/') {
     return (
       <ToastProvider>
         <AgriMarkIntro />
-        <div className="min-h-screen bg-[#000000] text-white font-sans selection:bg-[#1B4D3E] selection:text-white">
-          {children}
-        </div>
+        <div className="min-h-screen bg-[#000000] font-sans text-white selection:bg-[#1B4D3E] selection:text-white">{children}</div>
       </ToastProvider>
     );
   }
@@ -45,11 +30,11 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   return (
     <ToastProvider>
       <AgriMarkIntro />
-      <div className="min-h-screen bg-[#0a0f0d] text-gray-100 flex flex-col font-sans selection:bg-emerald-600 selection:text-white">
+      <div className="flex min-h-screen flex-col bg-[#0a0f0d] font-sans text-gray-100 selection:bg-emerald-600 selection:text-white">
         <Navbar />
-        <div className="flex-1 flex w-full max-w-[1600px] mx-auto">
+        <div className="mx-auto flex w-full max-w-[1800px] flex-1">
           {!isPublicPage && <Sidebar />}
-          <main className="flex-1 min-w-0 p-3 sm:p-4 md:p-6 lg:p-8 max-w-7xl w-full mx-auto pb-24 lg:pb-12 space-y-4 sm:space-y-6">
+          <main className="min-w-0 flex-1 p-3 pb-24 sm:p-4 md:p-6 lg:p-7 lg:pb-10">
             {children}
           </main>
         </div>
@@ -59,4 +44,3 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     </ToastProvider>
   );
 };
-
