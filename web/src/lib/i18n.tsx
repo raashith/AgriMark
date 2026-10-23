@@ -660,7 +660,10 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (current == null) return;
         if (!originals!.has(attribute)) originals!.set(attribute, current);
         const original = originals!.get(attribute) || current;
-        element.setAttribute(attribute, phrases.get(original.trim()) || original);
+        const nextValue = phrases.get(original.trim()) || original;
+        if (element.getAttribute(attribute) !== nextValue) {
+          element.setAttribute(attribute, nextValue);
+        }
       });
     };
 
