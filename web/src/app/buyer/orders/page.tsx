@@ -82,7 +82,7 @@ function canEditDeliveryAddress(order: MarketplaceOrder): boolean {
 
 function canCancelOrder(order: MarketplaceOrder): boolean {
   const raw = String(order.status || '').toLowerCase().replace(/[\s-]+/g, '_');
-  return raw === 'placed' || raw === 'pending';
+  return raw === 'placed';
 }
 
 export default function BuyerOrdersPage() {
