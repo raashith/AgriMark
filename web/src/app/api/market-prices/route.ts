@@ -6,7 +6,11 @@ export const revalidate = 0;
 const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://xrcqzpnstdbbtafhcwbb.supabase.co').replace(/\/$/, '');
 
 function getApiKey() {
-  return process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  // Prefer server-only credentials when configured; otherwise use the public
+  // key for read-only queries protected by Supabase RLS.
+  return process.env.SUPABASE_SERVICE_ROLE_KEY
+    || process.env.SUPABASE_SECRET_KEY
+    || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
     || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     || '';
 }
