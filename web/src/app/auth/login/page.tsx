@@ -43,8 +43,10 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await activateRole(role);
-      router.replace(getRoleRoute(role));
+      // Persist the selected workspace on the authenticated profile before navigating.
+      const profile = await activateRole(role);
+      const targetRole = role || profile.role || 'farmer';
+      router.replace(getRoleRoute(targetRole));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to open the selected workspace.');
     } finally {
@@ -54,14 +56,17 @@ export default function LoginPage() {
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (loading) return;
+    if (loading || authLoading) return;
 
     setError('');
     setLoading(true);
 
     try {
+      // Use the explicit selection, then activate it after authentication so
+      // stale/default profile roles cannot override the workspace the user chose.
       const profile = await login({ email, password, role });
-      router.replace(getRoleRoute(role || profile.role));
+      const targetRole = role || profile.role || 'farmer';
+      router.replace(getRoleRoute(targetRole));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to sign in.');
     } finally {
@@ -90,13 +95,14 @@ export default function LoginPage() {
   };
 
   const google = async () => {
-    if (loading) return;
+    if (loading || authLoading) return;
     setError('');
     setLoading(true);
 
     try {
       const profile = await loginWithGoogle(role);
-      router.replace(getRoleRoute(role || profile.role));
+      const targetRole = role || profile.role || 'farmer';
+      router.replace(getRoleRoute(targetRole));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Google sign-in could not be completed.');
     } finally {
