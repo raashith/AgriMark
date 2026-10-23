@@ -9,8 +9,17 @@ from backend.app.api.v1 import marketplace
 
 def test_marketplace_routes_require_authentication():
     client = TestClient(app)
+    order_id = uuid4()
     assert client.post("/api/v1/marketplace/rfqs", json={"quantity": 10}).status_code == 401
     assert client.get("/api/v1/marketplace/orders").status_code == 401
+    assert client.patch(
+        f"/api/v1/marketplace/orders/{order_id}/address",
+        json={"delivery_address": "123 Main Street, Town, PIN 600001"},
+    ).status_code == 401
+    assert client.post(
+        f"/api/v1/marketplace/orders/{order_id}/cancel",
+        json={"reason": "Changed my mind"},
+    ).status_code == 401
 
 
 def test_order_rejects_below_minimum(monkeypatch):
