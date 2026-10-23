@@ -687,11 +687,16 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (node instanceof Text) translateText(node);
           else if (node instanceof Element) translateTree(node);
         });
-        if (record.type === 'attributes' && record.target instanceof Element) translateElement(record.target);
       });
+      // Translation itself changes text nodes. Discard those self-generated records
+      // so they do not trigger another translation pass.
+      observer.takeRecords();
       translating = false;
     });
-    observer.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: translatableAttributes });
+    // Attribute changes are intentionally excluded: they are usually caused by
+    // this translator itself. Attributes are translated on initial scan and when
+    // a new element enters the DOM; text updates remain supported.
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true });
     return () => observer.disconnect();
   }, [language]);
 
