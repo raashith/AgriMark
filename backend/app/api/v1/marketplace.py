@@ -32,6 +32,14 @@ class OrderCreate(BaseModel):
     unit: str = "kg"
 
 
+class OrderAddressUpdate(BaseModel):
+    delivery_address: str = Field(min_length=5, max_length=1000)
+
+
+class OrderCancelRequest(BaseModel):
+    reason: str | None = Field(default=None, max_length=300)
+
+
 def _single(result, not_found: str = "Resource not found"):
     data = result.data
     if not data:
@@ -129,15 +137,123 @@ def create_order(request: OrderCreate, user: AuthenticatedUser = Depends(get_cur
 
 @router.get("/orders")
 def list_orders(user: AuthenticatedUser = Depends(get_current_user)):
+    db = get_supabase()
     result = (
-        get_supabase()
-        .table("marketplace_orders")
+        db.table("marketplace_orders")
         .select("*")
         .or_(f"buyer_id.eq.{user.id},seller_id.eq.{user.id}")
         .order("created_at", desc=True)
         .execute()
     )
-    return result.data or []
+    orders = [dict(row) for row in (result.data or [])]
+    if not orders:
+        return []
+
+    # Orders keep a stable listing_id, while the display title/crop belongs to
+    # the listing and its produce lot. Resolve these even when a listing is sold
+    # or no longer appears in the active marketplace feed.
+    listing_ids = list({row["listing_id"] for row in orders if row.get("listing_id")})
+    listings = {}
+    if listing_ids:
+        listing_result = (
+            db.table("listings")
+            .select("id,title,price_per_unit,lot_id,produce_lots(crop_id,quality_grade,crops(name))")
+            .in_("id", listing_ids)
+            .execute()
+        )
+        listings = {row["id"]: row for row in (listing_result.data or [])}
+
+    seller_ids = list({row["seller_id"] for row in orders if row.get("seller_id")})
+    sellers = {}
+    if seller_ids:
+        seller_result = db.table("profiles").select("id,full_name").in_("id", seller_ids).execute()
+        sellers = {row["id"]: row for row in (seller_result.data or [])}
+
+    for order in orders:
+        listing = listings.get(order.get("listing_id"), {})
+        lot = listing.get("produce_lots") or {}
+        if isinstance(lot, list):
+            lot = lot[0] if lot else {}
+        crop = lot.get("crops") or {}
+        if isinstance(crop, list):
+            crop = crop[0] if crop else {}
+        order["crop_name"] = crop.get("name")
+        order["listing_title"] = listing.get("title")
+        order["unit_price"] = listing.get("price_per_unit")
+        order["quality_grade"] = lot.get("quality_grade")
+        seller = sellers.get(order.get("seller_id"), {})
+        order["seller_name"] = seller.get("full_name")
+    return orders
+
+
+@router.patch("/orders/{order_id}/address")
+def update_order_address(
+    order_id: UUID,
+    request: OrderAddressUpdate,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    db = get_supabase()
+    current = (
+        db.table("marketplace_orders")
+        .select("id,status")
+        .eq("id", str(order_id))
+        .eq("buyer_id", str(user.id))
+        .limit(1)
+        .execute()
+    )
+    if not current.data:
+        raise HTTPException(status_code=404, detail="Order not found for this buyer.")
+
+    status = str(current.data[0].get("status") or "").lower()
+    if status in {"dispatched", "in_transit", "delivered", "cancelled", "rejected"}:
+        raise HTTPException(status_code=409, detail="The delivery address can no longer be changed for this order.")
+
+    try:
+        # jsonb is the canonical column type; store a named payload so the UI
+        # can render both this format and older address records consistently.
+        result = (
+            db.table("marketplace_orders")
+            .update({
+                "delivery_address": {"formatted_address": request.delivery_address.strip()},
+                "updated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+            })
+            .eq("id", str(order_id))
+            .eq("buyer_id", str(user.id))
+            .select("*")
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Unable to save the delivery address right now.") from exc
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Order not found for this buyer.")
+    return result.data[0]
+
+
+@router.post("/orders/{order_id}/cancel")
+def cancel_order(
+    order_id: UUID,
+    request: OrderCancelRequest,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    try:
+        result = get_supabase().rpc(
+            "cancel_marketplace_order_atomic",
+            {
+                "p_order_id": str(order_id),
+                "p_buyer_id": str(user.id),
+                "p_reason": (request.reason or "Cancelled by buyer").strip()[:300],
+            },
+        ).execute()
+        return _single(result, "Order not found")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        detail = str(exc).lower()
+        if "order not found" in detail:
+            raise HTTPException(status_code=404, detail="Order not found for this buyer.") from exc
+        if "buyer" in detail or "only unaccepted" in detail or "cannot be cancelled" in detail:
+            raise HTTPException(status_code=409, detail="This order can no longer be cancelled. Contact the seller for help.") from exc
+        raise HTTPException(status_code=503, detail="Unable to cancel this order right now. Please retry.") from exc
 
 
 @router.get("/listings")
