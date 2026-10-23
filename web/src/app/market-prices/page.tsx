@@ -12,33 +12,41 @@ export default function MarketPricesPage(){
  const load=useCallback(async()=>{
   L(true);E('');
   const controller=new AbortController();
-  const timeout=window.setTimeout(()=>controller.abort(),12000);
+  const timeout=window.setTimeout(()=>controller.abort(),15000);
   try{
-   const [commoditiesResult,statesResult,mandisResult,observationsResult]=await Promise.all([
+   // Load the primary dataset independently so a failed lookup/dimension table
+   // cannot hide valid market observations from the dashboard.
+   const observationResult=await supabase
+    .from('national_market_price_observations')
+    .select('id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source')
+    .order('observation_date',{ascending:false})
+    .limit(1000)
+    .abortSignal(controller.signal);
+   if(observationResult.error) throw new Error('Market observations: '+observationResult.error.message);
+   const rawRows=observationResult.data||[];
+   if(!rawRows.length) throw new Error('Supabase connected, but returned 0 rows from national_market_price_observations. Check the production API key, RLS policy, and table grants.');
+   S(rawRows.map((r:any)=>({...r,modal_price:Number(r.modal_price)||0,min_price:Number(r.min_price)||0,max_price:Number(r.max_price)||0,arrival_quantity:r.arrival_quantity==null?null:Number(r.arrival_quantity),commodity_name:r.commodity_code,mandi_name:r.mandi_code||'Mandi unavailable',state_name:r.state_code||'India'})));
+   U(new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+   // Lookup tables enhance labels only. They are deliberately non-blocking.
+   const [commoditiesResult,statesResult,mandisResult]=await Promise.allSettled([
     supabase.from('national_commodities').select('code,name').order('name').limit(1000).abortSignal(controller.signal),
     supabase.from('national_states').select('state_code,state_name').order('state_name').limit(100).abortSignal(controller.signal),
-    supabase.from('national_mandis').select('mandi_code,mandi_name,state_code').order('mandi_name').limit(2000).abortSignal(controller.signal),
-    // Keep the first paint fast: fetch the newest 1,000 real observations.
-    // The previous implementation launched 12 simultaneous 1,000-row queries
-    // on every visit, which could stall the whole page on PostgREST.
-    supabase.from('national_market_price_observations').select('id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source').order('observation_date',{ascending:false}).order('id',{ascending:false}).limit(1000).abortSignal(controller.signal)
+    supabase.from('national_mandis').select('mandi_code,mandi_name,state_code').order('mandi_name').limit(2000).abortSignal(controller.signal)
    ]);
-   const failure=[commoditiesResult,statesResult,mandisResult,observationsResult].find(result=>result.error);
-   if(failure?.error)throw failure.error;
-   const cs=(commoditiesResult.data||[]).map((r:any)=>({code:r.code,name:r.name}));
-   const ss=(statesResult.data||[]).map((r:any)=>({code:r.state_code,name:r.state_name}));
-   const ms=(mandisResult.data||[]).map((r:any)=>({code:r.mandi_code,name:r.mandi_name,state_code:r.state_code}));
-   const rawRows=observationsResult.data||[];
+   const cs=commoditiesResult.status==='fulfilled'&&!commoditiesResult.value.error?(commoditiesResult.value.data||[]).map((r:any)=>({code:r.code,name:r.name})):[];
+   const ss=statesResult.status==='fulfilled'&&!statesResult.value.error?(statesResult.value.data||[]).map((r:any)=>({code:r.state_code,name:r.state_name})): [];
+   const ms=mandisResult.status==='fulfilled'&&!mandisResult.value.error?(mandisResult.value.data||[]).map((r:any)=>({code:r.mandi_code,name:r.mandi_name,state_code:r.state_code})): [];
    const cm=new Map(cs.map((r:Opt)=>[r.code,r.name]));
    const stm=new Map(ss.map((r:Opt)=>[r.code,r.name]));
    const mm=new Map(ms.map((r:Opt)=>[r.code,r.name]));
-   SC(cs);SS(ss);SM(ms);
+   if(cs.length)SC(cs); if(ss.length)SS(ss); if(ms.length)SM(ms);
    S(rawRows.map((r:any)=>({...r,modal_price:Number(r.modal_price)||0,min_price:Number(r.min_price)||0,max_price:Number(r.max_price)||0,arrival_quantity:r.arrival_quantity==null?null:Number(r.arrival_quantity),commodity_name:cm.get(r.commodity_code)||r.commodity_code,mandi_name:mm.get(r.mandi_code)||r.mandi_code||'Mandi unavailable',state_name:stm.get(r.state_code)||r.state_code||'India'})));
-   U(new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
-   if(rawRows.length===0)E('The database returned no market observations. Check public read access (RLS) for national_market_price_observations.');
+   const metadataFailed=[commoditiesResult,statesResult,mandisResult].some(x=>x.status==='rejected'||(x.status==='fulfilled'&&x.value.error));
+   if(metadataFailed) E('Market prices loaded; some commodity/state/mandi names could not be resolved. Showing source codes where needed.');
   }catch(e){
    const err=e as {message?:string;name?:string;code?:string};
-   E(err.name==='AbortError'?'Market data request timed out. Please retry.':err.message||'Could not load market observations. Please retry.');
+   E(err.name==='AbortError'?'Market data request timed out after 15 seconds. Check Supabase connectivity and retry.':err.message||'Could not load market observations. Please retry.');
+   S([]);
   }finally{
    window.clearTimeout(timeout);L(false);
   }
