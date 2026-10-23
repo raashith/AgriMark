@@ -18,7 +18,7 @@ insert into public.profile_roles (profile_id, role)
 select p.id, p.role
 from public.profiles p
 where p.role in ('farmer', 'buyer', 'fpo', 'logistics', 'service_provider')
-on conflict (profile_id, role) do nothing;
+on conflict on constraint profile_roles_pkey do nothing;
 
 create or replace function public.ensure_firebase_identity(
   p_firebase_uid text,
@@ -111,7 +111,7 @@ begin
   if v_role = any(v_allowed_roles) then
     insert into public.profile_roles (profile_id, role)
     values (v_profile_id, v_role)
-    on conflict (profile_id, role) do nothing;
+    on conflict on constraint profile_roles_pkey do nothing;
   end if;
 
   if v_role = 'buyer' then

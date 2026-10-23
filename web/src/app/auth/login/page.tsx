@@ -130,31 +130,6 @@ export default function LoginPage() {
         )}
 
 
-        <div className="space-y-2">
-          <label className="block text-xs font-mono font-bold uppercase text-gray-400">Choose your workspace</label>
-          <p className="text-xs text-gray-500">You can use the same account for more than one role.</p>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { id: 'farmer', label: 'Farmer' },
-              { id: 'buyer', label: 'Buyer' },
-              { id: 'fpo', label: 'FPO / Co-op' },
-              { id: 'logistics', label: 'Logistics Partner' },
-            ].map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                aria-pressed={role === item.id}
-                onClick={() => setRole(item.id as typeof role)}
-                className={role === item.id
-                  ? 'p-3 rounded-xl border border-emerald-500 bg-emerald-950/80 text-emerald-300 font-semibold flex items-center justify-between'
-                  : 'p-3 rounded-xl border border-[#1e2d26] bg-[#0a0f0d] text-gray-400 font-semibold flex items-center justify-between hover:border-emerald-800'}
-              >
-                <span>{item.label}</span>
-                {role === item.id && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
-              </button>
-            ))}
-          </div>
-        </div>
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="block text-xs font-mono font-bold uppercase text-gray-400">Choose your workspace</label>
