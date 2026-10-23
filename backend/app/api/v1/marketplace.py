@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
@@ -215,7 +216,7 @@ def update_order_address(
             db.table("marketplace_orders")
             .update({
                 "delivery_address": {"formatted_address": request.delivery_address.strip()},
-                "updated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             })
             .eq("id", str(order_id))
             .eq("buyer_id", str(user.id))
