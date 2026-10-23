@@ -185,7 +185,7 @@ export interface MarketplaceOrder {
   unit_price: number;
   total_amount: number;
   total_price?: number;
-  status: 'pending' | 'confirmed' | 'in_transit' | 'delivered' | 'cancelled';
+  status: 'pending' | 'placed' | 'confirmed' | 'accepted' | 'processing' | 'ready_for_dispatch' | 'dispatched' | 'in_transit' | 'delivered' | 'cancelled' | 'rejected';
   payment_status?: 'pending' | 'escrowed' | 'released' | 'refunded';
   delivery_address?: string | { formatted_address?: string; [key: string]: unknown } | null;
   cancellation_reason?: string | null;
