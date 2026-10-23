@@ -76,12 +76,12 @@ function addressText(value: MarketplaceOrder['delivery_address']): string {
 }
 
 function canEditDeliveryAddress(order: MarketplaceOrder): boolean {
-  const raw = String(order.status || '').toLowerCase().replace(/[\\s-]+/g, '_');
+  const raw = String(order.status || '').toLowerCase().replace(/[\s-]+/g, '_');
   return !['dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivered', 'cancelled', 'canceled', 'rejected'].includes(raw);
 }
 
 function canCancelOrder(order: MarketplaceOrder): boolean {
-  const raw = String(order.status || '').toLowerCase().replace(/[\\s-]+/g, '_');
+  const raw = String(order.status || '').toLowerCase().replace(/[\s-]+/g, '_');
   return raw === 'placed' || raw === 'pending';
 }
 
