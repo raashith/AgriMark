@@ -18,8 +18,15 @@ export async function GET(request: Request) {
     const baseDate = searchParams.get('base_date') || new Date().toISOString().split('T')[0];
 
     const cookieStore = cookies();
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://tsdjtlmrvbspyzgwmccg.supabase.co';
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://xrcqzpnstdbbtafhcwbb.supabase.co').replace(/\/$/, '');
+    // Keep this route on the same active Supabase project as market-prices.
+    // A server-only key may be used when configured; otherwise use the public
+    // key and let RLS govern access.
+    const supabaseAnonKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      || process.env.SUPABASE_SECRET_KEY
+      || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+      || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      || '';
 
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: { get(name: string) { return cookieStore.get(name)?.value; } },
