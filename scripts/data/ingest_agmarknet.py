@@ -193,53 +193,44 @@ def persist_page(client: Client, rows: list[dict[str, Any]]) -> dict[str, int]:
     if not accepted:
         return {"accepted": 0, "inserted": 0, "duplicates": 0, "rejected": len(rows)}
 
-    states = [{"state_code": r["state_code"], "name": r["state_name"], "region": r["region"]} for r in accepted]
-    districts = [{"state_code": r["state_code"], "district_code": r["district_code"], "name": r["district_name"]} for r in accepted]
-    mandis = [{"district_code": r["district_code"], "mandi_code": r["mandi_code"], "name": r["mandi_name"]} for r in accepted]
-    commodities = [{"code": r["commodity_code"], "name": r["commodity_name"], "category": r["category"], "standard_unit": "QUINTAL"} for r in accepted]
-    variants = [{"variant_code": r["variant_code"], "variant_name": r["variant_name"], "grade": r["grade_name"]} for r in accepted]
+    # Match the production database's actual schema (not the newer canonical
+    # schema used by the first version of this worker).
+    states = [{"state_code": r["state_code"], "state_name": r["state_name"]} for r in accepted]
+    districts = [{"state_code": r["state_code"], "district_code": r["district_code"], "district_name": r["district_name"]} for r in accepted]
+    mandis = [{"state_code": r["state_code"], "district_code": r["district_code"], "mandi_code": r["mandi_code"], "mandi_name": r["mandi_name"]} for r in accepted]
+    commodities = [{"code": r["commodity_code"], "name": r["commodity_name"]} for r in accepted]
 
     client.table("national_states").upsert(states, on_conflict="state_code").execute()
     client.table("national_districts").upsert(districts, on_conflict="district_code").execute()
     client.table("national_mandis").upsert(mandis, on_conflict="mandi_code").execute()
     client.table("national_commodities").upsert(commodities, on_conflict="code").execute()
-    client.table("national_commodity_variants").upsert(variants, on_conflict="variant_code").execute()
 
     observations = []
     for r in accepted:
+        arrival = number(field(r["raw"], "arrival_quantity", field(r["raw"], "arrival")))
         observations.append({
-            "commodity_code": r["commodity_code"],
-            "variant_code": r["variant_code"],
-            "mandi_code": r["mandi_code"],
-            "district_code": r["district_code"],
+            "observation_date": r["observation_date"],
             "state_code": r["state_code"],
-            "price_signal_type": "OBSERVED_MANDI",
+            "district_code": r["district_code"],
+            "mandi_code": r["mandi_code"],
+            "commodity_code": r["commodity_code"],
+            "variety": r["variant_name"],
+            "grade": r["grade_name"],
+            "arrival_quantity": arrival,
             "min_price": r["min_price"],
             "max_price": r["max_price"],
             "modal_price": r["modal_price"],
-            "arrival_quantity_mt": 0,
-            "observed_at": r["observed_at"],
-            "source": r["source"],
-            "source_url": r["source_url"],
-            "retrieved_at": datetime.now(timezone.utc).isoformat(),
-            "published_at": r["observed_at"],
-            "license": "OPEN_DATA_GOV_IN",
-            "coverage_start": r["observation_date"],
-            "coverage_end": r["observation_date"],
-            "geography": f"{r['district_name']}, {r['state_name']}",
-            "unit": "INR_PER_QUINTAL",
-            "schema_version": "v2.0",
-            "quality_score": 0.98,
-            "validation_status": "VALIDATED",
-            "data_layer": "CANONICAL",
-            "is_synthetic": False,
+            "source": "AGMARKNET",
+            "source_record_id": "|".join((r["observation_date"], r["mandi_code"], r["commodity_code"], r["variant_name"], r["grade_name"])),
+            "raw_record": r["raw"],
         })
 
     result = client.table("national_market_price_observations").upsert(
         observations,
-        on_conflict="commodity_code,variant_code,mandi_code,observed_at,source",
+        on_conflict="observation_date,mandi_code,commodity_code,variety,grade,source",
     ).execute()
-    return {"accepted": len(accepted), "inserted": len(result.data or []), "duplicates": max(0, len(accepted) - len(result.data or [])), "rejected": len(rows) - len(accepted)}
+    inserted = len(result.data or [])
+    return {"accepted": len(accepted), "inserted": inserted, "duplicates": max(0, len(accepted) - inserted), "rejected": len(rows) - len(accepted)}
 
 def ingest_one_page(client: Client, api_key: str, mode: str, offset: int) -> dict[str, Any]:
     resource_id = HISTORICAL_RESOURCE_ID if mode == "historical" else DAILY_RESOURCE_ID
