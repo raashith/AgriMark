@@ -1,7 +1,7 @@
 export const PRODUCTION_SITE_URL = 'https://agrimark-six.vercel.app';
 export const PRODUCTION_AUTH_CALLBACK = `${PRODUCTION_SITE_URL}/auth/callback`;
 
-export const SUPABASE_EXPECTED_HOST = 'xrcqzpnstdbbtafhcwbb.supabase.co';
+export const SUPABASE_EXPECTED_HOST = 'tsdjtlmrvbspyzgwmccg.supabase.co';
 export const SUPABASE_GOOGLE_CALLBACK = `https://${SUPABASE_EXPECTED_HOST}/auth/v1/callback`;
 
 export function getRoleDashboard(role?: string | null): string {
