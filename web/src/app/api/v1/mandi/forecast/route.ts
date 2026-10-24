@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const baseDate = searchParams.get('base_date') || new Date().toISOString().split('T')[0];
 
     const cookieStore = cookies();
-    const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://xrcqzpnstdbbtafhcwbb.supabase.co').replace(/\/$/, '');
+    const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://tsdjtlmrvbspyzgwmccg.supabase.co').replace(/\/$/, '');
     // Keep this route on the same active Supabase project as market-prices.
     // A server-only key may be used when configured; otherwise use the public
     // key and let RLS govern access.
