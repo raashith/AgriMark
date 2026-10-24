@@ -13,9 +13,9 @@ export default function MarketPricesPage(){
   const requestId=++requestSequence.current;
   L(true);E('');
   const controller=new AbortController();
-  const timeout=window.setTimeout(()=>controller.abort(),20000);
+  const timeout=window.setTimeout(()=>controller.abort(),30000);
   try{
-   const params=new URLSearchParams();if(commodity)params.set('commodity',commodity);if(state)params.set('state',state);if(mandi)params.set('mandi',mandi);if(search.trim())params.set('search',search.trim());params.set('limit','100');
+   const params=new URLSearchParams();if(commodity)params.set('commodity',commodity);if(state)params.set('state',state);if(mandi)params.set('mandi',mandi);if(search.trim())params.set('search',search.trim());params.set('limit','25');
    const response=await fetch('/api/market-prices'+(params.size?'?'+params.toString():''),{cache:'no-store',signal:controller.signal});
    const payload=await response.json() as {ok?:boolean;rows?:any[];commodities?:any[];states?:any[];mandis?:any[];error?:string;warnings?:string[];capped?:boolean;latest_observation_date?:string|null};
    if(!response.ok||!payload.ok)throw new Error(payload.error||`Market data API failed (HTTP ${response.status}).`);
@@ -33,7 +33,7 @@ export default function MarketPricesPage(){
   }catch(e){
    if(requestId!==requestSequence.current)return;
    const err=e as {message?:string;name?:string};
-   E(err.name==='AbortError'?'Market data request timed out after 20 seconds. Please retry.':err.message||'Could not load market observations. Please retry.');
+   E(err.name==='AbortError'?'Market data request timed out after 30 seconds. Please retry.':err.message||'Could not load market observations. Please retry.');
    // Preserve the last successful rows during transient API failures.
   }finally{
    window.clearTimeout(timeout);if(requestId===requestSequence.current)L(false);
