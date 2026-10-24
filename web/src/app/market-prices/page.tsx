@@ -41,7 +41,14 @@ export default function MarketPricesPage(){
  const selectedCommodityName=commodities.find(o=>o.code===commodity)?.name||'';
  const selectedStateName=states.find(o=>o.code===state)?.name||'';
  const selectedMandiName=mandis.find(o=>o.code===mandi)?.name||'';
- const filtered=useMemo(()=>rows.filter(r=>(!commodity||(r.commodity_code===commodity||normalized(r.commodity_name)===normalized(selectedCommodityName)||normalized(r.commodity_code.replace(/^CSV_COMMODITY:/,'').split('|')[0])===normalized(selectedCommodityName)))&&(!state||(r.state_code===state||normalized(r.state_name)===normalized(selectedStateName)||normalized(r.state_code.replace(/^CSV_STATE:/,'').split('|')[0])===normalized(selectedStateName)))&&(!mandi||(r.mandi_code===mandi||normalized(r.mandi_name)===normalized(selectedMandiName)||normalized(r.mandi_code.replace(/^CSV_MANDI:/,'').split('|')[0])===normalized(selectedMandiName))&&(!state||normalized(r.state_name)===normalized(selectedStateName)||normalized(r.state_code.replace(/^CSV_STATE:/,'').split('|')[0])===normalized(selectedStateName))))&&(!search||normalized(r.commodity_name).includes(normalized(search))||normalized(r.mandi_name).includes(normalized(search))||normalized(r.state_name).includes(normalized(search)))),[rows,commodity,state,mandi,search,selectedCommodityName,selectedStateName,selectedMandiName]);
+ const filtered=useMemo(()=>rows.filter(r=>{
+  const commodityMatch=!commodity || r.commodity_code===commodity || normalized(r.commodity_name)===normalized(selectedCommodityName) || normalized(r.commodity_code.replace(/^CSV_COMMODITY:/,'').split('|')[0])===normalized(selectedCommodityName);
+  const stateMatch=!state || r.state_code===state || normalized(r.state_name)===normalized(selectedStateName) || normalized(r.state_code.replace(/^CSV_STATE:/,'').split('|')[0])===normalized(selectedStateName);
+  const mandiLabel=normalized(r.mandi_code.replace(/^CSV_MANDI:/,'').split('|')[0]);
+  const mandiMatch=!mandi || r.mandi_code===mandi || normalized(r.mandi_name)===normalized(selectedMandiName) || mandiLabel===normalized(selectedMandiName);
+  const searchMatch=!search || normalized(r.commodity_name).includes(normalized(search)) || normalized(r.mandi_name).includes(normalized(search)) || normalized(r.state_name).includes(normalized(search));
+  return commodityMatch && stateMatch && mandiMatch && searchMatch;
+ }),[rows,commodity,state,mandi,search,selectedCommodityName,selectedStateName,selectedMandiName]);
  const totalPages=Math.max(1,Math.ceil(filtered.length/pageSize));
  const pageRows=useMemo(()=>filtered.slice((page-1)*pageSize,page*pageSize),[filtered,page,pageSize]);
  useEffect(()=>{P(1)},[commodity,state,mandi,search,pageSize]);
