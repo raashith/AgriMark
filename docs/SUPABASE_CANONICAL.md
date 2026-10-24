@@ -1,10 +1,10 @@
 # AgriMark Supabase Canonical Integration
 
-Supabase/PostgreSQL is the single canonical application database for AgriMark.
+Supabase/PostgreSQL is the single canonical application database for AgriMark at `https://tsdjtlmrvbspyzgwmccg.supabase.co`.
 
 ## Production project
 
-Project ref: `xrcqzpnstdbbtafhcwbb`
+Project ref: `tsdjtlmrvbspyzgwmccg`
 
 The backend connects through environment variables such as `SUPABASE_URL` and server-side database credentials. Browser and Android clients never connect directly to PostgreSQL.
 
