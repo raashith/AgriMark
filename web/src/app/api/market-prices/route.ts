@@ -48,13 +48,29 @@ async function queryRecentRows(
   select: string,
   order: string,
   pageSize = 1000,
-  maxPages = 8,
+  maxPages = 24,
 ) {
+  // Fetch pages in small concurrent batches so older commodities and states
+  // remain available instead of silently disappearing after the first 8,000 rows.
   const all: any[] = [];
-  for (let page = 0; page < maxPages; page++) {
-    const rows = await queryTable(table, select, order, pageSize, { offset: String(page * pageSize) });
-    all.push(...rows);
-    if (rows.length < pageSize) break;
+  const concurrency = 6;
+  for (let firstPage = 0; firstPage < maxPages; firstPage += concurrency) {
+    const pageNumbers = Array.from(
+      { length: Math.min(concurrency, maxPages - firstPage) },
+      (_, index) => firstPage + index,
+    );
+    const pages = await Promise.all(pageNumbers.map(page =>
+      queryTable(table, select, order, pageSize, { offset: String(page * pageSize) })
+    ));
+    let finished = false;
+    for (const rows of pages) {
+      all.push(...rows);
+      if (rows.length < pageSize) {
+        finished = true;
+        break;
+      }
+    }
+    if (finished) break;
   }
   return all;
 }
@@ -157,7 +173,7 @@ export async function GET() {
       count: rows.length,
       primary_count: storedRows.length,
       imported_csv_count: csvRows.length,
-      capped: observations.length >= 8000 || imported.length >= 8000,
+      capped: observations.length >= 24000 || imported.length >= 24000,
       latest_observation_date: rows[0]?.observation_date ?? null,
       source: 'public.national_market_price_observations + public.agmarknet_csv_import_staging',
     }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
