@@ -7,6 +7,8 @@ const SUPABASE_URL = 'https://tsdjtlmrvbspyzgwmccg.supabase.co';
 const DEFAULT_ROWS = 3000;
 const MAX_ROWS = 10000;
 
+type ApiRow = Record<string, any>;
+
 function getApiKey() {
   return process.env.SUPABASE_SERVICE_ROLE_KEY
     || process.env.SUPABASE_SECRET_KEY
@@ -16,11 +18,15 @@ function getApiKey() {
 }
 
 function norm(value: unknown) {
-  return String(value ?? '').trim().toLocaleLowerCase('en-IN').split(/ +/).filter(Boolean).join(' ');
+  return String(value ?? '').trim().toLocaleLowerCase('en-IN').split(/\s+/).filter(Boolean).join(' ');
 }
 
 function parseSynthetic(value: string, prefix: string) {
   return value.startsWith(prefix) ? value.slice(prefix.length).trim() : '';
+}
+
+function escapeLike(value: string) {
+  return value.replace(/[,*()\\]/g, '').trim();
 }
 
 async function queryTable(
@@ -50,10 +56,13 @@ async function queryTable(
   }
   const json: unknown = await response.json();
   if (!Array.isArray(json)) throw new Error(`Supabase returned an unexpected payload for ${table}.`);
-  return json as any[];
+  return json as ApiRow[];
 }
 
 export async function GET(request: NextRequest) {
+  const requestId = `market-${Date.now().toString(36)}`;
+  const warnings: string[] = [];
+
   try {
     const params = request.nextUrl.searchParams;
     const rawCommodity = params.get('commodity')?.trim() || '';
@@ -61,24 +70,24 @@ export async function GET(request: NextRequest) {
     const rawMandi = params.get('mandi')?.trim() || '';
     const search = norm(params.get('search'));
     const limit = Math.min(MAX_ROWS, Math.max(100, Number(params.get('limit')) || DEFAULT_ROWS));
-
     const observationSelect = 'id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source,variety,grade';
-    const csvSelect = 'id,source_row_hash,observation_date,state_name,district_name,mandi_name,commodity_name,variety,grade,min_price,max_price,modal_price,source';
 
-    // Load reference labels first so UI codes can be resolved into the actual database keys/names.
+    // Column names verified against live Supabase schema.
     const [commodities, states, mandis] = await Promise.all([
       queryTable('national_commodities', 'code,name', 'name.asc', 5000),
       queryTable('national_states', 'state_code,state_name', 'state_name.asc', 1000),
-      queryTable('national_mandis', 'mandi_code,mandi_name,state_code', 'mandi_name.asc', 5000),
+      queryTable('national_mandis', 'mandi_code,mandi_name,state_code,district_code', 'mandi_name.asc', 5000),
     ]);
 
-    const commodityNameByCode = new Map(commodities.map((r: any) => [String(r.code), String(r.name)]));
-    const commodityCodeByName = new Map(commodities.map((r: any) => [norm(r.name), String(r.code)]));
-    const stateNameByCode = new Map(states.map((r: any) => [String(r.state_code), String(r.state_name)]));
-    const stateCodeByName = new Map(states.map((r: any) => [norm(r.state_name), String(r.state_code)]));
-    const mandiByCode = new Map(mandis.map((r: any) => [String(r.mandi_code), r]));
+    const commodityNameByCode = new Map(commodities.map((r) => [String(r.code), String(r.name)]));
+    const commodityCodeByName = new Map(commodities.map((r) => [norm(r.name), String(r.code)]));
+    const stateNameByCode = new Map(states.map((r) => [String(r.state_code), String(r.state_name)]));
+    const stateCodeByName = new Map(states.map((r) => [norm(r.state_name), String(r.state_code)]));
+    const mandiByCode = new Map(mandis.map((r) => [String(r.mandi_code), r]));
 
-    // Imported CSV options have synthetic values but the staging table stores plain names.
+    const isCsvCommodity = rawCommodity.startsWith('CSV_COMMODITY:');
+    const isCsvState = rawState.startsWith('CSV_STATE:');
+    const isCsvMandi = rawMandi.startsWith('CSV_MANDI:');
     const commodityName = parseSynthetic(rawCommodity, 'CSV_COMMODITY:')
       || commodityNameByCode.get(rawCommodity)
       || rawCommodity;
@@ -88,7 +97,7 @@ export async function GET(request: NextRequest) {
 
     let selectedMandiName = '';
     let selectedMandiState = '';
-    if (rawMandi.startsWith('CSV_MANDI:')) {
+    if (isCsvMandi) {
       const pair = rawMandi.slice('CSV_MANDI:'.length).split('|');
       selectedMandiName = (pair[0] || '').trim();
       selectedMandiState = (pair[1] || '').trim();
@@ -100,32 +109,43 @@ export async function GET(request: NextRequest) {
 
     const effectiveStateName = stateName || selectedMandiState;
     const canonicalCommodityCode = commodityCodeByName.get(norm(commodityName))
-      || (!rawCommodity.startsWith('CSV_COMMODITY:') && rawCommodity ? rawCommodity : '');
+      || (!isCsvCommodity && rawCommodity ? rawCommodity : '');
     const canonicalStateCode = stateCodeByName.get(norm(effectiveStateName))
-      || (!rawState.startsWith('CSV_STATE:') && rawState ? rawState : '');
-
-    const canonicalMandi = mandis.find((r: any) =>
+      || (!isCsvState && rawState ? rawState : '');
+    const canonicalMandi = mandis.find((r) =>
       norm(r.mandi_name) === norm(selectedMandiName)
       && (!selectedMandiState || norm(stateNameByCode.get(String(r.state_code)) || '') === norm(selectedMandiState))
       && (!effectiveStateName || norm(stateNameByCode.get(String(r.state_code)) || '') === norm(effectiveStateName))
     );
 
     const primaryParams: Record<string, string> = {};
-    if (rawCommodity && canonicalCommodityCode) primaryParams.commodity_code = `eq.${canonicalCommodityCode}`;
-    if ((rawState || selectedMandiState) && canonicalStateCode) primaryParams.state_code = `eq.${canonicalStateCode}`;
-    if (rawMandi && canonicalMandi?.mandi_code) primaryParams.mandi_code = `eq.${canonicalMandi.mandi_code}`;
+    if (rawCommodity && canonicalCommodityCode && !isCsvCommodity) primaryParams.commodity_code = `eq.${canonicalCommodityCode}`;
+    if ((rawState || selectedMandiState) && canonicalStateCode && !isCsvState && !isCsvMandi) primaryParams.state_code = `eq.${canonicalStateCode}`;
+    if (rawMandi && canonicalMandi?.mandi_code && !isCsvMandi) primaryParams.mandi_code = `eq.${canonicalMandi.mandi_code}`;
 
     const csvParams: Record<string, string> = {};
-    if (rawCommodity) csvParams.commodity_name = `ilike.*${commodityName.replace(/[,*()]/g, '')}*`;
-    if (rawState || selectedMandiState) csvParams.state_name = `ilike.*${effectiveStateName.replace(/[,*()]/g, '')}*`;
-    if (rawMandi) csvParams.mandi_name = `ilike.*${selectedMandiName.replace(/[,*()]/g, '')}*`;
+    if (rawCommodity) csvParams.commodity_name = `ilike.*${escapeLike(commodityName)}*`;
+    if (rawState || selectedMandiState) csvParams.state_name = `ilike.*${escapeLike(effectiveStateName)}*`;
+    if (rawMandi) csvParams.mandi_name = `ilike.*${escapeLike(selectedMandiName)}*`;
 
-    const [stored, imported] = await Promise.all([
+    const [storedResult, stagingResult] = await Promise.allSettled([
       queryTable('national_market_price_observations', observationSelect, 'observation_date.desc,id.desc', limit, primaryParams),
-      queryTable('agmarknet_csv_import_staging', csvSelect, 'observation_date.desc,id.desc', limit, csvParams),
+      queryTable(
+        'agmarknet_csv_import_staging',
+        'id,source_row_hash,observation_date,state_name,district_name,mandi_name,commodity_name,variety,grade,min_price,max_price,modal_price,source',
+        'observation_date.desc,id.desc',
+        limit,
+        csvParams,
+      ),
     ]);
 
-    const storedRows = stored.map((r: any) => ({
+    if (storedResult.status === 'rejected') throw storedResult.reason;
+    const stored = storedResult.value;
+    let imported: ApiRow[] = [];
+    if (stagingResult.status === 'fulfilled') imported = stagingResult.value;
+    else warnings.push('CSV staging records could not be loaded; showing canonical observations only.');
+
+    const storedRows = stored.map((r) => ({
       ...r,
       modal_price: Number(r.modal_price) || 0,
       min_price: Number(r.min_price) || 0,
@@ -137,7 +157,7 @@ export async function GET(request: NextRequest) {
       imported_csv: false,
     }));
 
-    const csvRows = imported.map((r: any) => ({
+    const csvRows = imported.map((r) => ({
       id: -Number(r.id),
       commodity_code: `CSV_COMMODITY:${String(r.commodity_name || '').trim()}`,
       mandi_code: `CSV_MANDI:${String(r.mandi_name || '').trim()}|${String(r.state_name || '').trim()}`,
@@ -160,37 +180,36 @@ export async function GET(request: NextRequest) {
     const wantedCommodity = rawCommodity ? norm(commodityName) : '';
     const wantedState = (rawState || selectedMandiState) ? norm(effectiveStateName) : '';
     const wantedMandi = rawMandi ? norm(selectedMandiName) : '';
-    const rowsBeforeSearch = [...storedRows, ...csvRows].filter((row: any) =>
+    const rowsBeforeSearch = [...storedRows, ...csvRows].filter((row) =>
       Number.isFinite(row.modal_price) && row.modal_price > 0
       && (!wantedCommodity || norm(row.commodity_name) === wantedCommodity)
       && (!wantedState || norm(row.state_name) === wantedState)
       && (!wantedMandi || norm(row.mandi_name) === wantedMandi)
     );
 
-    const byRecordKey = new Map<string, any>();
+    const byRecordKey = new Map<string, ApiRow>();
     for (const row of rowsBeforeSearch) {
       const key = [row.observation_date, norm(row.commodity_name), norm(row.mandi_name), norm(row.state_name), row.modal_price].join('|');
-      if (!byRecordKey.has(key) || (!row.imported_csv && byRecordKey.get(key)?.imported_csv)) {
-        byRecordKey.set(key, row);
-      }
+      const existing = byRecordKey.get(key);
+      if (!existing || (!row.imported_csv && existing.imported_csv)) byRecordKey.set(key, row);
     }
 
     const allMatching = [...byRecordKey.values()]
-      .filter((row: any) => !search || [row.commodity_name, row.mandi_name, row.state_name].some((value: unknown) => norm(value).includes(search)))
+      .filter((row) => !search || [row.commodity_name, row.mandi_name, row.state_name].some((value) => norm(value).includes(search)))
       .sort((a, b) => String(b.observation_date).localeCompare(String(a.observation_date)) || Number(b.id) - Number(a.id));
     const rows = allMatching.slice(0, limit);
 
     const allCommodities = [
-      ...commodities,
-      ...[...new Map(csvRows.map((r: any) => [r.commodity_code, { code: r.commodity_code, name: r.commodity_name }])).values()],
+      ...commodities.map((r) => ({ code: String(r.code), name: String(r.name) })),
+      ...[...new Map(csvRows.map((r) => [r.commodity_code, { code: r.commodity_code, name: r.commodity_name }])).values()],
     ];
     const allStates = [
-      ...states,
-      ...[...new Map(csvRows.map((r: any) => [r.state_code, { state_code: r.state_code, state_name: r.state_name }])).values()],
+      ...states.map((r) => ({ state_code: String(r.state_code), state_name: String(r.state_name) })),
+      ...[...new Map(csvRows.map((r) => [r.state_code, { state_code: r.state_code, state_name: r.state_name }])).values()],
     ];
     const allMandis = [
-      ...mandis,
-      ...[...new Map(csvRows.map((r: any) => [r.mandi_code, { mandi_code: r.mandi_code, mandi_name: r.mandi_name, state_code: r.state_code }])).values()],
+      ...mandis.map((r) => ({ mandi_code: String(r.mandi_code), mandi_name: String(r.mandi_name), state_code: String(r.state_code || '') })),
+      ...[...new Map(csvRows.map((r) => [r.mandi_code, { mandi_code: r.mandi_code, mandi_name: r.mandi_name, state_code: r.state_code }])).values()],
     ];
 
     return NextResponse.json({
@@ -199,19 +218,20 @@ export async function GET(request: NextRequest) {
       commodities: allCommodities,
       states: allStates,
       mandis: allMandis,
-      warnings: [],
+      warnings,
       count: rows.length,
       primary_count: storedRows.length,
       imported_csv_count: csvRows.length,
       capped: allMatching.length > limit,
       latest_observation_date: rows[0]?.observation_date ?? null,
+      request_id: requestId,
       source: 'public.national_market_price_observations + public.agmarknet_csv_import_staging',
       applied_filters: { commodity: rawCommodity || null, state: rawState || null, mandi: rawMandi || null, search: search || null },
     }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown market data request failure.';
     const status = message.includes('HTTP 401') || message.includes('HTTP 403') ? 502 : 500;
-    return NextResponse.json({ ok: false, rows: [], error: message }, {
+    return NextResponse.json({ ok: false, rows: [], error: message, request_id: requestId }, {
       status,
       headers: { 'Cache-Control': 'no-store, max-age=0' },
     });
