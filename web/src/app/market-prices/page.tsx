@@ -13,7 +13,7 @@ export default function MarketPricesPage(){
   const controller=new AbortController();
   const timeout=window.setTimeout(()=>controller.abort(),55000);
   try{
-   const response=await fetch('/api/market-prices',{cache:'no-store',signal:controller.signal});
+   const params=new URLSearchParams();if(commodity)params.set('commodity',commodity);if(state)params.set('state',state);if(mandi)params.set('mandi',mandi);if(search.trim())params.set('search',search.trim());params.set('limit','10000');\n   const response=await fetch('/api/market-prices'+(params.size?'?'+params.toString():''),{cache:'no-store',signal:controller.signal});
    const payload=await response.json() as {ok?:boolean;rows?:any[];commodities?:any[];states?:any[];mandis?:any[];error?:string;warnings?:string[];capped?:boolean;latest_observation_date?:string|null};
    if(!response.ok||!payload.ok)throw new Error(payload.error||`Market data API failed (HTTP ${response.status}).`);
    const rawRows=payload.rows||[];
