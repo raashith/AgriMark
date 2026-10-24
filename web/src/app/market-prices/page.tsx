@@ -11,7 +11,7 @@ export default function MarketPricesPage(){
  const load=useCallback(async()=>{
   L(true);E('');
   const controller=new AbortController();
-  const timeout=window.setTimeout(()=>controller.abort(),16000);
+  const timeout=window.setTimeout(()=>controller.abort(),55000);
   try{
    const response=await fetch('/api/market-prices',{cache:'no-store',signal:controller.signal});
    const payload=await response.json() as {ok?:boolean;rows?:any[];commodities?:any[];states?:any[];mandis?:any[];error?:string;warnings?:string[];capped?:boolean;latest_observation_date?:string|null};
@@ -29,7 +29,7 @@ export default function MarketPricesPage(){
    if(payload.warnings?.length)E(payload.warnings.join(' '));
   }catch(e){
    const err=e as {message?:string;name?:string};
-   E(err.name==='AbortError'?'Market data request timed out after 16 seconds.':err.message||'Could not load market observations. Please retry.');
+   E(err.name==='AbortError'?'Market data request timed out after 55 seconds. Please retry; the API may be slow.':err.message||'Could not load market observations. Please retry.');
    S([]);
   }finally{
    window.clearTimeout(timeout);L(false);
