@@ -7,8 +7,10 @@ type Opt={code:string;name:string;state_code?:string};
 type Row={id:number;commodity_code:string;mandi_code:string|null;state_code:string|null;observation_date:string;modal_price:number;min_price:number;max_price:number;arrival_quantity:number|null;source:string|null;commodity_name:string;mandi_name:string;state_name:string;imported_csv?:boolean};
 const nf=new Intl.NumberFormat('en-IN',{maximumFractionDigits:0}); const ru=(n:number)=>'₹'+nf.format(n); const dt=(s:string)=>s?new Date(s+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'—';
 export default function MarketPricesPage(){
+ const requestSequence=React.useRef(0);
  const [rows,S]=useState<Row[]>([]),[commodities,SC]=useState<Opt[]>([]),[states,SS]=useState<Opt[]>([]),[mandis,SM]=useState<Opt[]>([]),[commodity,C]=useState(''),[state,T]=useState(''),[mandi,M]=useState(''),[search,Q]=useState(''),[loading,L]=useState(true),[error,E]=useState(''),[updated,U]=useState(''),[page,P]=useState(1),[pageSize,PS]=useState(100),[apiCapped,setApiCapped]=useState(false);
  const load=useCallback(async()=>{
+  const requestId=++requestSequence.current;
   L(true);E('');
   const controller=new AbortController();
   const timeout=window.setTimeout(()=>controller.abort(),55000);
@@ -17,6 +19,7 @@ export default function MarketPricesPage(){
    const response=await fetch('/api/market-prices'+(params.size?'?'+params.toString():''),{cache:'no-store',signal:controller.signal});
    const payload=await response.json() as {ok?:boolean;rows?:any[];commodities?:any[];states?:any[];mandis?:any[];error?:string;warnings?:string[];capped?:boolean;latest_observation_date?:string|null};
    if(!response.ok||!payload.ok)throw new Error(payload.error||`Market data API failed (HTTP ${response.status}).`);
+   if(requestId!==requestSequence.current)return;
    const rawRows=payload.rows||[];
    S(rawRows as Row[]);setApiCapped(Boolean(payload.capped));
    const commodityOptions=(payload.commodities||[]).map((r:any)=>({code:r.code,name:r.name}));
@@ -28,11 +31,12 @@ export default function MarketPricesPage(){
    U(new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
    if(payload.warnings?.length)E(payload.warnings.join(' '));
   }catch(e){
+   if(requestId!==requestSequence.current)return;
    const err=e as {message?:string;name?:string};
    E(err.name==='AbortError'?'Market data request timed out after 55 seconds. Please retry; the API may be slow.':err.message||'Could not load market observations. Please retry.');
    S([]);
   }finally{
-   window.clearTimeout(timeout);L(false);
+   window.clearTimeout(timeout);if(requestId===requestSequence.current)L(false);
   }
  },[commodity,state,mandi,search]);
  useEffect(()=>{void load()},[load]);
