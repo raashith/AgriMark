@@ -15,6 +15,30 @@ function getApiKey() {
     || '';
 }
 
+async function queryAllPages(table: string, select: string, order: string) {
+  const PAGE_SIZE = 1000;
+  const CONCURRENCY = 6;
+  const all: any[] = [];
+  let offset = 0;
+
+  while (offset < 100000) {
+    const offsets = Array.from({ length: CONCURRENCY }, (_, i) => offset + i * PAGE_SIZE);
+    const pages = await Promise.all(offsets.map(pageOffset =>
+      queryTable(table, select, order, PAGE_SIZE, { offset: String(pageOffset) })
+    ));
+
+    for (let i = 0; i < pages.length; i++) {
+      const page = pages[i];
+      if (!Array.isArray(page)) throw new Error(`Supabase returned an unexpected payload for ${table}.`);
+      all.push(...page);
+      if (page.length < PAGE_SIZE) return all;
+    }
+    offset += CONCURRENCY * PAGE_SIZE;
+  }
+
+  throw new Error(`Stopped paging ${table} after 100,000 rows. Narrow the API scope for larger datasets.`);
+}
+
 async function queryTable(table: string, select: string, order: string, limit: number, extraParams: Record<string, string> = {}) {
   const key = getApiKey();
   if (!key) throw new Error('Supabase public key is missing from the Vercel production environment.');
@@ -37,49 +61,21 @@ async function queryTable(table: string, select: string, order: string, limit: n
 
 export async function GET() {
   try {
-    // Price observations are the source of truth. Lookup tables are optional
-    // enrichments, so a lookup schema mismatch cannot blank the price dashboard.
-    // Load all rows in bounded PostgREST pages instead of silently capping at 1,000.
+    // Fetch bounded pages concurrently. Sequential pagination made the browser's
+    // 16-second request timeout expire before the large imported dataset arrived.
     const observationSelect = 'id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source';
-    const PAGE_SIZE = 1000;
-    const observations: any[] = [];
-    for (let offset = 0; ; offset += PAGE_SIZE) {
-      const page = await queryTable(
+    const [observations, imported] = await Promise.all([
+      queryAllPages(
         'national_market_price_observations',
         observationSelect,
         'observation_date.desc,id.desc',
-        PAGE_SIZE,
-        { offset: String(offset) },
-      );
-      if (!Array.isArray(page)) throw new Error('Supabase returned an unexpected market observation payload.');
-      observations.push(...page);
-      if (page.length < PAGE_SIZE) break;
-      if (offset >= 100000) throw new Error('Stopped paging after 101,000 market rows. Narrow the API scope for larger datasets.');
-    }
-    if (!Array.isArray(observations)) throw new Error('Supabase returned an unexpected market observation payload.');
-    // Do not return early when the primary table is empty: imported CSV staging
-    // rows are also a valid source for the market-price dashboard.
-
-    // CSV imports are kept with the original market labels in a staging table;
-    // merge them into the same read model so all imported records are visible.
-    const imported: any[] = [];
-    for (let offset = 0; ; offset += PAGE_SIZE) {
-      const page = await queryTable(
+      ),
+      queryAllPages(
         'agmarknet_csv_import_staging',
         'id,source_row_hash,observation_date,state_name,district_name,mandi_name,commodity_name,variety,grade,min_price,max_price,modal_price,source',
         'observation_date.desc,id.desc',
-        PAGE_SIZE,
-        { offset: String(offset) },
-      ).catch((error: unknown) => {
-        // Before the staging migration exists in another environment, retain the
-        // primary observation feed and report the optional source as unavailable.
-        throw error;
-      });
-      if (!Array.isArray(page)) throw new Error('Supabase returned an unexpected imported CSV payload.');
-      imported.push(...page);
-      if (page.length < PAGE_SIZE) break;
-      if (offset >= 100000) throw new Error('Stopped paging after 101,000 imported CSV rows.');
-    }
+      ),
+    ]);
 
     const [commodities, states, mandis] = await Promise.allSettled([
       queryTable('national_commodities', 'code,name', 'name.asc', 5000),
