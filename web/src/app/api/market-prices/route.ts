@@ -44,13 +44,8 @@ function parseSynthetic(value: string, prefix: string) {
 function escapeLike(value: string) {
   return value.replace(/[,*()\\]/g, '').trim();
 }
-
 async function queryTable<T extends Record<string, unknown>>(
-  table: string,
-  select: string,
-  order: string,
-  limit: number,
-  extraParams: Record<string, string> = {},
+  table: string, select: string, order: string, limit: number, extraParams: Record<string, string> = {},
 ): Promise<T[]> {
   const key = getApiKey();
   if (!key) throw new Error('Supabase API key is missing from the Vercel production environment.');
@@ -96,7 +91,6 @@ export async function GET(request: NextRequest) {
       queryTable<RefState>('national_states', 'state_code,state_name', 'state_name.asc', 1000),
       queryTable<RefMandi>('national_mandis', 'mandi_code,mandi_name,state_code,district_code', 'mandi_name.asc', 5000),
     ]);
-
     const commodityNameByCode = new Map(commodities.map(r => [String(r.code), String(r.name)]));
     const commodityCodeByName = new Map(commodities.map(r => [norm(r.name), String(r.code)]));
     const stateNameByCode = new Map(states.map(r => [String(r.state_code), String(r.state_name)]));
@@ -120,7 +114,6 @@ export async function GET(request: NextRequest) {
       selectedMandiName = String(selected?.mandi_name || rawMandi);
       if (selected?.state_code) selectedMandiState = stateNameByCode.get(String(selected.state_code)) || '';
     }
-
     const effectiveStateName = stateName || selectedMandiState;
     const canonicalCommodityCode = commodityCodeByName.get(norm(commodityName))
       || (!isCsvCommodity && rawCommodity ? rawCommodity : '');
@@ -136,7 +129,6 @@ export async function GET(request: NextRequest) {
     if (rawCommodity && canonicalCommodityCode && !isCsvCommodity) primaryParams.commodity_code = `eq.${canonicalCommodityCode}`;
     if ((rawState || selectedMandiState) && canonicalStateCode && !isCsvState && !isCsvMandi) primaryParams.state_code = `eq.${canonicalStateCode}`;
     if (rawMandi && canonicalMandi?.mandi_code && !isCsvMandi) primaryParams.mandi_code = `eq.${canonicalMandi.mandi_code}`;
-
     const csvParams: Record<string,string> = {};
     if (rawCommodity) csvParams.commodity_name = `ilike.*${escapeLike(commodityName)}*`;
     if (rawState || selectedMandiState) csvParams.state_name = `ilike.*${escapeLike(effectiveStateName)}*`;
@@ -163,7 +155,6 @@ export async function GET(request: NextRequest) {
       state_name: stateNameByCode.get(String(r.state_code)) || r.state_code || 'India',
       imported_csv: false,
     }));
-
     const csvRows: ApiRow[] = imported.map(r => ({
       id: -Number(r.id),
       commodity_code: `CSV_COMMODITY:${String(r.commodity_name || '').trim()}`,
@@ -194,7 +185,6 @@ export async function GET(request: NextRequest) {
       && (!wantedState || norm(row.state_name) === wantedState)
       && (!wantedMandi || norm(row.mandi_name) === wantedMandi)
     );
-
     const byRecordKey = new Map<string,ApiRow>();
     for (const row of rowsBeforeSearch) {
       const key = [row.observation_date,norm(row.commodity_name),norm(row.mandi_name),norm(row.state_name),row.modal_price].join('|');
@@ -205,7 +195,6 @@ export async function GET(request: NextRequest) {
       .filter(row => !search || [row.commodity_name,row.mandi_name,row.state_name].some(value => norm(value).includes(search)))
       .sort((a,b) => String(b.observation_date).localeCompare(String(a.observation_date)) || Number(b.id)-Number(a.id));
     const rows = allMatching.slice(0,limit);
-
     const allCommodities = [
       ...commodities.map(r => ({code:String(r.code),name:String(r.name)})),
       ...[...new Map(csvRows.map(r => [r.commodity_code,{code:r.commodity_code,name:r.commodity_name}])).values()],
@@ -222,8 +211,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok:true,rows,commodities:allCommodities,states:allStates,mandis:allMandis,warnings,
       count:rows.length,primary_count:storedRows.length,imported_csv_count:csvRows.length,
-      capped:allMatching.length>limit,latest_observation_date:rows[0]?.observation_date??null,
-      request_id:requestId,
+      capped:allMatching.length>limit,latest_observation_date:rows[0]?.observation_date??null,request_id:requestId,
       source:'public.national_market_price_observations + public.agmarknet_csv_import_staging',
       applied_filters:{commodity:rawCommodity||null,state:rawState||null,mandi:rawMandi||null,search:search||null},
     },{headers:{'Cache-Control':'no-store, max-age=0'}});
