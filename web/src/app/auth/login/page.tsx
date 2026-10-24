@@ -8,6 +8,22 @@ import { sendPasswordResetEmail } from 'firebase/auth';
 import Link from 'next/link';
 import { Sprout, ArrowRight, AlertCircle, ShieldCheck, Mail, Lock, CheckCircle2 } from 'lucide-react';
 
+type SelectableRole = 'farmer' | 'buyer' | 'fpo' | 'logistics';
+
+const ROLE_LABELS: Record<SelectableRole, string> = {
+  farmer: 'Farmer',
+  buyer: 'Buyer',
+  fpo: 'FPO / Co-op',
+  logistics: 'Logistics Partner',
+};
+
+const ROLE_OPTIONS: Array<{ id: SelectableRole; label: string }> = [
+  { id: 'farmer', label: ROLE_LABELS.farmer },
+  { id: 'buyer', label: ROLE_LABELS.buyer },
+  { id: 'fpo', label: ROLE_LABELS.fpo },
+  { id: 'logistics', label: ROLE_LABELS.logistics },
+];
+
 function getRoleRoute(role?: string | null): string {
   switch (role) {
     case 'buyer': return '/buyer/dashboard';
@@ -25,7 +41,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'farmer' | 'buyer' | 'fpo' | 'logistics'>('farmer');
+  const [role, setRole] = useState<SelectableRole>('farmer');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
@@ -139,19 +155,15 @@ export default function LoginPage() {
         <div className="space-y-4">
           <div className="space-y-2">
             <label className="block text-xs font-mono font-bold uppercase text-gray-400">Choose your workspace</label>
+            <p className="text-xs font-semibold text-emerald-300" aria-live="polite">Selected workspace: {ROLE_LABELS[role]}</p>
             <p className="text-xs text-gray-500">One AgriMark account can have more than one role.</p>
             <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: 'farmer', label: 'Farmer' },
-                { id: 'buyer', label: 'Buyer' },
-                { id: 'fpo', label: 'FPO / Co-op' },
-                { id: 'logistics', label: 'Logistics Partner' },
-              ].map((item) => (
+              {ROLE_OPTIONS.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   aria-pressed={role === item.id}
-                  onClick={() => setRole(item.id as typeof role)}
+                  onClick={() => { setError(''); setRole(item.id); }}
                   className={role === item.id
                     ? 'p-3 rounded-xl border border-emerald-500 bg-emerald-950/80 text-emerald-300 font-semibold flex items-center justify-between'
                     : 'p-3 rounded-xl border border-[#1e2d26] bg-[#0a0f0d] text-gray-400 font-semibold flex items-center justify-between hover:border-emerald-800'}
@@ -172,7 +184,7 @@ export default function LoginPage() {
                 disabled={loading || authLoading}
                 className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-950/80 text-white font-extrabold rounded-2xl shadow-lg transition flex items-center justify-center gap-2 text-sm"
               >
-                <span>{loading ? 'Opening workspace…' : 'Continue as ' + (role === 'farmer' ? 'Farmer' : role === 'buyer' ? 'Buyer' : role === 'fpo' ? 'FPO' : 'Logistics')}</span>
+                <span>{loading ? 'Opening workspace…' : 'Continue as ' + ROLE_LABELS[role]}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -220,7 +232,7 @@ export default function LoginPage() {
                 disabled={loading || authLoading}
                 className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-950/80 disabled:text-gray-500 text-white font-extrabold rounded-2xl shadow-lg transition flex items-center justify-center gap-2 text-sm"
               >
-                <span>{loading ? 'Signing in…' : 'Sign in as ' + (role === 'farmer' ? 'Farmer' : role === 'buyer' ? 'Buyer' : role === 'fpo' ? 'FPO' : 'Logistics')}</span>
+                <span>{loading ? 'Signing in…' : 'Sign in as ' + ROLE_LABELS[role]}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 
@@ -236,7 +248,7 @@ export default function LoginPage() {
                 disabled={loading || authLoading}
                 className="w-full py-4 bg-white hover:bg-gray-100 disabled:bg-gray-300 text-gray-900 font-extrabold rounded-2xl shadow-lg transition flex items-center justify-center gap-2 text-sm"
               >
-                Continue with Google as {role === 'farmer' ? 'Farmer' : role === 'buyer' ? 'Buyer' : role === 'fpo' ? 'FPO' : 'Logistics'}
+                Continue with Google as {ROLE_LABELS[role]}
               </button>
             </form>
           )}
