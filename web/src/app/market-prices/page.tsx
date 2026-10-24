@@ -18,7 +18,6 @@ export default function MarketPricesPage(){
    const payload=await response.json() as {ok?:boolean;rows?:any[];commodities?:any[];states?:any[];mandis?:any[];error?:string;warnings?:string[];capped?:boolean;latest_observation_date?:string|null};
    if(!response.ok||!payload.ok)throw new Error(payload.error||`Market data API failed (HTTP ${response.status}).`);
    const rawRows=payload.rows||[];
-   if(!rawRows.length)throw new Error(payload.error||'The market data API returned no observations.');
    S(rawRows as Row[]);setApiCapped(Boolean(payload.capped));
    const commodityOptions=(payload.commodities||[]).map((r:any)=>({code:r.code,name:r.name}));
    const stateOptions=(payload.states||[]).map((r:any)=>({code:r.state_code||r.code,name:r.state_name||r.name}));
