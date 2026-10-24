@@ -15,7 +15,10 @@ export async function GET(request: Request) {
     const stateCode = searchParams.get('state_code') || undefined;
     const districtCode = searchParams.get('district_code') || undefined;
     const horizonDays = Math.min(30, Math.max(1, parseInt(searchParams.get('horizon_days') || searchParams.get('days') || '7', 10)));
-    const baseDate = searchParams.get('base_date') || new Date().toISOString().split('T')[0];
+    // This pilot forecast is intentionally anchored to the only verified observation date in the database.
+    // Do not silently mix in records from another date until validated history is available.
+    const sourceDate = '2026-10-16';
+    const baseDate = sourceDate;
 
     const cookieStore = cookies();
     const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://tsdjtlmrvbspyzgwmccg.supabase.co').replace(/\/$/, '');
@@ -32,9 +35,10 @@ export async function GET(request: Request) {
       cookies: { get(name: string) { return cookieStore.get(name)?.value; } },
     });
 
-    // Page through all eligible official observations. Supabase/PostgREST can
-    // cap responses below 5,000 rows; a single .limit(5000) silently truncates
-    // long-running commodity histories and can bias the fitted trend.
+    // Use only the verified AGMARKNET snapshot from 2026-10-16. The many rows
+    // on this date are cross-sectional mandi prices, not a multi-day time series.
+    // Page through matching rows so the selected commodity/state/mandi filters
+    // are applied without silently truncating the snapshot.
     const PAGE_SIZE = 1000;
     const historyData: any[] = [];
     for (let offset = 0; offset < 100000; offset += PAGE_SIZE) {
@@ -42,7 +46,7 @@ export async function GET(request: Request) {
         .from('national_market_price_observations')
         .select('commodity_code, state_code, district_code, mandi_code, modal_price, min_price, max_price, observation_date')
         .eq('commodity_code', commodityCode)
-        .lte('observation_date', baseDate)
+        .eq('observation_date', sourceDate)
         .order('observation_date', { ascending: true })
         .range(offset, offset + PAGE_SIZE - 1);
 
@@ -113,7 +117,7 @@ export async function GET(request: Request) {
       });
       return NextResponse.json({
         ok: true, training_status: 'BASELINE_ONLY',
-        message: 'Reference baseline from the latest observed modal price, not a trained prediction. At least five distinct dates are required to fit a trend.',
+        message: `Reference baseline anchored to the official ${sourceDate} snapshot, not a trained prediction. This dataset contains one observation date, so no time trend can be learned.`,
         commodity_code: commodityCode, mandi_code: mandiCode || null,
         forecast: baselinePoints, observed_count: observations.length,
         source_row_count: historyData.length,
@@ -184,6 +188,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       timestamp: new Date().toISOString(),
+      source_date: sourceDate,
       commodity_code: commodityCode,
       mandi_code: mandiCode || null,
       forecast: forecastResult.predictions,
