@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://agrimark-stitch-web.onrender.com';
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xrcqzpnstdbbtafhcwbb.supabase.co';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://tsdjtlmrvbspyzgwmccg.supabase.co';
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
