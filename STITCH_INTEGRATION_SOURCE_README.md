@@ -12,7 +12,7 @@ The Stitch package is treated as the visual authority. The existing AgriMark Nex
 
 - Frontend: `web/` — Next.js 14 App Router + Tailwind, deployed to Vercel and Render.
 - Backend: `backend/` — FastAPI, already deployed as Render service `agrimark-api`.
-- Database/Auth: Supabase project `xrcqzpnstdbbtafhcwbb` with RLS as the source of truth.
+- Database/Auth: Supabase project `tsdjtlmrvbspyzgwmccg` with RLS as the source of truth.
 - API base: `https://agrimark-api.onrender.com/api/v1`.
 
 ## Integration rules
