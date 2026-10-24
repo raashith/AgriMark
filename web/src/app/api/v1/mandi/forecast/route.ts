@@ -5,199 +5,154 @@ import { MandiForecastEngine, PriceObservationInput } from '@/lib/mandi-forecast
 
 export const dynamic = 'force-dynamic';
 
+const CANONICAL_SUPABASE_URL = 'https://tsdjtlmrvbspyzgwmccg.supabase.co';
+function getSupabaseKey() {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY
+    || process.env.SUPABASE_SECRET_KEY
+    || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+    || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    || '';
+}
+function validIsoDate(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`));
+}
+
 export async function GET(request: Request) {
+  const requestId = `mandi-forecast-${Date.now().toString(36)}`;
   try {
     const { searchParams } = new URL(request.url);
     const requestedCommodityCode = searchParams.get('commodity_code') || searchParams.get('commodity');
-    // Commodity codes are case-sensitive values from national_commodities.
     const commodityCode = requestedCommodityCode?.trim() || 'com-paddy-common-e045104e';
     const mandiCode = searchParams.get('mandi_code') || searchParams.get('mandi') || undefined;
     const stateCode = searchParams.get('state_code') || undefined;
     const districtCode = searchParams.get('district_code') || undefined;
-    const horizonDays = Math.min(30, Math.max(1, parseInt(searchParams.get('horizon_days') || searchParams.get('days') || '7', 10)));
-    const baseDate = searchParams.get('base_date') || new Date().toISOString().split('T')[0];
+    const requestedHorizon = Number.parseInt(searchParams.get('horizon_days') || searchParams.get('days') || '7', 10);
+    const horizonDays = Math.min(30, Math.max(1, Number.isFinite(requestedHorizon) ? requestedHorizon : 7));
+    const suppliedBaseDate = searchParams.get('base_date');
+    const baseDate = suppliedBaseDate || new Date().toISOString().slice(0, 10);
+    if (!validIsoDate(baseDate)) return NextResponse.json({ok:false,error:'base_date must be YYYY-MM-DD',request_id:requestId},{status:400});
 
     const cookieStore = cookies();
-    const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://tsdjtlmrvbspyzgwmccg.supabase.co').replace(/\/$/, '');
-    // Keep this route on the same active Supabase project as market-prices.
-    // A server-only key may be used when configured; otherwise use the public
-    // key and let RLS govern access.
-    const supabaseAnonKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-      || process.env.SUPABASE_SECRET_KEY
-      || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-      || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      || '';
-
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || CANONICAL_SUPABASE_URL).replace(/\/$/, '');
+    if (supabaseUrl !== CANONICAL_SUPABASE_URL) {
+      return NextResponse.json({ok:false,error:'Mandi forecasting is not configured for the canonical AgriMark Supabase project.',request_id:requestId},{status:503});
+    }
+    const supabaseKey = getSupabaseKey();
+    if (!supabaseKey) return NextResponse.json({ok:false,error:'Supabase API key is not configured server-side.',request_id:requestId},{status:503});
+    const supabase = createServerClient(supabaseUrl, supabaseKey, {
       cookies: { get(name: string) { return cookieStore.get(name)?.value; } },
     });
 
-    // Page through all eligible official observations. Supabase/PostgREST can
-    // cap responses below 5,000 rows; a single .limit(5000) silently truncates
-    // long-running commodity histories and can bias the fitted trend.
     const PAGE_SIZE = 1000;
     const historyData: any[] = [];
     for (let offset = 0; offset < 100000; offset += PAGE_SIZE) {
       let query = supabase
         .from('national_market_price_observations')
-        .select('commodity_code, state_code, district_code, mandi_code, modal_price, min_price, max_price, observation_date')
+        .select('commodity_code,state_code,district_code,mandi_code,modal_price,min_price,max_price,observation_date')
         .eq('commodity_code', commodityCode)
         .lte('observation_date', baseDate)
         .order('observation_date', { ascending: true })
         .range(offset, offset + PAGE_SIZE - 1);
-
       if (stateCode) query = query.eq('state_code', stateCode);
       if (districtCode) query = query.eq('district_code', districtCode);
       if (mandiCode) query = query.eq('mandi_code', mandiCode);
-
-      const { data: page, error: pageError } = await query;
-      if (pageError) throw pageError;
+      const { data: page, error } = await query;
+      if (error) throw error;
       historyData.push(...(page || []));
       if (!page || page.length < PAGE_SIZE) break;
     }
 
-    // A national dataset has many mandi rows per day. Aggregate those rows into
-    // one robust daily median so cross-mandi differences are never mistaken for
-    // a time trend. With one observation date, the engine can only produce a
-    // transparent flat baseline, not a learned trend.
-    const byDate = new Map<string, Array<{ row: any; price: number; min: number; max: number }>>();
-    for (const row of historyData || []) {
-      const date = String(row.observation_date).slice(0, 10);
+    const byDate = new Map<string, Array<{row:any;price:number;min:number;max:number}>>();
+    for (const row of historyData) {
+      const date = String(row.observation_date || '').slice(0, 10);
       const price = Number(row.modal_price);
-      if (!date || !Number.isFinite(price) || price <= 0) continue;
+      if (!validIsoDate(date) || !Number.isFinite(price) || price <= 0) continue;
       const bucket = byDate.get(date) || [];
-      bucket.push({ row, price, min: Number(row.min_price ?? price), max: Number(row.max_price ?? price) });
-      byDate.set(date, bucket);
+      bucket.push({row,price,min:Number(row.min_price ?? price),max:Number(row.max_price ?? price)});
+      byDate.set(date,bucket);
     }
-    const median = (values: number[]) => {
-      const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
+    const median = (values:number[]) => {
+      const sorted = values.filter(Number.isFinite).sort((a,b)=>a-b);
       if (!sorted.length) return 0;
-      const mid = Math.floor(sorted.length / 2);
-      return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+      const middle = Math.floor(sorted.length/2);
+      return sorted.length%2 ? sorted[middle] : (sorted[middle-1]+sorted[middle])/2;
     };
-    const observations: PriceObservationInput[] = Array.from(byDate.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, bucket]) => ({
-        commodity_code: commodityCode,
-        state_code: stateCode || bucket[0]?.row.state_code || undefined,
-        district_code: districtCode || bucket[0]?.row.district_code || undefined,
-        mandi_code: mandiCode || undefined,
-        modal_price: median(bucket.map((item) => item.price)),
-        min_price: median(bucket.map((item) => item.min)),
-        max_price: median(bucket.map((item) => item.max)),
-        observed_at: date,
-      }));
+    const observations: PriceObservationInput[] = Array.from(byDate.entries()).sort(([a],[b])=>a.localeCompare(b)).map(([date,bucket])=>({
+      commodity_code:commodityCode,
+      state_code:stateCode || bucket[0]?.row.state_code || undefined,
+      district_code:districtCode || bucket[0]?.row.district_code || undefined,
+      mandi_code:mandiCode || undefined,
+      modal_price:median(bucket.map(x=>x.price)),
+      min_price:median(bucket.map(x=>x.min)),
+      max_price:median(bucket.map(x=>x.max)),
+      observed_at:date,
+    }));
 
-    if (observations.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: 'No real AGMARKNET observations were found for this commodity/mandi selection. Choose a commodity or mandi with stored records.' },
-        { status: 404 },
-      );
-    }
+    if (!observations.length) return NextResponse.json({
+      ok:false,error:'No real observations match this commodity and geography.',request_id:requestId,
+      commodity_code:commodityCode,mandi_code:mandiCode||null,state_code:stateCode||null,
+    },{status:404});
 
-    // Never present a one-day cross-sectional snapshot as a trained forecast.
-    // Five distinct daily points are a minimum readiness gate; more history is
-    // needed for dependable validation and seasonal modelling.
     if (observations.length < 5) {
-      // Transparent reference baseline while official history is insufficient.
-      // This is not a trained forecast: it repeats the last real observed price.
-      const last = observations[observations.length - 1];
+      const last = observations[observations.length-1];
       const baseline = Number(last.modal_price);
-      const lower = Math.min(Number(last.min_price) || baseline, baseline);
-      const upper = Math.max(Number(last.max_price) || baseline, baseline);
-      const start = new Date(baseDate + 'T00:00:00.000Z');
-      const baselinePoints = Array.from({ length: horizonDays }, (_, index) => {
-        const target = new Date(start);
-        target.setUTCDate(target.getUTCDate() + index + 1);
-        return { target_date: target.toISOString().slice(0, 10), forecast_horizon_days: index + 1, predicted_value: baseline, lower_bound_95: lower, upper_bound_95: upper, data_type: 'BASELINE_NOT_TRAINED' };
+      const lower = Math.max(0,Math.min(Number(last.min_price)||baseline,baseline));
+      const upper = Math.max(Number(last.max_price)||baseline,baseline);
+      const start = new Date(`${last.observed_at}T00:00:00.000Z`);
+      const forecast = Array.from({length:horizonDays},(_,i)=>{
+        const target = new Date(start); target.setUTCDate(target.getUTCDate()+i+1);
+        return {target_date:target.toISOString().slice(0,10),forecast_horizon_days:i+1,predicted_value:baseline,lower_bound_95:lower,upper_bound_95:upper,data_type:'BASELINE_NOT_TRAINED'};
       });
       return NextResponse.json({
-        ok: true, training_status: 'BASELINE_ONLY',
-        message: 'Reference baseline from the latest observed modal price, not a trained prediction. At least five distinct dates are required to fit a trend.',
-        commodity_code: commodityCode, mandi_code: mandiCode || null,
-        forecast: baselinePoints, observed_count: observations.length,
-        source_row_count: historyData.length,
-        history_dates: observations.map((item) => item.observed_at),
-        model_name: null, model_version: null, materialized_run_id: null,
+        ok:true,request_id:requestId,training_status:'BASELINE_ONLY',
+        message:'Baseline only: fewer than five distinct observation dates. This is not a trained or validated prediction.',
+        commodity_code:commodityCode,mandi_code:mandiCode||null,state_code:stateCode||null,
+        forecast,observed_count:observations.length,source_row_count:historyData.length,
+        history_dates:observations.map(x=>x.observed_at),model_name:null,model_version:null,
+        materialized_run_id:null,persistence_status:'NOT_REQUIRED_BASELINE',
       });
     }
 
-    // Fit the leakage-safe time-series trend using daily medians of official observations
-    const forecastResult = MandiForecastEngine.generatePriceForecast(
-      observations,
-      commodityCode,
-      horizonDays,
-      baseDate,
-      stateCode,
-      districtCode
-    );
+    const result = MandiForecastEngine.generatePriceForecast(observations,commodityCode,horizonDays,baseDate,stateCode,districtCode);
+    let runId: string | null = null;
+    let persistenceStatus = 'FAILED';
+    let persistenceWarning: string | null = null;
+    const {data:runData,error:runError} = await supabase.from('national_forecast_runs').insert({
+      model_name:result.model_name,model_version:result.model_version,model_type:result.model_type,
+      commodity_code:commodityCode,state_code:stateCode,district_code:districtCode,
+      training_period_start:observations[0].observed_at,training_period_end:baseDate,
+      feature_set:{history_points:result.historical_data_points,horizon_days:horizonDays},
+      validation_method:'ROLLING_WINDOW',executed_at:new Date().toISOString(),source:'AGRIMARK_MLOPS',
+      is_champion:false,
+    }).select('id').maybeSingle();
 
-    // Materialize forecast execution into national_forecast_runs
-    const trainingStart = observations.length > 0 ? String(observations[0].observed_at).split('T')[0] : baseDate;
-    const trainingEnd = baseDate;
-
-    const { data: runData } = await supabase
-      .from('national_forecast_runs')
-      .insert({
-        model_name: forecastResult.model_name,
-        model_version: forecastResult.model_version,
-        model_type: forecastResult.model_type,
-        commodity_code: commodityCode,
-        state_code: stateCode,
-        district_code: districtCode,
-        training_period_start: trainingStart,
-        training_period_end: trainingEnd,
-        feature_set: { history_points: forecastResult.historical_data_points, horizon_days: horizonDays },
-        validation_method: 'ROLLING_WINDOW',
-        executed_at: new Date().toISOString(),
-        source: 'AGRIMARK_MLOPS',
-        is_champion: true,
-      })
-      .select('id')
-      .maybeSingle();
-
-    // Materialize daily prediction points if run succeeded
-    if (runData?.id) {
-      const runId = runData.id;
-      const predictionsPayload = forecastResult.predictions.map((p) => ({
-        forecast_run_id: runId,
-        commodity_code: commodityCode,
-        state_code: stateCode,
-        district_code: districtCode,
-        target_date: p.target_date,
-        predicted_metric: 'PRICE',
-        predicted_value: p.predicted_value,
-        lower_bound_95: p.lower_bound_95,
-        upper_bound_95: p.upper_bound_95,
-        forecast_horizon_days: p.forecast_horizon_days,
-        source: 'AGRIMARK_MLOPS',
-        geography: districtCode || stateCode || 'NATIONAL',
-        unit: 'INR_PER_QUINTAL',
-        validation_status: 'VALIDATED',
-        data_layer: 'FORECAST',
-        is_synthetic: false,
+    if (runError || !runData?.id) {
+      persistenceWarning = runError?.message || 'Forecast run record was not returned.';
+    } else {
+      runId = String(runData.id);
+      const payload = result.predictions.map(p=>({
+        forecast_run_id:runId,commodity_code:commodityCode,state_code:stateCode,district_code:districtCode,
+        target_date:p.target_date,predicted_metric:'PRICE',predicted_value:p.predicted_value,
+        lower_bound_95:p.lower_bound_95,upper_bound_95:p.upper_bound_95,
+        forecast_horizon_days:p.forecast_horizon_days,source:'AGRIMARK_MLOPS',
+        geography:districtCode||stateCode||'NATIONAL',unit:'INR_PER_QUINTAL',
+        validation_status:'UNVALIDATED',data_layer:'FORECAST',is_synthetic:false,
       }));
-
-      await supabase.from('national_forecast_predictions').insert(predictionsPayload);
+      const {error:predictionError}=await supabase.from('national_forecast_predictions').insert(payload);
+      if (predictionError) persistenceWarning = predictionError.message;
+      else persistenceStatus = 'SAVED_UNVALIDATED';
     }
 
     return NextResponse.json({
-      ok: true,
-      timestamp: new Date().toISOString(),
-      commodity_code: commodityCode,
-      mandi_code: mandiCode || null,
-      forecast: forecastResult.predictions,
-      observed_count: forecastResult.historical_data_points,
-      source_row_count: historyData?.length || 0,
-      history_dates: observations.map((item) => item.observed_at),
-      model_name: forecastResult.model_name,
-      model_version: forecastResult.model_version,
-      materialized_run_id: runData?.id || null,
+      ok:true,request_id:requestId,timestamp:new Date().toISOString(),
+      commodity_code:commodityCode,mandi_code:mandiCode||null,state_code:stateCode||null,
+      forecast:result.predictions,observed_count:result.historical_data_points,
+      source_row_count:historyData.length,history_dates:observations.map(x=>x.observed_at),
+      model_name:result.model_name,model_version:result.model_version,
+      materialized_run_id:runId,persistence_status:persistenceStatus,persistence_warning:persistenceWarning,
+      training_status:'TREND_FIT_NOT_YET_BACKTEST_VALIDATED',
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || 'Server forecast error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ok:false,error:err?.message||'Server forecast error',request_id:requestId},{status:500});
   }
 }
