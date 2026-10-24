@@ -157,9 +157,10 @@ def main() -> int:
         )
         return 2
 
-    # Chronological holdout: later forecast origins are never randomly mixed into training.
+    # Chronological holdout: every training target must also precede the cutoff,
+    # otherwise a 7-day training label could leak into the later test period.
     cut = data["source_date"].quantile(0.8)
-    train = data[data["source_date"] < cut].copy()
+    train = data[data["target_date"] < cut].copy()
     test = data[data["source_date"] >= cut].copy()
     if len(train) < MIN_TRAIN_SAMPLES // 2 or test.empty:
         print("TRAINING BLOCKED: insufficient chronological train/test samples.")
