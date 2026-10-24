@@ -87,9 +87,9 @@ export async function GET(request: NextRequest) {
 
     // Load reference labels first so UI codes can be resolved into the actual database keys/names.
     const [commodities, states, mandis] = await Promise.all([
-      queryTable('national_commodities', 'code,name', 'name.asc', 2000),
-      queryTable('national_states', 'state_code,state_name', 'state_name.asc', 1000),
-      queryTable('national_mandis', 'mandi_code,mandi_name,state_code', 'mandi_name.asc', 1500),
+      queryTable('national_commodities', 'code,name', 'name.asc', 500),
+      queryTable('national_states', 'state_code,state_name', 'state_name.asc', 100),
+      queryTable('national_mandis', 'mandi_code,mandi_name,state_code', 'mandi_name.asc', 1200),
     ]);
 
     const commodityNameByCode = new Map(commodities.map((r: any) => [String(r.code), String(r.name)]));
