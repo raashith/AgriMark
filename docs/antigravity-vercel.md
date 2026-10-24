@@ -14,7 +14,7 @@ This document outlines the canonical integration configuration connecting Google
 - **Production Branch**: `main`
 - **Render Backend API**: `https://agrimark-api.onrender.com`
 - **Canonical API Base**: `https://agrimark-api.onrender.com/api/v1`
-- **Supabase Database Ref**: `xrcqzpnstdbbtafhcwbb` (`AgriMark`, `ap-southeast-2`)
+- **Supabase Database Ref**: `tsdjtlmrvbspyzgwmccg` (`AgriMark`, `ap-southeast-2`)
 
 ---
 
