@@ -54,9 +54,9 @@ async function queryTable(
 }
 
 export async function GET(request: NextRequest) {
-  // Temporary load-shedding switch: pause all public mandi-price database reads.
-  // Set to false when the market-price API is ready to resume.
-  const MANDI_PRICE_API_PAUSED = true;
+  // Resume the canonical, date-filtered market feed. Queries below are restricted
+  // to the verified 2026-10-16 snapshot and respect commodity/state/mandi filters.
+  const MANDI_PRICE_API_PAUSED = false;
   if (MANDI_PRICE_API_PAUSED) {
     return NextResponse.json(
       {
