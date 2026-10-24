@@ -120,10 +120,18 @@ export async function GET(request: NextRequest) {
     if (rawState || selectedMandiState) csvParams.state_name = `ilike.*${effectiveStateName.replace(/[,*()]/g, '')}*`;
     if (rawMandi) csvParams.mandi_name = `ilike.*${selectedMandiName.replace(/[,*()]/g, '')}*`;
 
-    const [stored, imported] = await Promise.all([
+    // Canonical observations are the primary source. A staging-table problem must
+    // never discard valid canonical prices; staging is an optional supplemental source.
+    const [storedResult, importedResult] = await Promise.allSettled([
       queryTable('national_market_price_observations', observationSelect, 'observation_date.desc,id.desc', limit, primaryParams),
       queryTable('agmarknet_csv_import_staging', csvSelect, 'observation_date.desc,id.desc', limit, csvParams),
     ]);
+    if (storedResult.status === 'rejected') throw storedResult.reason;
+    const stored = storedResult.value;
+    const imported = importedResult.status === 'fulfilled' ? importedResult.value : [];
+    const warnings = importedResult.status === 'rejected'
+      ? ['Supplemental CSV staging records could not be loaded; showing canonical market observations only.']
+      : [];
 
     const storedRows = stored.map((r: any) => ({
       ...r,
@@ -199,7 +207,7 @@ export async function GET(request: NextRequest) {
       commodities: allCommodities,
       states: allStates,
       mandis: allMandis,
-      warnings: [],
+      warnings,
       count: rows.length,
       primary_count: storedRows.length,
       imported_csv_count: csvRows.length,
