@@ -80,9 +80,11 @@ export default function LoginPage() {
     try {
       // Use the explicit selection, then activate it after authentication so
       // stale/default profile roles cannot override the workspace the user chose.
-      const profile = await login({ email, password, role });
-      const targetRole = role || profile.role || 'farmer';
-      router.replace(getRoleRoute(targetRole));
+      await login({ email, password, role });
+      // Explicitly activate the selected workspace after Firebase authentication.
+      // This prevents a concurrent auth-state refresh from leaving the old role active.
+      await activateRole(role);
+      router.replace(getRoleRoute(role));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to sign in.');
     } finally {
@@ -116,9 +118,10 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const profile = await loginWithGoogle(role);
-      const targetRole = role || profile.role || 'farmer';
-      router.replace(getRoleRoute(targetRole));
+      await loginWithGoogle(role);
+      // Persist the selected workspace before navigating after Google sign-in too.
+      await activateRole(role);
+      router.replace(getRoleRoute(role));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Google sign-in could not be completed.');
     } finally {
