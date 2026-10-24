@@ -118,6 +118,7 @@ export async function GET(request: Request) {
       return NextResponse.json({
         ok: true, training_status: 'BASELINE_ONLY',
         message: `Reference baseline anchored to the official ${sourceDate} snapshot, not a trained prediction. This dataset contains one observation date, so no time trend can be learned.`,
+        source_date: sourceDate,
         commodity_code: commodityCode, mandi_code: mandiCode || null,
         forecast: baselinePoints, observed_count: observations.length,
         source_row_count: historyData.length,
