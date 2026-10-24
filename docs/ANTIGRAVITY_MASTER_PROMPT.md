@@ -11,7 +11,7 @@ Current Stitch integration branch: `feature/stitch-import-v2`.
 Main production branch: `main`.
 Existing API: `https://agrimark-api.onrender.com`.
 Existing Stitch Render service: `https://agrimark-stitch-web.onrender.com`.
-Supabase project: existing AgriMark project `xrcqzpnstdbbtafhcwbb`.
+Supabase project: existing AgriMark project `tsdjtlmrvbspyzgwmccg`.
 Supabase Stitch schema: `stitch_app` inside the same Supabase project. Do not create a second Supabase project unless technically unavoidable and explicitly justified.
 
 ## Non-Negotiable Architecture Rules
