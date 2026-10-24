@@ -63,7 +63,6 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(MAX_ROWS, Math.max(100, Number(params.get('limit')) || DEFAULT_ROWS));
 
     const observationSelect = 'id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source,variety,grade';
-    const csvSelect = 'id,source_row_hash,observation_date,state_name,district_name,mandi_name,commodity_name,variety,grade,min_price,max_price,modal_price,source';
 
     // Load reference labels first so UI codes can be resolved into the actual database keys/names.
     const [commodities, states, mandis] = await Promise.all([
@@ -115,23 +114,17 @@ export async function GET(request: NextRequest) {
     if ((rawState || selectedMandiState) && canonicalStateCode) primaryParams.state_code = `eq.${canonicalStateCode}`;
     if (rawMandi && canonicalMandi?.mandi_code) primaryParams.mandi_code = `eq.${canonicalMandi.mandi_code}`;
 
-    const csvParams: Record<string, string> = {};
-    if (rawCommodity) csvParams.commodity_name = `ilike.*${commodityName.replace(/[,*()]/g, '')}*`;
-    if (rawState || selectedMandiState) csvParams.state_name = `ilike.*${effectiveStateName.replace(/[,*()]/g, '')}*`;
-    if (rawMandi) csvParams.mandi_name = `ilike.*${selectedMandiName.replace(/[,*()]/g, '')}*`;
-
-    // Canonical observations are the primary source. A staging-table problem must
-    // never discard valid canonical prices; staging is an optional supplemental source.
-    const [storedResult, importedResult] = await Promise.allSettled([
-      queryTable('national_market_price_observations', observationSelect, 'observation_date.desc,id.desc', limit, primaryParams),
-      queryTable('agmarknet_csv_import_staging', csvSelect, 'observation_date.desc,id.desc', limit, csvParams),
-    ]);
-    if (storedResult.status === 'rejected') throw storedResult.reason;
-    const stored = storedResult.value;
-    const imported = importedResult.status === 'fulfilled' ? importedResult.value : [];
-    const warnings = importedResult.status === 'rejected'
-      ? ['Supplemental CSV staging records could not be loaded; showing canonical market observations only.']
-      : [];
+    // This page intentionally reads only the canonical dataset imported on 16 Oct 2026.
+    // Do not mix later staging rows into the selected commodity's displayed prices.
+    const dateParams = { ...primaryParams, observation_date: 'eq.2026-10-16' };
+    const stored = await queryTable(
+      'national_market_price_observations',
+      observationSelect,
+      'observation_date.desc,id.desc',
+      limit,
+      dateParams,
+    );
+    const warnings: string[] = [];
 
     const storedRows = stored.map((r: any) => ({
       ...r,
@@ -145,30 +138,10 @@ export async function GET(request: NextRequest) {
       imported_csv: false,
     }));
 
-    const csvRows = imported.map((r: any) => ({
-      id: -Number(r.id),
-      commodity_code: `CSV_COMMODITY:${String(r.commodity_name || '').trim()}`,
-      mandi_code: `CSV_MANDI:${String(r.mandi_name || '').trim()}|${String(r.state_name || '').trim()}`,
-      state_code: `CSV_STATE:${String(r.state_name || '').trim()}`,
-      observation_date: r.observation_date,
-      modal_price: Number(r.modal_price) || 0,
-      min_price: Number(r.min_price) || 0,
-      max_price: Number(r.max_price) || 0,
-      arrival_quantity: null,
-      source: r.source || 'AGMARKNET',
-      commodity_name: String(r.commodity_name || 'Unknown commodity').trim(),
-      mandi_name: String(r.mandi_name || 'Mandi unavailable').trim(),
-      state_name: String(r.state_name || 'India').trim(),
-      district_name: r.district_name,
-      variety: r.variety,
-      grade: r.grade,
-      imported_csv: true,
-    }));
-
     const wantedCommodity = rawCommodity ? norm(commodityName) : '';
     const wantedState = (rawState || selectedMandiState) ? norm(effectiveStateName) : '';
     const wantedMandi = rawMandi ? norm(selectedMandiName) : '';
-    const rowsBeforeSearch = [...storedRows, ...csvRows].filter((row: any) =>
+    const rowsBeforeSearch = storedRows.filter((row: any) =>
       Number.isFinite(row.modal_price) && row.modal_price > 0
       && (!wantedCommodity || norm(row.commodity_name) === wantedCommodity)
       && (!wantedState || norm(row.state_name) === wantedState)
@@ -188,18 +161,9 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => String(b.observation_date).localeCompare(String(a.observation_date)) || Number(b.id) - Number(a.id));
     const rows = allMatching.slice(0, limit);
 
-    const allCommodities = [
-      ...commodities,
-      ...[...new Map(csvRows.map((r: any) => [r.commodity_code, { code: r.commodity_code, name: r.commodity_name }])).values()],
-    ];
-    const allStates = [
-      ...states,
-      ...[...new Map(csvRows.map((r: any) => [r.state_code, { state_code: r.state_code, state_name: r.state_name }])).values()],
-    ];
-    const allMandis = [
-      ...mandis,
-      ...[...new Map(csvRows.map((r: any) => [r.mandi_code, { mandi_code: r.mandi_code, mandi_name: r.mandi_name, state_code: r.state_code }])).values()],
-    ];
+    const allCommodities = commodities;
+    const allStates = states;
+    const allMandis = mandis;
 
     return NextResponse.json({
       ok: true,
@@ -210,11 +174,11 @@ export async function GET(request: NextRequest) {
       warnings,
       count: rows.length,
       primary_count: storedRows.length,
-      imported_csv_count: csvRows.length,
+      imported_csv_count: 0,
       capped: allMatching.length > limit,
       latest_observation_date: rows[0]?.observation_date ?? null,
-      source: 'public.national_market_price_observations + public.agmarknet_csv_import_staging',
-      applied_filters: { commodity: rawCommodity || null, state: rawState || null, mandi: rawMandi || null, search: search || null },
+      source: 'public.national_market_price_observations (2026-10-16)',
+      applied_filters: { commodity: rawCommodity || null, state: rawState || null, mandi: rawMandi || null, search: search || null, observation_date: '2026-10-16' },
     }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown market data request failure.';
