@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://tsdjtlmrvbspyzgwmccg.supabase.co').replace(/\/$/, '');
+const SUPABASE_URL = 'https://tsdjtlmrvbspyzgwmccg.supabase.co';
 
 function getApiKey() {
   // Prefer server-only credentials when configured; otherwise use the public
