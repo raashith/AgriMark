@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, ArrowUpRight, BarChart3, BrainCircuit, CalendarDays, ChevronDown, Database, Globe2, Landmark, MapPin, RefreshCw, Search, ShieldCheck, Sprout, TrendingUp, Wheat } from 'lucide-react';
+import { Activity, BarChart3, BrainCircuit, CalendarDays, Database, Globe2, MapPin, RefreshCw, Search, ShieldCheck, Sprout, TrendingUp, Wheat } from 'lucide-react';
 
 type Opt={code:string;name:string;state_code?:string};
 type Row={id:number;commodity_code:string;mandi_code:string|null;state_code:string|null;observation_date:string;modal_price:number;min_price:number;max_price:number;arrival_quantity:number|null;source:string|null;commodity_name:string;mandi_name:string;state_name:string;imported_csv?:boolean};
@@ -41,8 +41,6 @@ export default function MarketPricesPage(){
  const latest=[...filtered].sort((a,b)=>b.observation_date.localeCompare(a.observation_date)||Number(b.id)-Number(a.id))[0];
  const dates=[...new Set(filtered.map(r=>r.observation_date))].sort();
 
- // Forecast only the exact selected series. If no mandi is selected, a state
- // aggregate is clearly labelled. National mode uses one median per date.
  const forecastRows=useMemo(()=>filtered.filter(r=>{
    if(!commodity)return false;
    if(mandi)return r.mandi_code===mandi;
@@ -61,7 +59,6 @@ export default function MarketPricesPage(){
  const [forecastLoading,setForecastLoading]=useState(false),[forecastMessage,setForecastMessage]=useState('Choose a commodity and market scope to inspect forecast readiness.');
  const [fallbackForecast,setFallbackForecast]=useState<{value:number;label:string}|null>(null);
  const latestPrice=latest&&Number.isFinite(Number(latest.modal_price))?Number(latest.modal_price):null;
- const loadedCount=filtered.length;
 
  useEffect(()=>{
    setForecast(null);setFallbackForecast(null);
@@ -87,7 +84,7 @@ export default function MarketPricesPage(){
        const denominator=xs.reduce((sum,x)=>sum+(x-meanX)**2,0);
        slope=denominator?xs.reduce((sum,x,i)=>sum+(x-meanX)*(series[i].price-meanY),0)/denominator:0;
        slope=Math.max(-50,Math.min(50,slope));
-       intercept=meanY-slope*meanX;
+       intercept=meanY-slope*xs[0];
        const residuals=series.map((p,i)=>p.price-(intercept+slope*xs[i]));
        residualStd=Math.sqrt(residuals.reduce((sum,v)=>sum+v*v,0)/Math.max(1,residuals.length-2));
      }
@@ -110,15 +107,14 @@ export default function MarketPricesPage(){
    }finally{setForecastLoading(false);}
  },[commodity,state,mandi,history,latestPrice]);
 
- const commoditiesForSelectedState=mandis.filter(m=>!state||m.state_code===state);
+ const mandisForSelectedState=mandis.filter(m=>!state||m.state_code===state);
  const onStateChange=(value:string)=>{T(value);M('');};
- const onCommodityChange=(value:string)=>{C(value);};
  return <main className="min-h-screen bg-[#06140e] text-white"><div className="mx-auto max-w-[1600px] space-y-6 px-4 py-5 md:px-6 md:py-8">
  <header className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end"><div><div className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-800 bg-emerald-950/60 px-3 py-1 text-xs font-bold text-emerald-300"><Sprout size={14}/> AGRIMARK INTELLIGENCE</div><h1 className="text-3xl font-black tracking-tight md:text-4xl">Mandi Price Intelligence</h1><p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">Official observed prices and clearly labelled reference forecasts from stored AGMARKNET records.</p></div><div className="flex flex-wrap items-center gap-2 text-xs text-slate-400"><Database size={15} className="text-emerald-300"/><span>Supabase · {updated?'checked '+updated:'loading source status'}</span><button onClick={()=>void load()} className="rounded-xl border border-emerald-800 p-2 text-emerald-300" aria-label="Refresh market prices"><RefreshCw size={15}/></button></div></header>
  <section className="grid grid-cols-1 gap-3 rounded-3xl border border-emerald-800/70 bg-[#0b1e15] p-4 md:grid-cols-2 xl:grid-cols-4">
- <Picker label="Commodity" value={commodity} change={onCommodityChange} opts={commodities} icon={<Wheat size={17}/>}/>
+ <Picker label="Commodity" value={commodity} change={C} opts={commodities} icon={<Wheat size={17}/>}/>
  <Picker label="State" value={state} change={onStateChange} opts={states} icon={<Globe2 size={17}/>}/>
- <Picker label="Mandi" value={mandi} change={M} opts={commoditiesForSelectedState.map(m=>({code:m.mandi_code||m.code,name:m.mandi_name||m.name,state_code:m.state_code}))} icon={<MapPin size={17}/>}/>
+ <Picker label="Mandi" value={mandi} change={M} opts={mandisForSelectedState.map(m=>({code:m.code,name:m.name,state_code:m.state_code}))} icon={<MapPin size={17}/>}/>
  <label className="flex min-h-12 items-center gap-2 rounded-xl border border-emerald-900 bg-[#071711] px-3"><Search size={17} className="text-emerald-300"/><input value={search} onChange={e=>Q(e.target.value)} placeholder="Search commodity, mandi, state" className="min-w-0 flex-1 bg-transparent text-sm outline-none"/></label>
  </section>
  {error&&<div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-700/70 bg-amber-950/30 p-4 text-sm text-amber-100"><span>{error}</span><button onClick={()=>void load()} className="rounded-lg border border-amber-700 px-3 py-1.5 font-bold">Retry</button></div>}
