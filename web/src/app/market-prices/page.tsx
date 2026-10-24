@@ -16,11 +16,20 @@ export default function MarketPricesPage(){
   const timeout=window.setTimeout(()=>controller.abort(),30000);
   try{
    const params=new URLSearchParams();if(commodity)params.set('commodity',commodity);if(state)params.set('state',state);if(mandi)params.set('mandi',mandi);if(search.trim())params.set('search',search.trim());params.set('limit','25');
-   const response=await fetch('/api/market-prices'+(params.size?'?'+params.toString():''),{cache:'no-store',signal:controller.signal});
-   const payload=await response.json() as {ok?:boolean;rows?:any[];commodities?:any[];states?:any[];mandis?:any[];error?:string;warnings?:string[];capped?:boolean;latest_observation_date?:string|null};
+   const requestUrl='/api/market-prices'+(params.size?'?'+params.toString():'');
+   let response=await fetch(requestUrl,{cache:'no-store',signal:controller.signal,headers:{Accept:'application/json'}});
+   let responseText=await response.text();
+   let payload={ok:false,rows:[],commodities:[],states:[],mandis:[],error:'Market data returned an unreadable response.'} as {ok?:boolean;rows?:any[];commodities?:any[];states?:any[];mandis?:any[];error?:string;warnings?:string[];capped?:boolean;latest_observation_date?:string|null};
+   try{payload=JSON.parse(responseText)}catch{}
+   if(response.ok&&payload.ok&&(!Array.isArray(payload.rows)||payload.rows.length===0)&&!commodity&&!state&&!mandi&&!search.trim()){
+    // Retry the unfiltered first page once if an edge cache or transient response returned an empty payload.
+    response=await fetch('/api/market-prices?limit=25&retry='+Date.now(),{cache:'no-store',signal:controller.signal,headers:{Accept:'application/json'}});
+    responseText=await response.text();
+    try{payload=JSON.parse(responseText)}catch{}
+   }
    if(!response.ok||!payload.ok)throw new Error(payload.error||`Market data API failed (HTTP ${response.status}).`);
    if(requestId!==requestSequence.current)return;
-   const rawRows=payload.rows||[];
+   const rawRows=Array.isArray(payload.rows)?payload.rows:[];
    S(rawRows as Row[]);setApiCapped(Boolean(payload.capped));
    const commodityOptions=(payload.commodities||[]).map((r:any)=>({code:r.code,name:r.name}));
    const stateOptions=(payload.states||[]).map((r:any)=>({code:r.state_code||r.code,name:r.state_name||r.name}));
