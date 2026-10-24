@@ -6,7 +6,7 @@ This runbook establishes operational procedures, environment deployment specs, r
 ---
 
 ## 1. Pilot Architecture & Roles
-- **Production Baseline**: Next.js 14 App Router on Vercel connected to Supabase PostgreSQL (`xrcqzpnstdbbtafhcwbb`).
+- **Production Baseline**: Next.js 14 App Router on Vercel connected to Supabase PostgreSQL (`tsdjtlmrvbspyzgwmccg`).
 - **Participant Roles**:
   1. **Farmer**: Manages farm boundaries, crop cultivations, field observations, harvest lots, and listings.
   2. **Buyer**: Submits RFQs, inspects produce provenance, places transaction-safe wholesale orders.
@@ -17,7 +17,7 @@ This runbook establishes operational procedures, environment deployment specs, r
 ---
 
 ## 2. Environment Setup & Data Isolation
-- **Production Database**: Supabase (`xrcqzpnstdbbtafhcwbb`).
+- **Production Database**: Supabase (`tsdjtlmrvbspyzgwmccg`).
 - **Seeding Strategy**: Synthetic identity seed scripts located in `scripts/pilot/seed_pilot_data.ts` (strictly excluded from production via `NODE_ENV` guards).
 - **Row Level Security (RLS)**: Active across all primary tables (`profiles`, `farms`, `cultivations`, `produce_lots`, `listings`, `marketplace_orders`).
 
