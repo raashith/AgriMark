@@ -71,8 +71,8 @@ export async function GET(request: Request) {
     const cookieStore = cookies();
     const supabase = createServerClient(supabaseUrl,supabaseKey,{cookies:{get(name:string){return cookieStore.get(name)?.value;}}});
 
-    // Legacy payload is incompatible with the canonical table. This check proves
-    // the table shape, but intentionally performs no mutation.
+    // Legacy payload is incompatible with the canonical table. This check verifies
+    // the table shape but intentionally performs no mutation.
     const {error:schemaCheckError} = await supabase.from('national_market_price_observations')
       .select('id,observation_date,state_code,district_code,mandi_code,commodity_code,variety,grade,arrival_quantity,min_price,max_price,modal_price,source,source_record_id,raw_record')
       .limit(1);
