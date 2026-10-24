@@ -16,7 +16,7 @@ function getApiKey() {
 }
 
 function norm(v: unknown) {
-  return String(v ?? '').trim().toLocaleLowerCase('en-IN').replace(/\\s+/g, ' ');
+  return String(v ?? '').trim().toLocaleLowerCase('en-IN').replace(/\s+/g, ' ');
 }
 function same(a: unknown, b: unknown) {
   return norm(a) === norm(b);
