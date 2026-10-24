@@ -16,7 +16,7 @@ Set these on the Render backend service:
 
 ```
 DATA_GOV_IN_API_KEY=<your data.gov.in API key>
-SUPABASE_URL=https://xrcqzpnstdbbtafhcwbb.supabase.co
+SUPABASE_URL=https://tsdjtlmrvbspyzgwmccg.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=<Supabase secret/service-role key>
 ```
 
