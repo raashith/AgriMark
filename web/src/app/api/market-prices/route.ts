@@ -4,8 +4,8 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const SUPABASE_URL = 'https://tsdjtlmrvbspyzgwmccg.supabase.co';
-const DEFAULT_ROWS = 3000;
-const MAX_ROWS = 10000;
+const DEFAULT_ROWS = 100;
+const MAX_ROWS = 300;
 
 function getApiKey() {
   return process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -81,15 +81,15 @@ export async function GET(request: NextRequest) {
     const rawState = params.get('state')?.trim() || '';
     const rawMandi = params.get('mandi')?.trim() || '';
     const search = norm(params.get('search'));
-    const limit = Math.min(MAX_ROWS, Math.max(100, Number(params.get('limit')) || DEFAULT_ROWS));
+    const limit = Math.min(MAX_ROWS, Math.max(25, Number(params.get('limit')) || DEFAULT_ROWS));
 
     const observationSelect = 'id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source,variety,grade';
 
     // Load reference labels first so UI codes can be resolved into the actual database keys/names.
     const [commodities, states, mandis] = await Promise.all([
-      queryTable('national_commodities', 'code,name', 'name.asc', 5000),
+      queryTable('national_commodities', 'code,name', 'name.asc', 2000),
       queryTable('national_states', 'state_code,state_name', 'state_name.asc', 1000),
-      queryTable('national_mandis', 'mandi_code,mandi_name,state_code', 'mandi_name.asc', 5000),
+      queryTable('national_mandis', 'mandi_code,mandi_name,state_code', 'mandi_name.asc', 1500),
     ]);
 
     const commodityNameByCode = new Map(commodities.map((r: any) => [String(r.code), String(r.name)]));
