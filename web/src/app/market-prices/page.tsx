@@ -34,9 +34,7 @@ export default function MarketPricesPage(){
    if(requestId!==requestSequence.current)return;
    const err=e as {message?:string;name?:string};
    E(err.name==='AbortError'?'Market data request timed out after 20 seconds. Please retry.':err.message||'Could not load market observations. Please retry.');
-   // Keep the last successful response visible during transient API failures.
-   // Clearing rows here made all four metric cards fall back to zero/blank.
-   if(!rows.length) S([]);
+   // Preserve the last successful rows during transient API failures.
   }finally{
    window.clearTimeout(timeout);if(requestId===requestSequence.current)L(false);
   }
