@@ -5,8 +5,8 @@ Fix the production authentication flow end-to-end. The live site currently shows
 ## Canonical architecture
 - Frontend: Next.js on Vercel
 - Auth: Supabase Auth only
-- Database: Supabase project `xrcqzpnstdbbtafhcwbb`
-- Supabase URL: `https://xrcqzpnstdbbtafhcwbb.supabase.co`
+- Database: Supabase project `tsdjtlmrvbspyzgwmccg`
+- Supabase URL: `https://tsdjtlmrvbspyzgwmccg.supabase.co`
 - Public browser credential: `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
 - Backend API: Render `https://agrimark-api.onrender.com`; do NOT use it as a browser password-auth fallback.
 - Never expose any service-role/secret key in client code.
@@ -21,7 +21,7 @@ Fix the production authentication flow end-to-end. The live site currently shows
 7. Do NOT invent or hardcode a fake API key. The public publishable key is safe for the browser, but should come from Vercel env vars or an explicitly documented public runtime/build configuration.
 8. Because the user cannot currently edit Vercel environment variables, add a robust production fallback strategy that does NOT require a secret: use the canonical Supabase URL and the real public publishable key supplied from the project configuration, but do not place service-role or database credentials anywhere client-side. Prefer a server/runtime injection if possible; otherwise document the exact Vercel env names and fail with a precise diagnostic.
 9. Add/verify `.env.example` with:
-   `NEXT_PUBLIC_SUPABASE_URL=https://xrcqzpnstdbbtafhcwbb.supabase.co`
+   `NEXT_PUBLIC_SUPABASE_URL=https://tsdjtlmrvbspyzgwmccg.supabase.co`
    `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=`
    `NEXT_PUBLIC_API_BASE_URL=https://agrimark-api.onrender.com/api/v1`
 10. Add automated checks that fail the build if client code contains `SERVICE_ROLE`, `sb_secret_`, or database passwords.
