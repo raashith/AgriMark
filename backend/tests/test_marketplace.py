@@ -12,6 +12,10 @@ def test_marketplace_routes_require_authentication():
     order_id = uuid4()
     assert client.post("/api/v1/marketplace/rfqs", json={"quantity": 10}).status_code == 401
     assert client.get("/api/v1/marketplace/orders").status_code == 401
+    assert client.get("/api/v1/marketplace/notifications").status_code == 401
+    assert client.patch(
+        f"/api/v1/marketplace/notifications/{uuid4()}/read",
+    ).status_code == 401
     assert client.patch(
         f"/api/v1/marketplace/orders/{order_id}/address",
         json={"delivery_address": "123 Main Street, Town, PIN 600001"},
