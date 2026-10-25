@@ -65,6 +65,16 @@ class ProduceLotCreate(BaseModel):
     harvested_at: date | None = None
 
 
+class ProduceLotUpdate(BaseModel):
+    cultivation_id: UUID | None = None
+    crop_id: UUID | None = None
+    quantity: Decimal | None = Field(default=None, gt=0)
+    unit: str | None = Field(default=None, min_length=1, max_length=24)
+    quality_grade: str | None = Field(default=None, max_length=100)
+    available_quantity: Decimal | None = Field(default=None, ge=0)
+    harvested_at: date | None = None
+
+
 class ProduceLotResponse(ProduceLotCreate):
     id: UUID
     owner_id: UUID
