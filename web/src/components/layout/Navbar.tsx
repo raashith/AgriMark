@@ -54,10 +54,25 @@ export const Navbar: React.FC = () => {
   };
 
   useEffect(() => {
-    void loadNotifications();
-    if (!isAuthenticated || !isFarmerWorkspace) return;
-    const interval = window.setInterval(() => { void loadNotifications(); }, 30000);
-    return () => window.clearInterval(interval);
+    let active = true;
+    const refresh = async () => {
+      if (!isAuthenticated || !isFarmerWorkspace) {
+        if (active) setNotifications([]);
+        return;
+      }
+      try {
+        const rows = await api.getNotifications();
+        if (active) setNotifications(Array.isArray(rows) ? rows : []);
+      } catch (error) {
+        if (active) console.error('[AgriMark] Unable to load notifications', error);
+      } finally {
+        if (active) setNotificationsLoading(false);
+      }
+    };
+    void refresh();
+    if (!isAuthenticated || !isFarmerWorkspace) return () => { active = false; };
+    const interval = window.setInterval(() => { void refresh(); }, 30000);
+    return () => { active = false; window.clearInterval(interval); };
   }, [isAuthenticated, user?.id, isFarmerWorkspace]);
 
   return (
