@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from decimal import Decimal
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -9,6 +10,7 @@ from ...core.auth import AuthenticatedUser, get_current_user
 from ...core.database import get_supabase
 
 router = APIRouter(prefix="/marketplace", tags=["marketplace"])
+logger = logging.getLogger(__name__)
 
 
 class RFQCreate(BaseModel):
@@ -119,8 +121,9 @@ def list_offers(user: AuthenticatedUser = Depends(get_current_user)):
 
 @router.post("/orders", status_code=201)
 def create_order(request: OrderCreate, user: AuthenticatedUser = Depends(get_current_user)):
+    db = get_supabase()
     try:
-        result = get_supabase().rpc(
+        result = db.rpc(
             "create_marketplace_order_atomic",
             {
                 "p_listing_id": str(request.listing_id),
@@ -128,11 +131,44 @@ def create_order(request: OrderCreate, user: AuthenticatedUser = Depends(get_cur
                 "p_quantity": str(request.quantity),
             },
         ).execute()
-        return _single(result)
+        order = dict(_single(result))
+
+        # The order itself is committed transactionally by the RPC. Notification
+        # delivery is best-effort so a notification issue never reports a failed
+        # purchase after inventory has already been reserved.
+        try:
+            listing_result = (
+                db.table("listings")
+                .select("id,title")
+                .eq("id", str(order.get("listing_id") or request.listing_id))
+                .limit(1)
+                .execute()
+            )
+            listing = (listing_result.data or [{}])[0]
+            title = str(listing.get("title") or "your listed produce")
+            quantity_kg = order.get("quantity_kg", request.quantity)
+            total_price = order.get("total_price")
+            amount_text = f" for ₹{float(total_price):,.0f}" if total_price is not None else ""
+            db.table("user_notifications").insert({
+                "user_id": str(order["seller_id"]),
+                "order_id": str(order["id"]),
+                "type": "marketplace_order",
+                "title": "New buyer order received",
+                "message": f"A buyer ordered {float(quantity_kg):g} kg of {title}{amount_text}. Review the order and buyer details.",
+                "channel": "in_app",
+                "delivery_status": "delivered",
+                "is_read": False,
+            }).execute()
+        except Exception:
+            logger.exception("Order %s was created, but seller notification could not be saved", order.get("id"))
+
+        return order
     except Exception as exc:
         detail = str(exc)
         if "seller cannot buy" in detail or "quantity is below" in detail or "insufficient" in detail or "listing is not active" in detail:
             raise HTTPException(status_code=400, detail=detail) from exc
+        if isinstance(exc, HTTPException):
+            raise
         raise HTTPException(status_code=400, detail="Unable to create order safely") from exc
 
 
