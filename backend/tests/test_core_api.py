@@ -291,3 +291,20 @@ def test_upload_farmer_document_rejects_mismatched_file_signature(monkeypatch):
         assert "contents do not match" in response.json()["detail"]
     finally:
         app.dependency_overrides.clear()
+
+
+
+def test_produce_lot_management_requires_authentication():
+    from uuid import uuid4
+
+    lot_id = uuid4()
+    assert client.get("/api/v1/core/produce-lots").status_code == 401
+    assert client.post(
+        "/api/v1/core/produce-lots",
+        json={"crop_id": str(uuid4()), "quantity": 10, "unit": "kg"},
+    ).status_code == 401
+    assert client.patch(
+        f"/api/v1/core/produce-lots/{lot_id}",
+        json={"quantity": 20},
+    ).status_code == 401
+    assert client.delete(f"/api/v1/core/produce-lots/{lot_id}").status_code == 401

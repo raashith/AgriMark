@@ -292,6 +292,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  updateProduceLot: (lotId: string, data: Partial<ProduceLot>) =>
+    request<ProduceLot>(`/core/produce-lots/${encodeURIComponent(lotId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  deleteProduceLot: (lotId: string) =>
+    request<void>(`/core/produce-lots/${encodeURIComponent(lotId)}`, { method: 'DELETE' }),
   createListing: (data: Partial<Listing>) =>
     request<Listing>('/core/listings', {
       method: 'POST',

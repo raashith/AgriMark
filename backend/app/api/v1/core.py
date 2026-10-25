@@ -23,6 +23,7 @@ from ...schemas.domain import (
     ListingCreate,
     ListingResponse,
     ProduceLotCreate,
+    ProduceLotUpdate,
     ProduceLotResponse,
     ProfileCreate,
     ProfileResponse,
@@ -559,12 +560,18 @@ def list_produce_lots(
     result = (
         get_supabase()
         .table("produce_lots")
-        .select("*")
+        .select("*,crops(name)")
         .eq("owner_id", str(user.id))
         .order("created_at", desc=True)
         .execute()
     )
-    return [ProduceLotResponse(**row) for row in (result.data or [])]
+    items = []
+    for raw_row in (result.data or []):
+        row = dict(raw_row)
+        crop = row.pop("crops", None)
+        row["crop_name"] = crop.get("name") if isinstance(crop, dict) else None
+        items.append(ProduceLotResponse(**row))
+    return items
 
 
 @router.post("/produce-lots", response_model=ProduceLotResponse, status_code=201)
@@ -572,24 +579,100 @@ def create_produce_lot(
     request: ProduceLotCreate,
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> ProduceLotResponse:
+    db = get_supabase()
     if request.cultivation_id:
-        cultivation = get_supabase().table("cultivations").select("id,farm_id").eq("id", str(request.cultivation_id)).limit(1).execute()
-        cultivation_row = _single(cultivation)
-        farm = get_supabase().table("farms").select("id").eq("id", cultivation_row["farm_id"]).eq("owner_id", str(user.id)).limit(1).execute()
-        _single(farm)
+        cultivation_result = db.table("cultivations").select("id,farm_id,crop_id").eq("id", str(request.cultivation_id)).limit(1).execute()
+        cultivation = _single(cultivation_result)
+        farm_result = db.table("farms").select("id").eq("id", cultivation["farm_id"]).eq("owner_id", str(user.id)).limit(1).execute()
+        _single(farm_result)
+        if str(cultivation.get("crop_id")) != str(request.crop_id):
+            raise HTTPException(status_code=422, detail="The selected crop must match the chosen cultivation.")
 
     payload = request.model_dump(exclude_none=True, mode="json")
     payload["owner_id"] = str(user.id)
-    if "available_quantity" not in payload or payload["available_quantity"] is None:
+    if payload.get("available_quantity") is None:
         payload["available_quantity"] = payload["quantity"]
-    if request.cultivation_id:
-        cultivation_row = get_supabase().table("cultivations").select("farm_id").eq("id", str(request.cultivation_id)).limit(1).execute().data[0]
-        payload["cultivation_id"] = str(request.cultivation_id)
     try:
-        result = get_supabase().table("produce_lots").insert(payload).execute()
-        return ProduceLotResponse(**_single(result))
+        result = db.table("produce_lots").insert(payload).select("*,crops(name)").execute()
+        row = dict(_single(result))
+        crop = row.pop("crops", None)
+        row["crop_name"] = crop.get("name") if isinstance(crop, dict) else None
+        return ProduceLotResponse(**row)
+    except HTTPException:
+        raise
     except Exception as exc:
+        logger.exception("Produce lot creation failed for profile %s", user.id)
         raise HTTPException(status_code=400, detail="Unable to create produce lot") from exc
+
+
+@router.patch("/produce-lots/{lot_id}", response_model=ProduceLotResponse)
+def update_produce_lot(
+    lot_id: UUID,
+    request: ProduceLotUpdate,
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> ProduceLotResponse:
+    db = get_supabase()
+    current_result = db.table("produce_lots").select("id,owner_id,cultivation_id,crop_id,quantity,available_quantity,status,is_listed").eq("id", str(lot_id)).eq("owner_id", str(user.id)).limit(1).execute()
+    lot = _single(current_result)
+    payload = request.model_dump(exclude_unset=True, mode="json")
+
+    new_cultivation_id = payload.get("cultivation_id", lot.get("cultivation_id"))
+    new_crop_id = payload.get("crop_id", lot.get("crop_id"))
+    if new_cultivation_id:
+        cultivation_result = db.table("cultivations").select("id,farm_id,crop_id").eq("id", str(new_cultivation_id)).limit(1).execute()
+        cultivation = _single(cultivation_result)
+        farm_result = db.table("farms").select("id").eq("id", cultivation["farm_id"]).eq("owner_id", str(user.id)).limit(1).execute()
+        _single(farm_result)
+        if str(cultivation.get("crop_id")) != str(new_crop_id):
+            raise HTTPException(status_code=422, detail="The selected crop must match the chosen cultivation.")
+
+    if "quantity" in payload or "available_quantity" in payload:
+        current_total = float(lot.get("quantity") or 0)
+        current_available = float(lot.get("available_quantity") if lot.get("available_quantity") is not None else current_total)
+        committed = max(0.0, current_total - current_available)
+        requested_total = float(payload.get("quantity", current_total))
+        requested_available = float(payload.get("available_quantity", max(0.0, requested_total - committed)))
+        if requested_total < committed:
+            raise HTTPException(status_code=409, detail=f"At least {committed:g} units are reserved or sold and cannot be removed.")
+        if requested_available < 0 or requested_available > requested_total - committed:
+            raise HTTPException(status_code=422, detail="Available quantity cannot exceed total quantity after reserved or sold stock.")
+        payload["available_quantity"] = str(requested_available)
+
+    if not payload:
+        return ProduceLotResponse(**lot)
+    try:
+        updated = db.table("produce_lots").update(payload).eq("id", str(lot_id)).eq("owner_id", str(user.id)).select("*,crops(name)").execute()
+        row = dict(_single(updated))
+        crop = row.pop("crops", None)
+        row["crop_name"] = crop.get("name") if isinstance(crop, dict) else None
+        return ProduceLotResponse(**row)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Produce lot update failed for profile %s lot %s", user.id, lot_id)
+        raise HTTPException(status_code=400, detail="Unable to update this produce item") from exc
+
+
+@router.delete("/produce-lots/{lot_id}", status_code=204)
+def delete_produce_lot(
+    lot_id: UUID,
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> None:
+    db = get_supabase()
+    current_result = db.table("produce_lots").select("id,owner_id,quantity,available_quantity,status,is_listed").eq("id", str(lot_id)).eq("owner_id", str(user.id)).limit(1).execute()
+    lot = _single(current_result)
+    active_listing = db.table("listings").select("id,status").eq("lot_id", str(lot_id)).in_("status", ["active", "paused"]).limit(1).execute()
+    if active_listing.data:
+        raise HTTPException(status_code=409, detail="This produce item is linked to an active marketplace listing. Close the listing before deleting it.")
+    total = float(lot.get("quantity") or 0)
+    available = float(lot.get("available_quantity") if lot.get("available_quantity") is not None else total)
+    if available < total or lot.get("status") in {"reserved", "sold", "listed"} or lot.get("is_listed"):
+        raise HTTPException(status_code=409, detail="This item has listed, reserved, or sold stock and cannot be deleted.")
+    try:
+        db.table("produce_lots").delete().eq("id", str(lot_id)).eq("owner_id", str(user.id)).execute()
+    except Exception as exc:
+        logger.exception("Produce lot delete failed for profile %s lot %s", user.id, lot_id)
+        raise HTTPException(status_code=409, detail="This item cannot be deleted while marketplace or order records reference it.") from exc
 
 
 @router.post("/listings", response_model=ListingResponse, status_code=201)
