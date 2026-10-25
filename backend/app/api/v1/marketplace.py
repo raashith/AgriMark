@@ -252,6 +252,50 @@ def list_orders(user: AuthenticatedUser = Depends(get_current_user)):
     return orders
 
 
+@router.get("/notifications")
+def list_notifications(user: AuthenticatedUser = Depends(get_current_user)):
+    """List the current user's recent in-app notifications."""
+    try:
+        result = (
+            get_supabase()
+            .table("user_notifications")
+            .select("id,user_id,order_id,type,title,message,is_read,created_at")
+            .eq("user_id", str(user.id))
+            .order("created_at", desc=True)
+            .limit(20)
+            .execute()
+        )
+        return result.data or []
+    except Exception as exc:
+        logger.exception("Unable to load notifications for profile %s", user.id)
+        raise HTTPException(status_code=503, detail="Unable to load notifications right now.") from exc
+
+
+@router.patch("/notifications/{notification_id}/read")
+def mark_notification_read(
+    notification_id: UUID,
+    user: AuthenticatedUser = Depends(get_current_user),
+):
+    """Mark a notification read only when it belongs to the authenticated user."""
+    try:
+        result = (
+            get_supabase()
+            .table("user_notifications")
+            .update({"is_read": True})
+            .eq("id", str(notification_id))
+            .eq("user_id", str(user.id))
+            .select("id,is_read")
+            .limit(1)
+            .execute()
+        )
+    except Exception as exc:
+        logger.exception("Unable to mark notification read for profile %s", user.id)
+        raise HTTPException(status_code=503, detail="Unable to update notification right now.") from exc
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Notification not found.")
+    return result.data[0]
+
+
 @router.patch("/orders/{order_id}/address")
 def update_order_address(
     order_id: UUID,
