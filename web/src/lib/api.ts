@@ -1,4 +1,4 @@
-import { UserProfile, Farm, Cultivation, FarmerDocument, ProduceLot, Listing, MarketplaceOrder, MarketPriceObservation } from '@/types';
+import { UserProfile, Farm, Cultivation, FarmerDocument, ProduceLot, Listing, MarketplaceOrder, MarketplaceNotification, MarketPriceObservation } from '@/types';
 
 const DEFAULT_API_BASE_URL = 'https://agrimark-api.onrender.com/api/v1';
 const configuredApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
