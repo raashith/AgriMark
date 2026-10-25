@@ -186,10 +186,7 @@ def list_orders(user: AuthenticatedUser = Depends(get_current_user)):
     if not orders:
         return []
 
-    # Orders keep a stable listing_id, while the display title/crop belongs to
-    # the listing and its produce lot. Resolve these even when a listing is sold
-    # or no longer appears in the active marketplace feed.
-    listing_ids = list({row["listing_id"] for row in orders if row.get("listing_id")})
+    listing_ids = list({str(row["listing_id"]) for row in orders if row.get("listing_id")})
     listings = {}
     if listing_ids:
         listing_result = (
@@ -198,16 +195,39 @@ def list_orders(user: AuthenticatedUser = Depends(get_current_user)):
             .in_("id", listing_ids)
             .execute()
         )
-        listings = {row["id"]: row for row in (listing_result.data or [])}
+        listings = {str(row["id"]): row for row in (listing_result.data or [])}
 
-    seller_ids = list({row["seller_id"] for row in orders if row.get("seller_id")})
+    # Enrich only the orders visible to this authenticated participant. A farmer
+    # sees the buyer's contact details for their own orders; buyers do not gain
+    # access to other buyers or sellers because the base order query is scoped.
+    buyer_ids = list({str(row["buyer_id"]) for row in orders if row.get("buyer_id")})
+    buyers = {}
+    buyer_profiles = {}
+    if buyer_ids:
+        buyer_result = (
+            db.table("profiles")
+            .select("id,full_name,phone")
+            .in_("id", buyer_ids)
+            .execute()
+        )
+        buyers = {str(row["id"]): row for row in (buyer_result.data or [])}
+
+        buyer_profile_result = (
+            db.table("buyer_profiles")
+            .select("user_id,organization_name,buyer_type")
+            .in_("user_id", buyer_ids)
+            .execute()
+        )
+        buyer_profiles = {str(row["user_id"]): row for row in (buyer_profile_result.data or [])}
+
+    seller_ids = list({str(row["seller_id"]) for row in orders if row.get("seller_id")})
     sellers = {}
     if seller_ids:
-        seller_result = db.table("profiles").select("id,full_name").in_("id", seller_ids).execute()
-        sellers = {row["id"]: row for row in (seller_result.data or [])}
+        seller_result = db.table("profiles").select("id,full_name,phone").in_("id", seller_ids).execute()
+        sellers = {str(row["id"]): row for row in (seller_result.data or [])}
 
     for order in orders:
-        listing = listings.get(order.get("listing_id"), {})
+        listing = listings.get(str(order.get("listing_id")), {})
         lot = listing.get("produce_lots") or {}
         if isinstance(lot, list):
             lot = lot[0] if lot else {}
@@ -218,8 +238,17 @@ def list_orders(user: AuthenticatedUser = Depends(get_current_user)):
         order["listing_title"] = listing.get("title")
         order["unit_price"] = listing.get("price_per_unit")
         order["quality_grade"] = lot.get("quality_grade")
-        seller = sellers.get(order.get("seller_id"), {})
+
+        seller = sellers.get(str(order.get("seller_id")), {})
         order["seller_name"] = seller.get("full_name")
+
+        buyer = buyers.get(str(order.get("buyer_id")), {})
+        buyer_profile = buyer_profiles.get(str(order.get("buyer_id")), {})
+        order["buyer_name"] = buyer.get("full_name")
+        order["buyer_phone"] = buyer.get("phone")
+        order["buyer_organization"] = buyer_profile.get("organization_name")
+        order["buyer_type"] = buyer_profile.get("buyer_type")
+
     return orders
 
 
