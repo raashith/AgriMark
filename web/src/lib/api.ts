@@ -306,6 +306,11 @@ export const api = {
       body: JSON.stringify(data),
     }),
   getOrders: () => request<MarketplaceOrder[]>('/marketplace/orders'),
+  getNotifications: () => request<MarketplaceNotification[]>('/marketplace/notifications'),
+  markNotificationRead: (notificationId: string) =>
+    request<{ id: string; is_read: boolean }>(`/marketplace/notifications/${encodeURIComponent(notificationId)}/read`, {
+      method: 'PATCH',
+    }),
   updateOrderAddress: (orderId: string, deliveryAddress: string) =>
     request<MarketplaceOrder>(`/marketplace/orders/${encodeURIComponent(orderId)}/address`, {
       method: 'PATCH',
