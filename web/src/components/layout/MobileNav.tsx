@@ -26,6 +26,7 @@ export const MobileNav: React.FC<{ onOpenMobileMenu?: () => void }> = ({ onOpenM
         { label: 'Home', href: mainDashboard, icon: LayoutDashboard },
         { label: 'Market', href: '/farmer/market', icon: Store },
         { label: 'Harvest', href: '/farmer/harvest', icon: Map },
+        { label: 'Stock', href: '/farmer/produce', icon: PackageCheck },
         { label: 'Prices', href: '/market-prices', icon: TrendingUp },
         { label: 'AgriAI', href: '/ai-assistant', icon: Bot },
       ];
