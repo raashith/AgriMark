@@ -177,6 +177,9 @@ export interface MarketplaceOrder {
   quality_grade?: string | null;
   buyer_id: string;
   buyer_name?: string;
+  buyer_phone?: string | null;
+  buyer_organization?: string | null;
+  buyer_type?: string | null;
   seller_id: string;
   seller_name?: string;
   quantity: number;
@@ -189,6 +192,17 @@ export interface MarketplaceOrder {
   payment_status?: 'pending' | 'escrowed' | 'released' | 'refunded';
   delivery_address?: string | { formatted_address?: string; [key: string]: unknown } | null;
   cancellation_reason?: string | null;
+  created_at?: string;
+}
+
+export interface MarketplaceNotification {
+  id: string;
+  user_id: string;
+  order_id?: string | null;
+  type: string;
+  title: string;
+  message: string;
+  is_read: boolean;
   created_at?: string;
 }
 
