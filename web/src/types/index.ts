@@ -180,6 +180,7 @@ export interface MarketplaceOrder {
   buyer_phone?: string | null;
   buyer_organization?: string | null;
   buyer_type?: string | null;
+  buyer_note?: string | null;
   seller_id: string;
   seller_name?: string;
   quantity: number;
