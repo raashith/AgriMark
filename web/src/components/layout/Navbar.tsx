@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useI18n, SUPPORTED_LANGUAGES } from '@/lib/i18n';
+import { api } from '@/lib/api';
+import { MarketplaceNotification } from '@/types';
 import { CommandPalette } from './CommandPalette';
 import { LocationSelectorModal } from './LocationSelectorModal';
 import {
@@ -30,12 +32,33 @@ export const Navbar: React.FC = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isLocationOpen, setIsLocationOpen] = useState(false);
+  const [notifications, setNotifications] = useState<MarketplaceNotification[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const isFarmerWorkspace = ['farmer', 'fpo', 'admin'].includes(String(role || user?.role || '').toLowerCase());
+  const unreadNotifications = notifications.filter((notification) => !notification.is_read).length;
 
-  const notifications = [
-    { id: 1, title: 'Market Price Alert', desc: 'Turmeric modal price rose +₹400/quintal in Erode Mandi.', time: '10m ago', type: 'price' },
-    { id: 2, title: 'New Buyer Offer Received', desc: 'FreshGro submitted ₹145/kg offer for 2.5 Tons turmeric.', time: '1h ago', type: 'order' },
-    { id: 3, title: 'Weather Advisory', desc: 'Light rainfall expected tomorrow in Thanjavur district.', time: '3h ago', type: 'weather' },
-  ];
+  const loadNotifications = async () => {
+    if (!isAuthenticated || !isFarmerWorkspace) {
+      setNotifications([]);
+      return;
+    }
+    setNotificationsLoading(true);
+    try {
+      const rows = await api.getNotifications();
+      setNotifications(Array.isArray(rows) ? rows : []);
+    } catch (error) {
+      console.error('[AgriMark] Unable to load notifications', error);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadNotifications();
+    if (!isAuthenticated || !isFarmerWorkspace) return;
+    const interval = window.setInterval(() => { void loadNotifications(); }, 30000);
+    return () => window.clearInterval(interval);
+  }, [isAuthenticated, user?.id, isFarmerWorkspace]);
 
   return (
     <>
@@ -159,37 +182,78 @@ export const Navbar: React.FC = () => {
                       setIsNotifOpen(!isNotifOpen);
                       setIsProfileOpen(false);
                       setIsLangOpen(false);
+                      void loadNotifications();
                     }}
                     className="relative p-2 text-gray-300 hover:text-white hover:bg-[#18241f] rounded-xl transition"
                     aria-label="Notifications"
                   >
                     <Bell className="w-5 h-5" />
-                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
-                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full" />
+                    {unreadNotifications > 0 && (
+                      <>
+                        <span className="absolute top-1 right-1 h-2.5 w-2.5 animate-ping rounded-full bg-red-500" />
+                        <span className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-red-500" />
+                      </>
+                    )}
                   </button>
 
-                  {/* Notification Dropdown */}
+                  {/* Live, account-scoped notification dropdown */}
                   {isNotifOpen && (
-                    <div className="absolute right-0 mt-2 w-80 bg-[#121a16] border border-[#1e2d26] rounded-2xl shadow-2xl p-4 z-50 space-y-3 animate-fade-in">
+                    <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-[#1e2d26] bg-[#121a16] p-4 shadow-2xl z-50 space-y-3 animate-fade-in">
                       <div className="flex items-center justify-between border-b border-[#1e2d26] pb-2">
-                        <h4 className="font-bold text-sm text-white flex items-center gap-2">
-                          <Bell className="w-4 h-4 text-emerald-400" /> Notifications
+                        <h4 className="flex items-center gap-2 text-sm font-bold text-white">
+                          <Bell className="h-4 w-4 text-emerald-400" /> Notifications
                         </h4>
-                        <span className="text-[10px] font-mono font-bold bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-800/40">
-                          3 New
+                        <span className="rounded-full border border-emerald-800/40 bg-emerald-950 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-400">
+                          {unreadNotifications} unread
                         </span>
                       </div>
-                      <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {notifications.map((n) => (
-                          <div key={n.id} className="p-2.5 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl space-y-1">
-                            <div className="flex items-center justify-between text-xs font-bold text-emerald-300">
-                              <span>{n.title}</span>
-                              <span className="text-[10px] text-gray-500 font-mono">{n.time}</span>
-                            </div>
-                            <p className="text-xs text-gray-300">{n.desc}</p>
+                      <div className="max-h-72 space-y-2 overflow-y-auto">
+                        {notificationsLoading && notifications.length === 0 ? (
+                          <p className="rounded-xl border border-white/5 bg-black/20 p-3 text-xs text-gray-400">Loading notifications…</p>
+                        ) : notifications.length === 0 ? (
+                          <div className="rounded-xl border border-white/5 bg-black/20 p-3">
+                            <p className="text-xs font-semibold text-gray-200">No new notifications</p>
+                            <p className="mt-1 text-xs text-gray-500">New buyer orders will appear here.</p>
                           </div>
+                        ) : notifications.map((notification) => (
+                          <button
+                            key={notification.id}
+                            type="button"
+                            onClick={async () => {
+                              if (!notification.is_read) {
+                                setNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, is_read: true } : item));
+                                try { await api.markNotificationRead(notification.id); }
+                                catch (error) { console.error('[AgriMark] Unable to mark notification read', error); }
+                              }
+                              setIsNotifOpen(false);
+                              if (notification.type === 'marketplace_order' || notification.order_id) {
+                                router.push(notification.order_id
+                                  ? `/farmer/orders?order_id=${encodeURIComponent(notification.order_id)}`
+                                  : '/farmer/orders');
+                              }
+                            }}
+                            className={`w-full rounded-xl border p-2.5 text-left transition ${notification.is_read ? 'border-[#1e2d26] bg-[#0a0f0d] hover:border-emerald-900' : 'border-emerald-800/50 bg-emerald-950/30 hover:border-emerald-500'}`}
+                          >
+                            <div className="flex items-center justify-between gap-2 text-xs font-bold text-emerald-300">
+                              <span className="truncate">{notification.title}</span>
+                              {!notification.is_read && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />}
+                            </div>
+                            <p className="mt-1 text-xs leading-5 text-gray-300">{notification.message}</p>
+                            <span className="mt-1 block text-[10px] text-gray-500">
+                              {notification.created_at ? new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(notification.created_at)) : ''}
+                            </span>
+                          </button>
                         ))}
                       </div>
+                      {isFarmerWorkspace && (
+                        <Link
+                          href="/farmer/orders"
+                          onClick={() => setIsNotifOpen(false)}
+                          className="block rounded-xl border border-emerald-800/50 bg-emerald-950/30 px-3 py-2.5 text-center text-xs font-bold text-emerald-300 transition hover:bg-emerald-900/50"
+                        >
+                          View received orders
+                        </Link>
+                      )}
                     </div>
                   )}
                 </div>
