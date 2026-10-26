@@ -99,10 +99,19 @@ export async function GET(request: NextRequest) {
     if (rawCommodity && !rawCommodity.startsWith('CSV_COMMODITY:')) extraCanonical.commodity_code = `eq.${rawCommodity}`;
     if (rawState && !rawState.startsWith('CSV_STATE:')) extraCanonical.state_code = `eq.${rawState}`;
     if (rawMandi && !rawMandi.startsWith('CSV_MANDI:')) extraCanonical.mandi_code = `eq.${rawMandi}`;
-    if (effectiveStateName && (rawState.startsWith('CSV_STATE:') || rawMandi.startsWith('CSV_MANDI:'))) {
-      // The canonical table stores state_code, not state_name; resolve CSV labels to a canonical code.
+    if (rawMandi.startsWith('CSV_MANDI:')) {
+      extraImported.mandi_name = `eq.${selectedMandiName}`;
+    }
+    if (rawState.startsWith('CSV_STATE:') && !rawCommodity.startsWith('CSV_COMMODITY:')) {
       const canonicalStateCode = states.find((r: any) => norm(r.state_name) === norm(effectiveStateName))?.state_code;
       if (canonicalStateCode) extraCanonical.state_code = `eq.${canonicalStateCode}`;
+    }
+    if (rawCommodity.startsWith('CSV_COMMODITY:') && rawState.startsWith('CSV_STATE:')) {
+      // Keep normalized data available alongside matching CSV-source rows for this combination.
+      const canonicalStateCode = states.find((r: any) => norm(r.state_name) === norm(effectiveStateName))?.state_code;
+      if (canonicalStateCode) extraCanonical.state_code = `eq.${canonicalStateCode}`;
+      const canonicalCommodityCode = commodities.find((r: any) => norm(r.name) === norm(commodityName))?.code;
+      if (canonicalCommodityCode) extraCanonical.commodity_code = `eq.${canonicalCommodityCode}`;
     }
 
     const extraImported: Record<string, string> = {};
