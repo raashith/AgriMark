@@ -43,7 +43,6 @@ function SellForm() {
   const [lots, setLots] = useState<ProduceLot[]>([]);
   const [selectedLotId, setSelectedLotId] = useState(searchParams.get('lot_id') || '');
   const [askingPrice, setAskingPrice] = useState('');
-  const [minOrderQty, setMinOrderQty] = useState('50');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
@@ -189,9 +188,8 @@ function SellForm() {
       return;
     }
     const unitPrice = Number(askingPrice);
-    const minimum = Number(minOrderQty);
-    if (!Number.isFinite(unitPrice) || unitPrice <= 0 || !Number.isFinite(minimum) || minimum <= 0) {
-      setMessage('Error: Enter a price greater than zero and a valid minimum order quantity.');
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      setMessage('Error: Enter a price greater than zero.');
       return;
     }
     setSubmitting(true);
@@ -202,7 +200,6 @@ function SellForm() {
         title: selectedLot.crop_name || (selectedLot.quality_grade ? `${selectedLot.quality_grade} produce lot` : 'Produce lot'),
         price_per_unit: unitPrice,
         currency: 'INR',
-        min_order_quantity: minimum,
       });
       setMessage('Listing published to AgriMark Marketplace!');
       setTimeout(() => router.push('/buyer/marketplace'), 1200);
@@ -247,7 +244,11 @@ function SellForm() {
         <div className="p-6 bg-[#0a0f0d] border border-dashed border-[#1e2d26] rounded-xl text-center space-y-3 text-gray-400"><p>No available unlisted produce lots found.</p><p className="text-xs">Record a harvest first before creating a marketplace listing.</p><button type="button" onClick={() => router.push('/farmer/harvest')} className="px-4 py-2 bg-amber-600 text-white font-bold text-xs rounded-lg">+ Go Record Harvest</button></div>
       ) : (
         <form onSubmit={handleCreateListing} className="space-y-5">
-          <div><label className="block text-xs font-semibold uppercase text-gray-400 mb-1">Select Available Produce Lot</label><select value={selectedLotId} onChange={(e) => setSelectedLotId(e.target.value)} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white">{lots.map((lot) => <option key={lot.id} value={lot.id}>{lot.crop_name || (lot.id === selectedLotId ? (resolvedCropName || 'Crop') : 'Crop')} — {lot.quantity_kg ?? lot.quantity} KG ({lot.quality_grade || 'Standard quality'})</option>)}</select></div>
+          <div><label htmlFor="produce-lot-select" className="mb-2 block text-sm font-semibold text-gray-200">Choose produce to sell</label>
+            <select id="produce-lot-select" value={selectedLotId} onChange={(e) => setSelectedLotId(e.target.value)} className="w-full rounded-xl border border-emerald-500/30 bg-[#0a0f0d] px-4 py-3.5 text-white outline-none focus:border-emerald-400">
+              {lots.map((lot) => <option key={lot.id} value={lot.id}>{lot.crop_name || (lot.id === selectedLotId ? (resolvedCropName || 'Loading crop name…') : 'Crop name unavailable')} · {lot.available_quantity ?? lot.quantity_kg ?? lot.quantity} {lot.unit || 'kg'} available · {lot.quality_grade || 'Standard quality'} · Lot {lot.id.slice(0, 6).toUpperCase()}</option>)}
+            </select>
+            <p className="mt-2 text-xs leading-5 text-gray-400">Select by crop name first. Available quantity, grade, and short lot reference help distinguish duplicate crops.</p></div>
           {selectedLot && <div className="p-3 bg-[#0a0f0d] border border-emerald-950 rounded-xl text-xs text-emerald-300 space-y-1 font-mono"><p><strong>Lot ID:</strong> {selectedLot.id}</p><p><strong>Crop:</strong> {resolvedCropName || selectedLot.crop_name || 'Resolving crop…'}</p><p><strong>Quantity:</strong> {selectedLot.quantity_kg ?? selectedLot.quantity} KG</p><p><strong>Quality:</strong> {selectedLot.quality_grade || 'Not specified'}</p></div>}
 
           <section className="rounded-2xl border border-emerald-500/25 bg-emerald-950/20 p-4 space-y-3" aria-live="polite">
@@ -271,7 +272,7 @@ function SellForm() {
             </div>}
           </section>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className="block text-xs font-semibold uppercase text-gray-400 mb-1">{t('askingPrice')} (₹ / KG)</label><input type="number" min="0.01" step="0.01" required value={askingPrice} onChange={(e) => setAskingPrice(e.target.value)} placeholder={comparison ? comparison.medianPerKg.toFixed(2) : 'Enter your price'} className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white" /></div><div><label className="block text-xs font-semibold uppercase text-gray-400 mb-1">{t('minOrderQty')} (KG)</label><input type="number" min="0.01" step="0.01" required value={minOrderQty} onChange={(e) => setMinOrderQty(e.target.value)} placeholder="50" className="w-full px-4 py-3 bg-[#0a0f0d] border border-[#1e2d26] rounded-xl text-white" /></div></div>
+          <div><label className="mb-1 block text-xs font-semibold uppercase text-gray-400">{t('askingPrice')} (₹ / KG)</label><input type="number" min="0.01" step="0.01" required value={askingPrice} onChange={(e) => setAskingPrice(e.target.value)} placeholder={comparison ? comparison.medianPerKg.toFixed(2) : 'Enter your price'} className="w-full rounded-xl border border-[#1e2d26] bg-[#0a0f0d] px-4 py-3 text-white" /></div>
           <button type="submit" disabled={submitting} className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-950 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2"><ShoppingCart className="w-5 h-5" /><span>{submitting ? t('loading') : t('sellProduce')}</span></button>
         </form>
       )}
