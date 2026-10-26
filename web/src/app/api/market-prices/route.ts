@@ -101,8 +101,7 @@ export async function GET(request: NextRequest) {
     if (rawState && !rawState.startsWith('CSV_STATE:')) extraCanonical.state_code = `eq.${rawState}`;
     if (rawMandi && !rawMandi.startsWith('CSV_MANDI:')) extraCanonical.mandi_code = `eq.${rawMandi}`;
 
-    // Map CSV-labelled selections back to canonical IDs too, so both source tables
-    // contribute rows for the same commodity/state filter.
+    // Resolve CSV dropdown values to canonical codes so both sources use the same filters.
     if (rawCommodity.startsWith('CSV_COMMODITY:')) {
       const canonicalCommodityCode = commodities.find((r: any) => norm(r.name) === norm(commodityName))?.code;
       if (canonicalCommodityCode) extraCanonical.commodity_code = `eq.${canonicalCommodityCode}`;
