@@ -100,7 +100,9 @@ export async function GET(request: NextRequest) {
     if (rawState && !rawState.startsWith('CSV_STATE:')) extraCanonical.state_code = `eq.${rawState}`;
     if (rawMandi && !rawMandi.startsWith('CSV_MANDI:')) extraCanonical.mandi_code = `eq.${rawMandi}`;
     if (effectiveStateName && (rawState.startsWith('CSV_STATE:') || rawMandi.startsWith('CSV_MANDI:'))) {
-      extraCanonical.state_name = `eq.${effectiveStateName}`;
+      // The canonical table stores state_code, not state_name; resolve CSV labels to a canonical code.
+      const canonicalStateCode = states.find((r: any) => norm(r.state_name) === norm(effectiveStateName))?.state_code;
+      if (canonicalStateCode) extraCanonical.state_code = `eq.${canonicalStateCode}`;
     }
 
     const extraImported: Record<string, string> = {};
