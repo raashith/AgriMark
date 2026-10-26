@@ -98,6 +98,8 @@ class ListingCreate(BaseModel):
     title: str
     price_per_unit: Decimal = Field(ge=0)
     currency: str = "INR"
+    # Kept server-side for backwards-compatible listings; the farmer sell form
+    # intentionally uses the default without asking for an extra field.
     min_order_quantity: Decimal = Field(default=1, gt=0)
 
 
