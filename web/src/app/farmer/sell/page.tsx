@@ -146,97 +146,87 @@ function SellForm() {
   }, [user?.id, fetchLots]);
 
   const selectedLot = lots.find((lot) => lot.id === selectedLotId);
-  const cropForSelected = lotCrop(selectedLot || ({} as ProduceLot), resolvedCropName);
+  const [resolvedCropNames, setResolvedCropNames] = useState<Record<string, string>>({});
+  const selectedResolvedCropName = selectedLot ? (selectedLot.crop_name?.trim() || resolvedCropNames[selectedLot.id] || '') : '';
+  const cropForSelected = selectedResolvedCropName || (selectedLot ? 'Resolving crop name…' : 'Select produce');
   const selectedAvailable = Number(selectedLot?.available_quantity ?? selectedLot?.quantity_kg ?? selectedLot?.quantity ?? 0);
   const selectedUnit = selectedLot?.unit || 'kg';
 
   const filteredLots = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return lots.filter((lot) => {
-      const crop = String(lot.crop_name || (lot.id === selectedLotId ? resolvedCropName : '') || '').toLowerCase();
+      const crop = String(lot.crop_name?.trim() || resolvedCropNames[lot.id] || '').toLowerCase();
       const id = String(lot.id || '').toLowerCase();
       const grade = String(lot.quality_grade || '').toLowerCase();
       return !term || crop.includes(term) || id.includes(term) || grade.includes(term);
     });
-  }, [lots, searchTerm, selectedLotId, resolvedCropName]);
+  }, [lots, resolvedCropNames, searchTerm]);
 
   useEffect(() => {
-    if (!selectedLot) {
-      setHarvestDate('');
-      return;
+    let cancelled = false;
+    async function hydrateCropNames() {
+      const missing = lots.filter((lot) => !lot.crop_name?.trim() && !resolvedCropNames[lot.id] && lot.crop_id);
+      if (!missing.length) return;
+      try {
+        const supabase = getSupabaseClient();
+        const ids = Array.from(new Set(missing.map((lot) => String(lot.crop_id))));
+        const { data, error } = await supabase.from('crops').select('id,name').in('id', ids);
+        if (error) throw error;
+        if (cancelled) return;
+        const byCropId = new Map<string, string>((data || []).map((crop: { id: string; name: string }) => [String(crop.id), String(crop.name || '').trim()] as [string, string]));
+        const resolved: Record<string, string> = {};
+        for (const lot of missing) {
+          const name = byCropId.get(String(lot.crop_id));
+          if (name) resolved[lot.id] = name;
+        }
+        if (Object.keys(resolved).length) setResolvedCropNames((current) => ({ ...current, ...resolved }));
+      } catch (error) {
+        console.error('[AgriMark Sell Produce] Crop name hydration failed:', error);
+      }
     }
-    setHarvestDate(String(selectedLot.harvested_at || selectedLot.harvest_date || '').slice(0, 10));
-  }, [selectedLotId, selectedLot?.harvested_at, selectedLot?.harvest_date]);
+    void hydrateCropNames();
+    return () => { cancelled = true; };
+  }, [lots, resolvedCropNames]);
 
-  // Official mandi observations only; the page never invents a reference price.
+  useEffect(() => {
+    if (!selectedLot) { setHarvestDate(''); return; }
+    setHarvestDate(String(selectedLot.harvested_at || selectedLot.harvest_date || '').slice(0, 10));
+  }, [selectedLot?.id, selectedLot?.harvested_at, selectedLot?.harvest_date]);
+
   useEffect(() => {
     let cancelled = false;
     async function loadComparablePrices() {
-      setComparison(null);
-      setPriceError('');
-      setAiAdvice('');
-      setResolvedCropName('');
-      if (!selectedLot) return;
-      let cropName = selectedLot.crop_name?.trim() || '';
+      setComparison(null); setPriceError(''); setAiAdvice('');
+      if (!selectedLot) { setPriceLoading(false); setAiLoading(false); return; }
+      const cropName = selectedLot.crop_name?.trim() || resolvedCropNames[selectedLot.id] || '';
+      if (!cropName) { setPriceLoading(false); return; }
       setPriceLoading(true);
       try {
         const supabase = getSupabaseClient();
-        if (!cropName && selectedLot.crop_id) {
-          const { data: cropRow, error: cropError } = await supabase
-            .from('crops').select('name').eq('id', selectedLot.crop_id).maybeSingle();
-          if (cropError) throw cropError;
-          cropName = String(cropRow?.name || '').trim();
-        }
-        if (!cropName) {
-          if (!cancelled) setPriceError('This lot has no resolvable crop name. Update its crop record before requesting a comparable mandi price.');
-          return;
-        }
-        if (!cancelled) setResolvedCropName(cropName);
-        const { data: commodities, error: commodityError } = await supabase
-          .from('national_commodities').select('code,name').limit(2000);
+        const { data: commodities, error: commodityError } = await supabase.from('national_commodities').select('code,name').limit(2000);
         if (commodityError) throw commodityError;
         const normalizedCrop = normalizeName(cropName);
         const commodity = (commodities || []).find((item: any) => normalizeName(String(item.name || '')) === normalizedCrop)
-          || (commodities || []).find((item: any) => {
-            const name = normalizeName(String(item.name || ''));
-            return name.length >= 4 && (name.includes(normalizedCrop) || normalizedCrop.includes(name));
-          });
-        if (!commodity) {
-          if (!cancelled) setPriceError(`No official mandi commodity mapping was found for ${cropName}. You can still enter your own asking price.`);
-          return;
-        }
-        const { data: rows, error: observationError } = await supabase
-          .from('national_market_price_observations')
-          .select('modal_price,min_price,max_price,observation_date,source')
-          .eq('commodity_code', commodity.code).gt('modal_price', 0)
+          || (commodities || []).find((item: any) => { const name = normalizeName(String(item.name || '')); return name.length >= 4 && (name.includes(normalizedCrop) || normalizedCrop.includes(name)); });
+        if (!commodity) { if (!cancelled) setPriceError(`No official mandi commodity mapping was found for ${cropName}. You can still enter your own asking price.`); return; }
+        const { data: rows, error: observationError } = await supabase.from('national_market_price_observations')
+          .select('modal_price,min_price,max_price,observation_date,source').eq('commodity_code', commodity.code).gt('modal_price', 0)
           .order('observation_date', { ascending: false }).limit(100);
         if (observationError) throw observationError;
         const validRows = (rows || []).filter((row: any) => Number(row.modal_price) > 0);
-        if (!validRows.length) {
-          if (!cancelled) setPriceError(`No official price observations are available for ${cropName} yet. AgriMark will not guess a comparison price.`);
-          return;
-        }
-        // AGMARKNET stores min/modal/max values in INR per quintal.
+        if (!validRows.length) { if (!cancelled) setPriceError(`No official price observations are available for ${cropName} yet. AgriMark will not guess a comparison price.`); return; }
         const perKg = (row: any, field: string) => Number(row[field] ?? row.modal_price) / 100;
-        const modalValues = validRows.map((row: any) => perKg(row, 'modal_price')).filter((value: number) => value > 0);
-        const lowValues = validRows.map((row: any) => perKg(row, 'min_price')).filter((value: number) => value > 0);
-        const highValues = validRows.map((row: any) => perKg(row, 'max_price')).filter((value: number) => value > 0);
-        const latestDate = String(validRows[0]?.observation_date || '').slice(0, 10);
-        const result: PriceComparison = {
-          commodity: String(commodity.name || cropName),
-          medianPerKg: median(modalValues),
-          lowPerKg: lowValues.length ? Math.min(...lowValues) : median(modalValues),
-          highPerKg: highValues.length ? Math.max(...highValues) : median(modalValues),
-          observations: validRows.length,
-          latestDate,
-          source: String(validRows[0]?.source || 'Stored mandi observations'),
-          unitLabel: '₹/kg',
-        };
+        const modalValues = validRows.map((row: any) => perKg(row, 'modal_price')).filter((v: number) => v > 0);
+        const lowValues = validRows.map((row: any) => perKg(row, 'min_price')).filter((v: number) => v > 0);
+        const highValues = validRows.map((row: any) => perKg(row, 'max_price')).filter((v: number) => v > 0);
+        const result: PriceComparison = { commodity: String(commodity.name || cropName), medianPerKg: median(modalValues),
+          lowPerKg: lowValues.length ? Math.min(...lowValues) : median(modalValues), highPerKg: highValues.length ? Math.max(...highValues) : median(modalValues),
+          observations: validRows.length, latestDate: String(validRows[0]?.observation_date || '').slice(0, 10),
+          source: String(validRows[0]?.source || 'Stored mandi observations'), unitLabel: '₹/kg' };
         if (!cancelled) {
-          setComparison(result);
-          setAiLoading(true);
+          setComparison(result); setAiLoading(true);
           try {
-            const asking = Number(askingPrice);
+            const askingValue = Number(askingPrice);
             const context = [
               'You are AgriMark AI helping an Indian farmer price a produce listing.',
               'Use only the verified market figures below. Do not invent prices, market facts, or forecasts.',
@@ -244,31 +234,23 @@ function SellForm() {
               `Official mandi records: ${result.observations}; latest observation: ${result.latestDate || 'not provided'}; source: ${result.source}.`,
               `Observed modal-price median: ₹${result.medianPerKg.toFixed(2)}/kg.`,
               `Observed min/max range across returned records: ₹${result.lowPerKg.toFixed(2)}–₹${result.highPerKg.toFixed(2)}/kg.`,
-              Number.isFinite(asking) && asking > 0 ? `Farmer asking price: ₹${asking.toFixed(2)}/kg.` : 'Farmer has not entered an asking price.',
-              'In 2-4 short sentences, compare the asking price to this observed reference, mention quality, transport, and local mandi differences, and clarify this is not a guaranteed sale price. Do not invent any figures.',
+              Number.isFinite(askingValue) && askingValue > 0 ? `Farmer asking price: ₹${askingValue.toFixed(2)}/kg.` : 'Farmer has not entered an asking price.',
+              'In 2-4 short sentences, compare the asking price to this observed reference, mention quality, transport, and local mandi differences, and clarify this is not a guaranteed sale price. Do not invent any figures.'
             ].join('\n');
             const advice = await api.askAgriAI(context, 'PRICE_COMPARISON_FROM_OFFICIAL_MANDI_OBSERVATIONS');
             if (!cancelled) setAiAdvice(advice.answer || '');
-          } catch {
-            if (!cancelled) setAiAdvice('Use the observed modal-price median as a reference. Final buyer offers can differ with quality, location, transport and demand.');
-          } finally {
-            if (!cancelled) setAiLoading(false);
-          }
+          } catch { if (!cancelled) setAiAdvice('Use the observed modal-price median as a reference. Final buyer offers can differ with quality, location, transport and demand.'); }
+          finally { if (!cancelled) setAiLoading(false); }
         }
       } catch (error) {
         console.error('[AgriMark price comparison] Failed to load mandi observations:', error);
         if (!cancelled) setPriceError(error instanceof Error ? error.message : 'Could not load comparable mandi prices.');
-      } finally {
-        if (!cancelled) setPriceLoading(false);
-      }
+      } finally { if (!cancelled) { setPriceLoading(false); setAiLoading(false); } }
     }
     void loadComparablePrices();
     return () => { cancelled = true; };
-  }, [selectedLotId, selectedLot?.id, selectedLot?.crop_name, selectedLot?.quality_grade]);
-
+  }, [selectedLot?.id, selectedLot?.crop_name, selectedLot?.quality_grade, resolvedCropNames[selectedLot?.id || '']]);
   const asking = Number(askingPrice);
-  const priceDifference = comparison && asking > 0 && comparison.medianPerKg > 0
-    ? ((asking - comparison.medianPerKg) / comparison.medianPerKg) * 100 : null;
 
   const analyzeAskingPrice = async () => {
     if (!comparison || !selectedLot || !Number.isFinite(asking) || asking <= 0) return;
@@ -291,6 +273,11 @@ function SellForm() {
       setAiLoading(false);
     }
   };
+
+  const priceDifference = comparison && asking > 0 && comparison.medianPerKg > 0
+    ? ((asking - comparison.medianPerKg) / comparison.medianPerKg) * 100 : null;
+
+
 
   const handleCreateListing = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -465,7 +452,7 @@ function SellForm() {
             ) : filteredLots.map((lot) => {
               const available = Number(lot.available_quantity ?? lot.quantity_kg ?? lot.quantity ?? 0);
               const isSelected = lot.id === selectedLotId;
-              const cropName = lot.crop_name?.trim() || (isSelected ? resolvedCropName : '') || (lot.crop_id ? 'Loading crop name…' : 'Unnamed crop');
+              const cropName = lot.crop_name?.trim() || resolvedCropNames[lot.id] || (lot.crop_id ? 'Resolving crop name…' : 'Unnamed crop');
               return <button key={lot.id} type="button" onClick={() => { setSelectedLotId(lot.id); setMessage(''); }} aria-pressed={isSelected} className="sell-lot-card flex w-full min-w-0 items-center gap-3 rounded-2xl p-3 text-left sm:gap-3.5 sm:p-3.5">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-emerald-100/80">
                   {isSelected && <span className="h-2.5 w-2.5 rounded-full bg-teal-300 shadow-[0_0_12px_rgba(45,212,191,.8)]" />}
@@ -496,7 +483,7 @@ function SellForm() {
 
             {!selectedLot ? <div className="mt-5 rounded-2xl border border-dashed border-white/15 p-6 text-center text-sm text-emerald-50/65">Select an available lot from the stock list to see its details.</div> : (
               <div className="sell-glass-subpanel mt-4 flex items-center gap-3 rounded-2xl p-3.5">
-                <div className="sell-crop-art flex h-16 w-16 shrink-0 items-center justify-center rounded-xl text-lg font-extrabold text-emerald-50">{cropEmoji(cropForSelected)}</div>
+                <div className="sell-crop-art flex h-16 w-16 shrink-0 items-center justify-center rounded-xl text-3xl" role="img" aria-label={`${cropForSelected} crop icon`}>{cropEmoji(cropForSelected)}</div>
                 <div className="min-w-0 flex-1"><h3 className="truncate !text-base font-extrabold text-white">{cropForSelected}</h3><p className="mt-1 text-xs text-teal-200">{selectedAvailable.toLocaleString('en-IN')} {selectedUnit} available</p><p className="mt-1 truncate font-mono text-[10px] text-emerald-50/55">Lot {selectedLot.id.toUpperCase()}</p></div>
                 <Leaf className="h-5 w-5 shrink-0 text-teal-200/70" />
               </div>
