@@ -55,6 +55,7 @@ export default function MarketPricesPage(){
  const pageRows=useMemo(()=>filtered.slice((page-1)*pageSize,page*pageSize),[filtered,page,pageSize]);
  useEffect(()=>{P(1)},[commodity,state,mandi,search,pageSize]);
  const latest=[...filtered].sort((a,b)=>b.observation_date.localeCompare(a.observation_date)||Number(b.id)-Number(a.id))[0], dates=[...new Set(filtered.map(r=>r.observation_date))].sort();
+ const latestDateLabel = latest?.observation_date ? dt(latest.observation_date) : 'No observations';
  // Forecast history is only meaningful for one chosen commodity. Never blend
  // prices from unrelated crops into a single time series.
  const forecastRows=useMemo(()=>commodity?filtered:[],[filtered,commodity]);
