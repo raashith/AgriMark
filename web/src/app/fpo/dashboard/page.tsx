@@ -1,14 +1,12 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useI18n } from '@/lib/i18n';
 import { useAuth } from '@/lib/auth';
 import { dataService } from '@/lib/data-service';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { Users, Sprout, ShoppingBag, Package } from 'lucide-react';
+import { Users } from 'lucide-react';
 
 export default function FPODashboard() {
-  const { t } = useI18n();
   const { user } = useAuth();
   const [stats, setStats] = useState({ listings: 0, stockKg: 0, orders: 0 });
   const [loading, setLoading] = useState(true);
