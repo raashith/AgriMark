@@ -173,7 +173,7 @@ function SellForm() {
         const { data, error } = await supabase.from('crops').select('id,name').in('id', ids);
         if (error) throw error;
         if (cancelled) return;
-        const byCropId = new Map((data || []).map((crop: { id: string; name: string }) => [String(crop.id), String(crop.name || '').trim()]));
+        const byCropId = new Map<string, string>((data || []).map((crop: { id: string; name: string }) => [String(crop.id), String(crop.name || '').trim()] as [string, string]));
         const resolved: Record<string, string> = {};
         for (const lot of missing) {
           const name = byCropId.get(String(lot.crop_id));
@@ -277,27 +277,7 @@ function SellForm() {
   const priceDifference = comparison && asking > 0 && comparison.medianPerKg > 0
     ? ((asking - comparison.medianPerKg) / comparison.medianPerKg) * 100 : null;
 
-  const analyzeAskingPrice = async () => {
-    if (!comparison || !selectedLot || !Number.isFinite(asking) || asking <= 0) return;
-    setAiLoading(true);
-    try {
-      const context = [
-        'You are AgriMark AI comparing a farmer asking price with official mandi observations.',
-        'Use only the figures below. Do not invent data or promise a sale. Note that grade, location, transport and demand affect prices.',
-        `Crop: ${comparison.commodity}; quality: ${selectedLot.quality_grade || 'not specified'}.`,
-        `Farmer asking price: ₹${asking.toFixed(2)}/kg.`,
-        `Observed modal median: ₹${comparison.medianPerKg.toFixed(2)}/kg; low: ₹${comparison.lowPerKg.toFixed(2)}/kg; high: ₹${comparison.highPerKg.toFixed(2)}/kg.`,
-        `Records: ${comparison.observations}; latest observation: ${comparison.latestDate || 'unknown'}; source: ${comparison.source}.`,
-        'In 2-4 concise sentences say whether the asking price is above, below, or near the observed median; do not recommend an unsupported exact price.',
-      ].join('\n');
-      const result = await api.askAgriAI(context, 'PRICE_COMPARISON_FROM_OFFICIAL_MANDI_OBSERVATIONS');
-      setAiAdvice(result.answer || 'Compare your asking price with the observed median and account for quality, location and transport costs.');
-    } catch {
-      setAiAdvice('Your price comparison is shown above. Consider quality, location, transport costs and current buyer demand before publishing.');
-    } finally {
-      setAiLoading(false);
-    }
-  };
+
 
   const handleCreateListing = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
