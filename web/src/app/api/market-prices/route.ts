@@ -132,6 +132,10 @@ export async function GET(request: NextRequest) {
       state_name: stateNameByCode.get(String(r.state_code)) || String(r.state_code || 'India'),
       imported_csv: false,
     }));
+    const wantedCommodity = rawCommodity ? norm(commodityName) : '';
+    const wantedState = (rawState || selectedMandiState) ? norm(effectiveStateName) : '';
+    const wantedMandi = rawMandi ? norm(selectedMandiName) : '';
+
     const imported = importedRows.map((r: any) => ({
       ...r,
       id: 'csv-' + String(r.id),
