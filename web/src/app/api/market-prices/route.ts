@@ -132,9 +132,6 @@ export async function GET(request: NextRequest) {
       state_name: stateNameByCode.get(String(r.state_code)) || String(r.state_code || 'India'),
       imported_csv: false,
     }));
-    const wantedCommodity = rawCommodity ? norm(commodityName) : '';
-    const wantedState = (rawState || selectedMandiState) ? norm(effectiveStateName) : '';
-    const wantedMandi = rawMandi ? norm(selectedMandiName) : '';
 
     const imported = importedRows.map((r: any) => ({
       ...r,
@@ -152,6 +149,10 @@ export async function GET(request: NextRequest) {
       source: r.source || 'AGMARKNET',
       imported_csv: true,
     }));
+
+    const wantedCommodity = rawCommodity ? norm(commodityName) : '';
+    const wantedState = (rawState || selectedMandiState) ? norm(effectiveStateName) : '';
+    const wantedMandi = rawMandi ? norm(selectedMandiName) : '';
 
     const matches = (row: any) =>
       Number.isFinite(row.modal_price) && row.modal_price > 0
