@@ -203,7 +203,10 @@ function SellForm() {
     let cancelled = false;
     async function loadComparablePrices() {
       setComparison(null); setPriceError(''); setAiAdvice('');
-      if (!selectedLot) { setPriceLoading(false); setAiLoading(false); return; }
+      // Reset AI state on each selection so a cancelled previous request cannot
+      // leave the newly selected crop stuck in the loading state.
+      setAiLoading(false);
+      if (!selectedLot) { setPriceLoading(false); return; }
       const cropName = selectedLot.crop_name?.trim() || resolvedCropNames[selectedLot.id] || '';
       if (!cropName) { setPriceLoading(false); return; }
       setPriceLoading(true);
@@ -230,7 +233,9 @@ function SellForm() {
           observations: validRows.length, latestDate: String(validRows[0]?.observation_date || '').slice(0, 10),
           source: String(validRows[0]?.source || 'Stored mandi observations'), unitLabel: '₹/kg' };
         if (!cancelled) {
-          setComparison(result); setAiLoading(true);
+          setComparison(result);
+          setAiLoading(true);
+          const fallbackAdvice = 'These are stored mandi observations, not a guaranteed buyer offer. Compare your asking price with the observed median and consider grade, local demand, transport and handling costs.';
           try {
             const askingValue = Number(askingPrice);
             const context = [
@@ -242,11 +247,18 @@ function SellForm() {
               `Observed min/max range across returned records: ₹${result.lowPerKg.toFixed(2)}–₹${result.highPerKg.toFixed(2)}/kg.`,
               Number.isFinite(askingValue) && askingValue > 0 ? `Farmer asking price: ₹${askingValue.toFixed(2)}/kg.` : 'Farmer has not entered an asking price.',
               'In 2-4 short sentences, compare the asking price to this observed reference, mention quality, transport, and local mandi differences, and clarify this is not a guaranteed sale price. Do not invent any figures.'
-            ].join('\n');
-            const advice = await api.askAgriAI(context, 'PRICE_COMPARISON_FROM_OFFICIAL_MANDI_OBSERVATIONS');
-            if (!cancelled) setAiAdvice(advice.answer || '');
-          } catch { if (!cancelled) setAiAdvice('Use the observed modal-price median as a reference. Final buyer offers can differ with quality, location, transport and demand.'); }
-          finally { if (!cancelled) setAiLoading(false); }
+            ].join('\\n');
+            const advice = await Promise.race([
+              api.askAgriAI(context, 'PRICE_COMPARISON_FROM_OFFICIAL_MANDI_OBSERVATIONS'),
+              new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error('AI analysis timed out')), 10000)),
+            ]);
+            if (!cancelled) setAiAdvice(advice.answer?.trim() || fallbackAdvice);
+          } catch (error) {
+            if (!cancelled) setAiAdvice(fallbackAdvice);
+            console.warn('[AgriMark Sell Produce] AI analysis fallback:', error);
+          } finally {
+            if (!cancelled) setAiLoading(false);
+          }
         }
       } catch (error) {
         console.error('[AgriMark price comparison] Failed to load mandi observations:', error);
