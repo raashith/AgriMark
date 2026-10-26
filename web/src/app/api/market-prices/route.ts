@@ -6,6 +6,7 @@ export const revalidate = 0;
 const SUPABASE_URL = 'https://tsdjtlmrvbspyzgwmccg.supabase.co';
 const DEFAULT_ROWS = 100;
 const MAX_ROWS = 300;
+const PAGE_SIZE = 1000;
 
 function getApiKey() {
   return process.env.SUPABASE_SERVICE_ROLE_KEY
