@@ -557,9 +557,9 @@ def create_harvest_batch(
 def list_produce_lots(
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> list[ProduceLotResponse]:
+    db = get_supabase()
     result = (
-        get_supabase()
-        .table("produce_lots")
+        db.table("produce_lots")
         .select("*,crops(name)")
         .eq("owner_id", str(user.id))
         .order("created_at", desc=True)
@@ -569,7 +569,29 @@ def list_produce_lots(
     for raw_row in (result.data or []):
         row = dict(raw_row)
         crop = row.pop("crops", None)
-        row["crop_name"] = crop.get("name") if isinstance(crop, dict) else None
+        crop_name = crop.get("name") if isinstance(crop, dict) else None
+
+        # Some historical lots have a valid crop_id but the embedded relation
+        # may be absent because of old rows/schema relationship metadata. Resolve
+        # the name from the canonical crops table rather than returning a blank UI.
+        if not crop_name and row.get("crop_id"):
+            try:
+                crop_result = (
+                    db.table("crops")
+                    .select("name")
+                    .eq("id", str(row["crop_id"]))
+                    .limit(1)
+                    .execute()
+                )
+                if crop_result.data:
+                    crop_name = crop_result.data[0].get("name")
+            except Exception:
+                logger.exception(
+                    "Unable to resolve crop name for produce lot %s",
+                    row.get("id"),
+                )
+
+        row["crop_name"] = crop_name
         items.append(ProduceLotResponse(**row))
     return items
 
