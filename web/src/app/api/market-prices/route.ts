@@ -77,6 +77,7 @@ export async function GET(request: NextRequest) {
 
     const commodityNameByCode = new Map(commodities.map((r: any) => [String(r.code), String(r.name)]));
     const stateNameByCode = new Map(states.map((r: any) => [String(r.state_code), String(r.state_name)]));
+    const mandiByCode = new Map(mandis.map((r: any) => [String(r.mandi_code), r]));
     const optionValue = (value: string, prefix: string) => value.startsWith(prefix) ? value.slice(prefix.length).trim() : '';
     const commodityName = optionValue(rawCommodity, 'CSV_COMMODITY:') || commodityNameByCode.get(rawCommodity) || rawCommodity;
     const stateName = optionValue(rawState, 'CSV_STATE:') || stateNameByCode.get(rawState) || rawState;
@@ -88,7 +89,7 @@ export async function GET(request: NextRequest) {
       selectedMandiName = (pair[0] || '').trim();
       selectedMandiState = (pair[1] || '').trim();
     } else if (rawMandi) {
-      const selected = mandis.find((r: any) => String(r.mandi_code) === rawMandi);
+      const selected = mandiByCode.get(rawMandi);
       selectedMandiName = String(selected?.mandi_name || rawMandi);
       selectedMandiState = String(stateNameByCode.get(String(selected?.state_code || '')) || '');
     }
@@ -112,25 +113,6 @@ export async function GET(request: NextRequest) {
       queryTable('agmarknet_csv_import_staging', 'id,observation_date,state_name,district_name,mandi_name,commodity_name,variety,grade,min_price,max_price,modal_price,source', 'observation_date.desc,id.desc', 30000, extraImported),
     ]);
 
-    const commodityNameByCode = new Map(commodities.map((r: any) => [String(r.code), String(r.name)]));
-    const stateNameByCode = new Map(states.map((r: any) => [String(r.state_code), String(r.state_name)]));
-    const mandiByCode = new Map(mandis.map((r: any) => [String(r.mandi_code), r]));
-    const optionValue = (value: string, prefix: string) => value.startsWith(prefix) ? value.slice(prefix.length).trim() : '';
-    const commodityName = optionValue(rawCommodity, 'CSV_COMMODITY:') || commodityNameByCode.get(rawCommodity) || rawCommodity;
-    const stateName = optionValue(rawState, 'CSV_STATE:') || stateNameByCode.get(rawState) || rawState;
-
-    let selectedMandiName = '';
-    let selectedMandiState = '';
-    if (rawMandi.startsWith('CSV_MANDI:')) {
-      const pair = rawMandi.slice('CSV_MANDI:'.length).split('|');
-      selectedMandiName = (pair[0] || '').trim();
-      selectedMandiState = (pair[1] || '').trim();
-    } else if (rawMandi) {
-      const selected = mandiByCode.get(rawMandi);
-      selectedMandiName = String(selected?.mandi_name || rawMandi);
-      selectedMandiState = String(stateNameByCode.get(String(selected?.state_code || '')) || '');
-    }
-    const effectiveStateName = stateName || selectedMandiState;
     const wantedCommodity = rawCommodity ? norm(commodityName) : '';
     const wantedState = (rawState || selectedMandiState) ? norm(effectiveStateName) : '';
     const wantedMandi = rawMandi ? norm(selectedMandiName) : '';
