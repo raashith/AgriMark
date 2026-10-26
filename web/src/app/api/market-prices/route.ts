@@ -73,8 +73,27 @@ export async function GET(request: NextRequest) {
       queryTable('national_commodities', 'code,name', 'name.asc', 500),
       queryTable('national_states', 'state_code,state_name', 'state_name.asc', 100),
       queryTable('national_mandis', 'mandi_code,mandi_name,state_code', 'mandi_name.asc', 1200),
-      queryTable('national_market_price_observations', 'id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source,variety,grade', 'observation_date.desc,id.desc', 30000),
-      queryTable('agmarknet_csv_import_staging', 'id,observation_date,state_name,district_name,mandi_name,commodity_name,variety,grade,min_price,max_price,modal_price,source', 'observation_date.desc,id.desc', 30000),
+      queryTable(
+        'national_market_price_observations',
+        'id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source,variety,grade',
+        'observation_date.desc,id.desc',
+        30000,
+        {
+          ...(rawCommodity && !rawCommodity.startsWith('CSV_COMMODITY:') ? { commodity_code: `eq.${rawCommodity}` } : {}),
+          ...(rawState && !rawState.startsWith('CSV_STATE:') ? { state_code: `eq.${rawState}` } : {}),
+          ...(rawMandi && !rawMandi.startsWith('CSV_MANDI:') ? { mandi_code: `eq.${rawMandi}` } : {}),
+        },
+      ),
+      queryTable(
+        'agmarknet_csv_import_staging',
+        'id,observation_date,state_name,district_name,mandi_name,commodity_name,variety,grade,min_price,max_price,modal_price,source',
+        'observation_date.desc,id.desc',
+        30000,
+        {
+          ...(rawCommodity.startsWith('CSV_COMMODITY:') ? { commodity_name: `eq.${rawCommodity.slice('CSV_COMMODITY:'.length).trim()}` } : rawCommodity ? { commodity_name: `eq.${rawCommodity}` } : {}),
+          ...(rawState.startsWith('CSV_STATE:') ? { state_name: `eq.${rawState.slice('CSV_STATE:'.length).trim()}` } : rawState ? { state_name: `eq.${rawState}` } : {}),
+        },
+      ),
     ]);
 
     const commodityNameByCode = new Map(commodities.map((r: any) => [String(r.code), String(r.name)]));
