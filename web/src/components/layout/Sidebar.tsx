@@ -89,8 +89,10 @@ export const Sidebar: React.FC = () => {
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsExpanded(false);
       }}
-      className={`fixed left-0 top-[4.25rem] z-40 hidden h-[calc(100vh-4.25rem)] flex-col border-r border-[#1e2d26] bg-[#0d1511] p-2 transition-[width,box-shadow] duration-200 ease-out lg:flex ${isExpanded ? 'w-64 shadow-2xl' : 'w-[4.5rem]'}`}
+      className={`fixed left-0 top-[4.25rem] z-40 hidden h-[calc(100vh-4.25rem)] flex-col overflow-hidden transition-[width,background-color,border-color,box-shadow] duration-200 ease-out lg:flex ${isExpanded ? 'w-64 border-r border-[#1e2d26] bg-[#0d1511] p-2 shadow-2xl' : 'w-3 border-r border-transparent bg-transparent p-0 shadow-none'}`}
     >
+      {isExpanded && (
+        <>
       <div className={`mb-3 flex min-h-14 items-center gap-3 overflow-hidden rounded-2xl border border-[#1e2d26] bg-[#0a0f0d] ${isExpanded ? 'p-3' : 'justify-center p-1.5'}`}>
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-700/60 bg-emerald-950 font-bold text-emerald-400">
           {user?.avatar_url ? <img src={user.avatar_url} alt="" referrerPolicy="no-referrer" className="h-full w-full rounded-xl object-cover" /> : (user?.full_name?.trim()?.[0]?.toUpperCase() || 'A')}
@@ -124,6 +126,8 @@ export const Sidebar: React.FC = () => {
         <div className="flex items-center gap-2 text-[11px] font-semibold text-gray-300"><Sprout className="h-4 w-4 shrink-0 text-emerald-400" /> {isExpanded && <span>Farmer-first logistics</span>}</div>
         {isExpanded && <p className="mt-1 text-[10px] leading-4 text-gray-500">Track shipments and open routes in the map workspace.</p>}
       </div>
+        </>
+      )}
     </aside>
   );
 };
