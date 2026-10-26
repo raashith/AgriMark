@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
     const effectiveStateName = stateName || selectedMandiState;
 
     const extraCanonical: Record<string, string> = {};
-    const extraImported: Record<string, string> = {};
+    const extraImported: Record<string, string> = {}; // CSV source paused for this diagnostic.
     if (rawCommodity && !rawCommodity.startsWith('CSV_COMMODITY:')) extraCanonical.commodity_code = `eq.${rawCommodity}`;
     if (rawState && !rawState.startsWith('CSV_STATE:')) extraCanonical.state_code = `eq.${rawState}`;
     if (rawMandi && !rawMandi.startsWith('CSV_MANDI:')) extraCanonical.mandi_code = `eq.${rawMandi}`;
@@ -116,14 +116,15 @@ export async function GET(request: NextRequest) {
     if (effectiveStateName) extraImported.state_name = `eq.${effectiveStateName}`;
     if (selectedMandiName) extraImported.mandi_name = `eq.${selectedMandiName}`;
 
-    // TEMPORARY DIAGNOSTIC: pause CSV staging data so we can verify the
-    // mandi price cards using canonical Supabase observations only.
-    // Re-enable the staging source after card/filter behaviour is verified.
+    // Diagnostic snapshot: use ONLY canonical observations from 2026-10-16.
+    // Keep this query bounded to avoid serially paging through the full table
+    // on every dashboard request (which can time out before cards render).
+    extraCanonical.observation_date = 'eq.2026-10-16';
     const canonicalRows = await queryTable(
       'national_market_price_observations',
       'id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source,variety,grade',
       'observation_date.desc,id.desc',
-      30000,
+      1000,
       extraCanonical,
     );
     const importedRows: any[] = [];
@@ -217,7 +218,7 @@ export async function GET(request: NextRequest) {
       imported_csv_count: importedRows.length,
       capped: allMatching.length > limit,
       latest_observation_date: rows[0]?.observation_date ?? null,
-      source: 'Supabase AGMARKNET canonical + imported observations',
+      source: 'Supabase public.national_market_price_observations · snapshot 2026-10-16 only',
       applied_filters: { commodity: rawCommodity || null, state: rawState || null, mandi: rawMandi || null, search: search || null },
     }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (error) {
