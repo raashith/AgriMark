@@ -237,16 +237,14 @@ export const dataService = {
 
   // Orders
   async getOrders(userId?: string, role?: string): Promise<MarketplaceOrder[]> {
-    try {
-      let query = supabase.from('orders').select('*');
-      if (userId) {
-        if (role === 'buyer') query = query.eq('buyer_id', userId);
-        else if (role === 'farmer') query = query.eq('seller_id', userId);
-      }
-      const { data, error } = await query;
-      if (!error && data) return data as MarketplaceOrder[];
-    } catch {}
-    return [];
+    // Marketplace checkout writes to marketplace_orders and the authenticated API
+    // enriches orders with listing and buyer/seller details. Reading the legacy
+    // Supabase "orders" table made every dashboard show zero despite real orders.
+    const rows = await api.getOrders();
+    if (!userId) return rows;
+    if (role === 'buyer') return rows.filter((order) => order.buyer_id === userId);
+    if (role === 'farmer' || role === 'seller') return rows.filter((order) => order.seller_id === userId);
+    return rows.filter((order) => order.buyer_id === userId || order.seller_id === userId);
   },
 
   async createOrder(order: Partial<MarketplaceOrder>): Promise<MarketplaceOrder | null> {
