@@ -221,11 +221,14 @@ def test_no_accounts_google_hostname_restriction_in_auth_tsx():
     assert "oauthUrl.hostname !== 'accounts.google.com'" not in content, \
         "Fragile hostname check accounts.google.com must be removed because Supabase returns its own authorization URL first."
     assert "Invalid OAuth redirect host returned." not in content
-    assert "['https:', 'http:'].includes(oauthUrl.protocol)" in content or \
-           '["https:", "http:"].includes(oauthUrl.protocol)' in content
-    assert "window.location.assign(oauthUrl.toString())" in content or \
-           "window.location.assign(data.url)" in content or \
-           "window.location.assign" in content
+    # The current client uses Firebase signInWithPopup rather than manually
+    # constructing and redirecting to a Supabase OAuth URL. Keep the test aligned
+    # with the active provider flow rather than checking for obsolete redirect code.
+    assert "signInWithPopup(getFirebaseAuth(), provider)" in content
+    assert "provider.addScope('openid')" in content
+    assert "provider.addScope('email')" in content
+    assert "provider.addScope('profile')" in content
+    assert "https://www.googleapis.com/auth/userinfo.email" in content
 
 
 
