@@ -9,8 +9,8 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { ProduceLot } from '@/types';
 import {
   ShoppingCart, CheckCircle2, AlertCircle, Sparkles, TrendingUp, Info,
-  RefreshCw, Search, Package, Leaf, Wheat, CalendarDays, MapPin, ArrowLeft,
-  Tag, Sprout, Boxes, ShieldCheck, XCircle, BarChart3,
+  RefreshCw, Search, Package, Leaf, CalendarDays, ArrowLeft,
+  Tag, Sprout, Boxes, ShieldCheck, BarChart3,
 } from 'lucide-react';
 
 type PriceComparison = {
@@ -63,8 +63,9 @@ function SellForm() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryLotId = searchParams.get('lot_id') || '';
   const [lots, setLots] = useState<ProduceLot[]>([]);
-  const [selectedLotId, setSelectedLotId] = useState(searchParams.get('lot_id') || '');
+  const [selectedLotId, setSelectedLotId] = useState(queryLotId);
   const [askingPrice, setAskingPrice] = useState('');
   const [minOrderQuantity, setMinOrderQuantity] = useState('1');
   const [harvestDate, setHarvestDate] = useState('');
@@ -85,9 +86,8 @@ function SellForm() {
       const unlisted = res.filter((lot) => !lot.is_listed && (lot.status ?? 'available') === 'available');
       setLots(unlisted);
       setSelectedLotId((current) => {
-        const queryLot = searchParams.get('lot_id');
         if (current && unlisted.some((lot) => lot.id === current)) return current;
-        if (queryLot && unlisted.some((lot) => lot.id === queryLot)) return queryLot;
+        if (queryLotId && unlisted.some((lot) => lot.id === queryLotId)) return queryLotId;
         return unlisted[0]?.id || '';
       });
     } catch (error) {
@@ -96,7 +96,7 @@ function SellForm() {
     } finally {
       setLoading(false);
     }
-  }, [searchParams]);
+  }, [queryLotId]);
 
   useEffect(() => {
     if (!user?.id) {
