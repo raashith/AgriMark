@@ -120,10 +120,6 @@ export async function GET(request: NextRequest) {
       queryTable('agmarknet_csv_import_staging', 'id,observation_date,state_name,district_name,mandi_name,commodity_name,variety,grade,min_price,max_price,modal_price,source', 'observation_date.desc,id.desc', 30000, extraImported),
     ]);
 
-    const wantedCommodity = rawCommodity ? norm(commodityName) : '';
-    const wantedState = (rawState || selectedMandiState) ? norm(effectiveStateName) : '';
-    const wantedMandi = rawMandi ? norm(selectedMandiName) : '';
-
     const canonical = canonicalRows.map((r: any) => ({
       ...r,
       modal_price: Number(r.modal_price) || 0,
