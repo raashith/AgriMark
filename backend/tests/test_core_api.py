@@ -308,3 +308,64 @@ def test_produce_lot_management_requires_authentication():
         json={"quantity": 20},
     ).status_code == 401
     assert client.delete(f"/api/v1/core/produce-lots/{lot_id}").status_code == 401
+
+
+
+def test_produce_lot_resolves_crop_name_when_embedded_relation_missing(monkeypatch):
+    from types import SimpleNamespace
+    from backend.app.api.v1 import core
+
+    user_id = UUID("00000000-0000-0000-0000-000000000123")
+    crop_id = UUID("00000000-0000-0000-0000-000000000789")
+    lot_id = UUID("00000000-0000-0000-0000-000000000abc")
+    calls = []
+
+    class FakeQuery:
+        def __init__(self, table_name):
+            self.table_name = table_name
+
+        def select(self, _columns):
+            return self
+
+        def eq(self, *_args):
+            return self
+
+        def order(self, *_args, **_kwargs):
+            return self
+
+        def limit(self, _limit):
+            return self
+
+        def execute(self):
+            calls.append(self.table_name)
+            if self.table_name == "produce_lots":
+                return SimpleNamespace(data=[{
+                    "id": str(lot_id),
+                    "owner_id": str(user_id),
+                    "crop_id": str(crop_id),
+                    "cultivation_id": None,
+                    "quantity": "10",
+                    "unit": "kg",
+                    "quality_grade": "Grade A",
+                    "available_quantity": "10",
+                    "harvested_at": "2026-10-16",
+                    "status": "available",
+                    "crops": None,
+                }])
+            if self.table_name == "crops":
+                return SimpleNamespace(data=[{"name": "Paddy"}])
+            raise AssertionError(f"Unexpected table: {self.table_name}")
+
+    class FakeDatabase:
+        def table(self, name):
+            return FakeQuery(name)
+
+    monkeypatch.setattr(core, "get_supabase", lambda: FakeDatabase())
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(id=user_id, role="farmer")
+    try:
+        response = client.get("/api/v1/core/produce-lots", headers={"Authorization": "Bearer fake_token"})
+        assert response.status_code == 200, response.text
+        assert response.json()[0]["crop_name"] == "Paddy"
+        assert "crops" in calls
+    finally:
+        app.dependency_overrides.clear()
