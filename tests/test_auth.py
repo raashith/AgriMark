@@ -28,8 +28,11 @@ def test_auth_rejects_non_bearer_scheme() -> None:
         scheme = "Basic"
         credentials = "not-a-token"
 
+    # Optional auth deliberately returns None for an unsupported scheme;
+    # the required-auth dependency converts that missing identity into 401.
+    assert auth.get_optional_current_user(Credentials()) is None
     with pytest.raises(HTTPException) as exc:
-        auth.get_optional_current_user(Credentials())
+        auth.get_current_user(None)
     assert exc.value.status_code == 401
 
 
