@@ -50,6 +50,31 @@ function cropInitials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() || '').join('') || 'AG';
 }
 
+function cropEmoji(name: string) {
+  const crop = normalizeName(name);
+  if (/rice|paddy/.test(crop)) return '🌾';
+  if (/wheat|barley|millet|ragi|jowar|sorghum|bajra/.test(crop)) return '🌾';
+  if (/maize|corn/.test(crop)) return '🌽';
+  if (/tomato/.test(crop)) return '🍅';
+  if (/potato/.test(crop)) return '🥔';
+  if (/onion/.test(crop)) return '🧅';
+  if (/chilli|chili|pepper/.test(crop)) return '🌶️';
+  if (/banana/.test(crop)) return '🍌';
+  if (/mango/.test(crop)) return '🥭';
+  if (/coconut/.test(crop)) return '🥥';
+  if (/groundnut|peanut/.test(crop)) return '🥜';
+  if (/soybean|bean|pea|pulse|lentil|gram|dal|arhar|tur/.test(crop)) return '🫘';
+  if (/cotton/.test(crop)) return '☁️';
+  if (/sugarcane/.test(crop)) return '🎋';
+  if (/garlic/.test(crop)) return '🧄';
+  if (/ginger/.test(crop)) return '🫚';
+  if (/grape/.test(crop)) return '🍇';
+  if (/apple/.test(crop)) return '🍎';
+  if (/orange|citrus/.test(crop)) return '🍊';
+  if (/papaya/.test(crop)) return '🍈';
+  return '🌱';
+}
+
 function lotCrop(lot: ProduceLot, resolved: string) {
   return lot.crop_name?.trim() || (resolved && lot.id ? resolved : '') || 'Produce lot';
 }
@@ -81,8 +106,23 @@ function SellForm() {
 
   const fetchLots = useCallback(async () => {
     try {
-      const res = await api.getProduceLots();
-      const unlisted = res.filter((lot) => !lot.is_listed && (lot.status ?? 'available') === 'available');
+      const [res, cropCatalog] = await Promise.all([
+        api.getProduceLots(),
+        api.getCrops().catch((error) => {
+          console.warn('[AgriMark Sell Produce] Crop catalog lookup failed:', error);
+          return { items: [] as Array<{ id: string; name: string }> };
+        }),
+      ]);
+      const cropNames = new Map(
+        (cropCatalog.items || [])
+          .filter((crop: { id?: string; name?: string }) => crop.id && crop.name)
+          .map((crop: { id: string; name: string }) => [String(crop.id), String(crop.name).trim()])
+      );
+      const withCropNames = res.map((lot) => ({
+        ...lot,
+        crop_name: lot.crop_name?.trim() || cropNames.get(String(lot.crop_id)) || '',
+      }));
+      const unlisted = withCropNames.filter((lot) => !lot.is_listed && (lot.status ?? 'available') === 'available');
       setLots(unlisted);
       setSelectedLotId((current) => {
         if (current && unlisted.some((lot) => lot.id === current)) return current;
@@ -430,7 +470,7 @@ function SellForm() {
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-emerald-100/80">
                   {isSelected && <span className="h-2.5 w-2.5 rounded-full bg-teal-300 shadow-[0_0_12px_rgba(45,212,191,.8)]" />}
                 </span>
-                <span className="sell-crop-art flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-sm font-extrabold text-emerald-50">{cropInitials(cropName)}</span>
+                <span className="sell-crop-art flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-sm font-extrabold text-emerald-50">{cropEmoji(cropName)}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-extrabold text-white">{cropName}</span>
                   <span className="mt-1 block text-xs font-bold text-teal-200">{available.toLocaleString('en-IN')} {lot.unit || 'kg'} available</span>
@@ -456,7 +496,7 @@ function SellForm() {
 
             {!selectedLot ? <div className="mt-5 rounded-2xl border border-dashed border-white/15 p-6 text-center text-sm text-emerald-50/65">Select an available lot from the stock list to see its details.</div> : (
               <div className="sell-glass-subpanel mt-4 flex items-center gap-3 rounded-2xl p-3.5">
-                <div className="sell-crop-art flex h-16 w-16 shrink-0 items-center justify-center rounded-xl text-lg font-extrabold text-emerald-50">{cropInitials(cropForSelected)}</div>
+                <div className="sell-crop-art flex h-16 w-16 shrink-0 items-center justify-center rounded-xl text-lg font-extrabold text-emerald-50">{cropEmoji(cropForSelected)}</div>
                 <div className="min-w-0 flex-1"><h3 className="truncate !text-base font-extrabold text-white">{cropForSelected}</h3><p className="mt-1 text-xs text-teal-200">{selectedAvailable.toLocaleString('en-IN')} {selectedUnit} available</p><p className="mt-1 truncate font-mono text-[10px] text-emerald-50/55">Lot {selectedLot.id.toUpperCase()}</p></div>
                 <Leaf className="h-5 w-5 shrink-0 text-teal-200/70" />
               </div>
