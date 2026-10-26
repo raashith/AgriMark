@@ -96,25 +96,22 @@ export async function GET(request: NextRequest) {
     const effectiveStateName = stateName || selectedMandiState;
 
     const extraCanonical: Record<string, string> = {};
+    const extraImported: Record<string, string> = {};
     if (rawCommodity && !rawCommodity.startsWith('CSV_COMMODITY:')) extraCanonical.commodity_code = `eq.${rawCommodity}`;
     if (rawState && !rawState.startsWith('CSV_STATE:')) extraCanonical.state_code = `eq.${rawState}`;
     if (rawMandi && !rawMandi.startsWith('CSV_MANDI:')) extraCanonical.mandi_code = `eq.${rawMandi}`;
-    if (rawMandi.startsWith('CSV_MANDI:')) {
-      extraImported.mandi_name = `eq.${selectedMandiName}`;
-    }
-    if (rawState.startsWith('CSV_STATE:') && !rawCommodity.startsWith('CSV_COMMODITY:')) {
-      const canonicalStateCode = states.find((r: any) => norm(r.state_name) === norm(effectiveStateName))?.state_code;
-      if (canonicalStateCode) extraCanonical.state_code = `eq.${canonicalStateCode}`;
-    }
-    if (rawCommodity.startsWith('CSV_COMMODITY:') && rawState.startsWith('CSV_STATE:')) {
-      // Keep normalized data available alongside matching CSV-source rows for this combination.
-      const canonicalStateCode = states.find((r: any) => norm(r.state_name) === norm(effectiveStateName))?.state_code;
-      if (canonicalStateCode) extraCanonical.state_code = `eq.${canonicalStateCode}`;
+
+    // Map CSV-labelled selections back to canonical IDs too, so both source tables
+    // contribute rows for the same commodity/state filter.
+    if (rawCommodity.startsWith('CSV_COMMODITY:')) {
       const canonicalCommodityCode = commodities.find((r: any) => norm(r.name) === norm(commodityName))?.code;
       if (canonicalCommodityCode) extraCanonical.commodity_code = `eq.${canonicalCommodityCode}`;
     }
+    if (rawState.startsWith('CSV_STATE:') || rawMandi.startsWith('CSV_MANDI:')) {
+      const canonicalStateCode = states.find((r: any) => norm(r.state_name) === norm(effectiveStateName))?.state_code;
+      if (canonicalStateCode) extraCanonical.state_code = `eq.${canonicalStateCode}`;
+    }
 
-    const extraImported: Record<string, string> = {};
     if (rawCommodity) extraImported.commodity_name = `eq.${commodityName}`;
     if (effectiveStateName) extraImported.state_name = `eq.${effectiveStateName}`;
     if (selectedMandiName) extraImported.mandi_name = `eq.${selectedMandiName}`;
