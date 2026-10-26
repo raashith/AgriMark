@@ -89,7 +89,7 @@ export const Sidebar: React.FC = () => {
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsExpanded(false);
       }}
-      className={`sticky top-[4.25rem] z-30 hidden h-[calc(100vh-4.25rem)] shrink-0 flex-col border-r border-[#1e2d26] bg-[#0d1511] p-2 transition-[width] duration-200 ease-out lg:flex ${isExpanded ? 'w-64 shadow-2xl' : 'w-[4.5rem]'}`}
+      className={`fixed left-0 top-[4.25rem] z-40 hidden h-[calc(100vh-4.25rem)] flex-col border-r border-[#1e2d26] bg-[#0d1511] p-2 transition-[width,box-shadow] duration-200 ease-out lg:flex ${isExpanded ? 'w-64 shadow-2xl' : 'w-[4.5rem]'}`}
     >
       <div className={`mb-3 flex min-h-14 items-center gap-3 overflow-hidden rounded-2xl border border-[#1e2d26] bg-[#0a0f0d] ${isExpanded ? 'p-3' : 'justify-center p-1.5'}`}>
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-700/60 bg-emerald-950 font-bold text-emerald-400">
