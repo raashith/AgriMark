@@ -34,26 +34,32 @@ async function queryTable(
   const key = getApiKey();
   if (!key) throw new Error('Supabase API key is missing from the Vercel production environment.');
 
-  const url = new URL(`${SUPABASE_URL}/rest/v1/${table}`);
-  url.searchParams.set('select', select);
-  if (order) url.searchParams.set('order', order);
-  url.searchParams.set('limit', String(limit));
-  for (const [param, value] of Object.entries(extraParams)) url.searchParams.set(param, value);
+  const rows: any[] = [];
+  for (let offset = 0; offset < limit; offset += PAGE_SIZE) {
+    const pageLimit = Math.min(PAGE_SIZE, limit - offset);
+    const url = new URL(`${SUPABASE_URL}/rest/v1/${table}`);
+    url.searchParams.set('select', select);
+    if (order) url.searchParams.set('order', order);
+    url.searchParams.set('limit', String(pageLimit));
+    url.searchParams.set('offset', String(offset));
+    for (const [param, value] of Object.entries(extraParams)) url.searchParams.set(param, value);
 
-  const response = await fetch(url, {
-    headers: { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' },
-    cache: 'no-store',
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!response.ok) {
-    const detail = (await response.text()).slice(0, 400);
-    throw new Error(`Supabase ${table} query failed (HTTP ${response.status}): ${detail}`);
+    const response = await fetch(url, {
+      headers: { apikey: key, Authorization: `Bearer ${key}`, Accept: 'application/json' },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok) {
+      const detail = (await response.text()).slice(0, 400);
+      throw new Error(`Supabase ${table} query failed (HTTP ${response.status}): ${detail}`);
+    }
+    const json: unknown = await response.json();
+    if (!Array.isArray(json)) throw new Error(`Supabase returned an unexpected payload for ${table}.`);
+    rows.push(...json as any[]);
+    if (json.length < pageLimit) break;
   }
-  const json: unknown = await response.json();
-  if (!Array.isArray(json)) throw new Error(`Supabase returned an unexpected payload for ${table}.`);
-  return json as any[];
+  return rows;
 }
-
 export async function GET(request: NextRequest) {
   try {
     const params = request.nextUrl.searchParams;
