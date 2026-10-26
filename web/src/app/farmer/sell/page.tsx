@@ -67,7 +67,6 @@ function SellForm() {
   const [lots, setLots] = useState<ProduceLot[]>([]);
   const [selectedLotId, setSelectedLotId] = useState(queryLotId);
   const [askingPrice, setAskingPrice] = useState('');
-  const [minOrderQuantity, setMinOrderQuantity] = useState('1');
   const [harvestDate, setHarvestDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
@@ -124,15 +123,9 @@ function SellForm() {
   useEffect(() => {
     if (!selectedLot) {
       setHarvestDate('');
-      setMinOrderQuantity('1');
       return;
     }
     setHarvestDate(String(selectedLot.harvested_at || selectedLot.harvest_date || '').slice(0, 10));
-    setMinOrderQuantity((current) => {
-      const numeric = Number(current);
-      return Number.isFinite(numeric) && numeric > 0 && numeric <= Number(selectedLot.available_quantity ?? selectedLot.quantity ?? 0)
-        ? current : '1';
-    });
   }, [selectedLotId, selectedLot?.harvested_at, selectedLot?.harvest_date]);
 
   // Official mandi observations only; the page never invents a reference price.
@@ -270,20 +263,15 @@ function SellForm() {
       setMessage('Error: Enter a price greater than zero.');
       return;
     }
-    const minimum = Number(minOrderQuantity);
-    if (!Number.isFinite(minimum) || minimum <= 0 || minimum > selectedAvailable) {
-      setMessage(`Error: Minimum order quantity must be greater than zero and no more than ` + selectedAvailable.toLocaleString() + ` ${selectedUnit} available.`);
-      return;
-    }
     setSubmitting(true);
     setMessage('');
     try {
       await api.createListing({
         lot_id: selectedLot.id,
-        title: selectedLot.crop_name || (selectedLot.quality_grade ? `${selectedLot.quality_grade} produce lot` : 'Produce lot'),
+        title: cropForSelected !== 'Produce lot' ? cropForSelected : (selectedLot.quality_grade ? `${selectedLot.quality_grade} produce lot` : 'Produce lot'),
         price_per_unit: unitPrice,
         currency: 'INR',
-        min_order_quantity: minimum,
+        min_order_quantity: 1,
       });
       setMessage('Listing published to AgriMark Marketplace!');
       window.setTimeout(() => router.push('/buyer/marketplace'), 1200);
@@ -437,7 +425,7 @@ function SellForm() {
             ) : filteredLots.map((lot) => {
               const available = Number(lot.available_quantity ?? lot.quantity_kg ?? lot.quantity ?? 0);
               const isSelected = lot.id === selectedLotId;
-              const cropName = lot.crop_name || (isSelected ? resolvedCropName : '') || 'Produce lot';
+              const cropName = lot.crop_name?.trim() || (isSelected ? resolvedCropName : '') || (lot.crop_id ? 'Loading crop name…' : 'Unnamed crop');
               return <button key={lot.id} type="button" onClick={() => { setSelectedLotId(lot.id); setMessage(''); }} aria-pressed={isSelected} className="sell-lot-card flex w-full min-w-0 items-center gap-3 rounded-2xl p-3 text-left sm:gap-3.5 sm:p-3.5">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-emerald-100/80">
                   {isSelected && <span className="h-2.5 w-2.5 rounded-full bg-teal-300 shadow-[0_0_12px_rgba(45,212,191,.8)]" />}
@@ -482,15 +470,6 @@ function SellForm() {
                 <label htmlFor="sell-asking-price" className="sell-label">Asking price (₹ per kg) <span className="text-teal-200">*</span></label>
                 <div className="relative"><span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 font-extrabold text-teal-100">₹</span><input id="sell-asking-price" type="number" min="0.01" step="0.01" required disabled={!selectedLot || submitting} value={askingPrice} onChange={(event) => setAskingPrice(event.target.value)} placeholder={comparison ? comparison.medianPerKg.toFixed(2) : 'Enter your asking price'} className="sell-input !pl-10 !font-bold" /></div>
                 <p className="mt-2 sell-caption">Set your price against the available mandi reference. This is your own asking price, not an automatic quote.</p>
-              </div>
-              <div>
-                <label htmlFor="sell-min-order" className="sell-label">Minimum order quantity ({selectedUnit}) <span className="text-teal-200">*</span></label>
-                <div className="flex items-stretch overflow-hidden rounded-[14px] border border-emerald-100/30 bg-black/25 focus-within:border-teal-300">
-                  <span className="flex items-center px-3 text-teal-100"><CalendarDays className="h-4 w-4" /></span>
-                  <input id="sell-min-order" type="number" min="0.01" step="0.01" max={selectedAvailable || undefined} required disabled={!selectedLot || submitting} value={minOrderQuantity} onChange={(event) => setMinOrderQuantity(event.target.value)} className="min-w-0 flex-1 bg-transparent px-2 py-3 text-sm font-bold text-white outline-none" />
-                  <span className="flex items-center border-l border-white/10 px-3 text-xs font-bold text-emerald-50/80">{selectedUnit}</span>
-                </div>
-                <p className="mt-2 sell-caption">Available to list: {selectedAvailable.toLocaleString('en-IN')} {selectedUnit}. Minimum order cannot exceed the available lot quantity.</p>
               </div>
               <div>
                 <label htmlFor="sell-grade" className="sell-label">Quality grade</label>
