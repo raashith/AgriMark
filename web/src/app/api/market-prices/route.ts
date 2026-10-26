@@ -116,10 +116,17 @@ export async function GET(request: NextRequest) {
     if (effectiveStateName) extraImported.state_name = `eq.${effectiveStateName}`;
     if (selectedMandiName) extraImported.mandi_name = `eq.${selectedMandiName}`;
 
-    const [canonicalRows, importedRows] = await Promise.all([
-      queryTable('national_market_price_observations', 'id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source,variety,grade', 'observation_date.desc,id.desc', 30000, extraCanonical),
-      queryTable('agmarknet_csv_import_staging', 'id,observation_date,state_name,district_name,mandi_name,commodity_name,variety,grade,min_price,max_price,modal_price,source', 'observation_date.desc,id.desc', 30000, extraImported),
-    ]);
+    // TEMPORARY DIAGNOSTIC: pause CSV staging data so we can verify the
+    // mandi price cards using canonical Supabase observations only.
+    // Re-enable the staging source after card/filter behaviour is verified.
+    const canonicalRows = await queryTable(
+      'national_market_price_observations',
+      'id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source,variety,grade',
+      'observation_date.desc,id.desc',
+      30000,
+      extraCanonical,
+    );
+    const importedRows: any[] = [];
 
     const canonical = canonicalRows.map((r: any) => ({
       ...r,
