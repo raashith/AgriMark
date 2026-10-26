@@ -91,6 +91,7 @@ function SellForm() {
   const queryLotId = searchParams.get('lot_id') || '';
   const [lots, setLots] = useState<ProduceLot[]>([]);
   const [selectedLotId, setSelectedLotId] = useState(queryLotId);
+  const [selectedLotSelection, setSelectedLotSelection] = useState<ProduceLot | null>(null);
   const [askingPrice, setAskingPrice] = useState('');
   const [harvestDate, setHarvestDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -102,7 +103,6 @@ function SellForm() {
   const [priceError, setPriceError] = useState('');
   const [aiAdvice, setAiAdvice] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
-  const [resolvedCropName, setResolvedCropName] = useState('');
 
   const fetchLots = useCallback(async () => {
     try {
@@ -124,6 +124,7 @@ function SellForm() {
       }));
       const unlisted = withCropNames.filter((lot) => !lot.is_listed && (lot.status ?? 'available') === 'available');
       setLots(unlisted);
+      setSelectedLotSelection((current) => current ? (unlisted.find((lot) => lot.id === current.id) || null) : null);
       setSelectedLotId((current) => {
         if (current && unlisted.some((lot) => lot.id === current)) return current;
         if (queryLotId && unlisted.some((lot) => lot.id === queryLotId)) return queryLotId;
@@ -145,7 +146,12 @@ function SellForm() {
     void fetchLots();
   }, [user?.id, fetchLots]);
 
-  const selectedLot = lots.find((lot) => lot.id === selectedLotId);
+  // Keep the exact clicked lot as the immediate selection source; fall back to the
+  // latest inventory copy after loading/refresh. This prevents the details panel
+  // from lagging behind the highlighted inventory card.
+  const selectedLot = selectedLotSelection?.id === selectedLotId
+    ? selectedLotSelection
+    : lots.find((lot) => lot.id === selectedLotId);
   const [resolvedCropNames, setResolvedCropNames] = useState<Record<string, string>>({});
   const selectedResolvedCropName = selectedLot ? (selectedLot.crop_name?.trim() || resolvedCropNames[selectedLot.id] || '') : '';
   const cropForSelected = selectedResolvedCropName || (selectedLot ? 'Resolving crop name…' : 'Select produce');
@@ -453,7 +459,7 @@ function SellForm() {
               const available = Number(lot.available_quantity ?? lot.quantity_kg ?? lot.quantity ?? 0);
               const isSelected = lot.id === selectedLotId;
               const cropName = lot.crop_name?.trim() || resolvedCropNames[lot.id] || (lot.crop_id ? 'Resolving crop name…' : 'Unnamed crop');
-              return <button key={lot.id} type="button" onClick={() => { setSelectedLotId(lot.id); setMessage(''); }} aria-pressed={isSelected} className="sell-lot-card flex w-full min-w-0 items-center gap-3 rounded-2xl p-3 text-left sm:gap-3.5 sm:p-3.5">
+              return <button key={lot.id} type="button" onClick={() => { setSelectedLotSelection(lot); setSelectedLotId(lot.id); setComparison(null); setPriceError(''); setAiAdvice(''); setHarvestDate(String(lot.harvested_at || lot.harvest_date || '').slice(0, 10)); setMessage(''); }} aria-pressed={isSelected} className="sell-lot-card flex w-full min-w-0 items-center gap-3 rounded-2xl p-3 text-left sm:gap-3.5 sm:p-3.5">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-emerald-100/80">
                   {isSelected && <span className="h-2.5 w-2.5 rounded-full bg-teal-300 shadow-[0_0_12px_rgba(45,212,191,.8)]" />}
                 </span>
