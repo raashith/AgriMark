@@ -69,31 +69,47 @@ export async function GET(request: NextRequest) {
     const search = norm(params.get('search'));
     const limit = Math.min(MAX_ROWS, Math.max(25, Number(params.get('limit')) || DEFAULT_ROWS));
 
-    const [commodities, states, mandis, canonicalRows, importedRows] = await Promise.all([
+    const [commodities, states, mandis] = await Promise.all([
       queryTable('national_commodities', 'code,name', 'name.asc', 500),
       queryTable('national_states', 'state_code,state_name', 'state_name.asc', 100),
       queryTable('national_mandis', 'mandi_code,mandi_name,state_code', 'mandi_name.asc', 1200),
-      queryTable(
-        'national_market_price_observations',
-        'id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source,variety,grade',
-        'observation_date.desc,id.desc',
-        30000,
-        {
-          ...(rawCommodity && !rawCommodity.startsWith('CSV_COMMODITY:') ? { commodity_code: `eq.${rawCommodity}` } : {}),
-          ...(rawState && !rawState.startsWith('CSV_STATE:') ? { state_code: `eq.${rawState}` } : {}),
-          ...(rawMandi && !rawMandi.startsWith('CSV_MANDI:') ? { mandi_code: `eq.${rawMandi}` } : {}),
-        },
-      ),
-      queryTable(
-        'agmarknet_csv_import_staging',
-        'id,observation_date,state_name,district_name,mandi_name,commodity_name,variety,grade,min_price,max_price,modal_price,source',
-        'observation_date.desc,id.desc',
-        30000,
-        {
-          ...(rawCommodity.startsWith('CSV_COMMODITY:') ? { commodity_name: `eq.${rawCommodity.slice('CSV_COMMODITY:'.length).trim()}` } : rawCommodity ? { commodity_name: `eq.${rawCommodity}` } : {}),
-          ...(rawState.startsWith('CSV_STATE:') ? { state_name: `eq.${rawState.slice('CSV_STATE:'.length).trim()}` } : rawState ? { state_name: `eq.${rawState}` } : {}),
-        },
-      ),
+    ]);
+
+    const commodityNameByCode = new Map(commodities.map((r: any) => [String(r.code), String(r.name)]));
+    const stateNameByCode = new Map(states.map((r: any) => [String(r.state_code), String(r.state_name)]));
+    const optionValue = (value: string, prefix: string) => value.startsWith(prefix) ? value.slice(prefix.length).trim() : '';
+    const commodityName = optionValue(rawCommodity, 'CSV_COMMODITY:') || commodityNameByCode.get(rawCommodity) || rawCommodity;
+    const stateName = optionValue(rawState, 'CSV_STATE:') || stateNameByCode.get(rawState) || rawState;
+
+    let selectedMandiName = '';
+    let selectedMandiState = '';
+    if (rawMandi.startsWith('CSV_MANDI:')) {
+      const pair = rawMandi.slice('CSV_MANDI:'.length).split('|');
+      selectedMandiName = (pair[0] || '').trim();
+      selectedMandiState = (pair[1] || '').trim();
+    } else if (rawMandi) {
+      const selected = mandis.find((r: any) => String(r.mandi_code) === rawMandi);
+      selectedMandiName = String(selected?.mandi_name || rawMandi);
+      selectedMandiState = String(stateNameByCode.get(String(selected?.state_code || '')) || '');
+    }
+    const effectiveStateName = stateName || selectedMandiState;
+
+    const extraCanonical: Record<string, string> = {};
+    if (rawCommodity && !rawCommodity.startsWith('CSV_COMMODITY:')) extraCanonical.commodity_code = `eq.${rawCommodity}`;
+    if (rawState && !rawState.startsWith('CSV_STATE:')) extraCanonical.state_code = `eq.${rawState}`;
+    if (rawMandi && !rawMandi.startsWith('CSV_MANDI:')) extraCanonical.mandi_code = `eq.${rawMandi}`;
+    if (effectiveStateName && (rawState.startsWith('CSV_STATE:') || rawMandi.startsWith('CSV_MANDI:'))) {
+      extraCanonical.state_name = `eq.${effectiveStateName}`;
+    }
+
+    const extraImported: Record<string, string> = {};
+    if (rawCommodity) extraImported.commodity_name = `eq.${commodityName}`;
+    if (effectiveStateName) extraImported.state_name = `eq.${effectiveStateName}`;
+    if (selectedMandiName) extraImported.mandi_name = `eq.${selectedMandiName}`;
+
+    const [canonicalRows, importedRows] = await Promise.all([
+      queryTable('national_market_price_observations', 'id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source,variety,grade', 'observation_date.desc,id.desc', 30000, extraCanonical),
+      queryTable('agmarknet_csv_import_staging', 'id,observation_date,state_name,district_name,mandi_name,commodity_name,variety,grade,min_price,max_price,modal_price,source', 'observation_date.desc,id.desc', 30000, extraImported),
     ]);
 
     const commodityNameByCode = new Map(commodities.map((r: any) => [String(r.code), String(r.name)]));
