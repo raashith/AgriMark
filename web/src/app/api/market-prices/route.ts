@@ -101,7 +101,8 @@ export async function GET(request: NextRequest) {
     if (rawState && !rawState.startsWith('CSV_STATE:')) extraCanonical.state_code = `eq.${rawState}`;
     if (rawMandi && !rawMandi.startsWith('CSV_MANDI:')) extraCanonical.mandi_code = `eq.${rawMandi}`;
 
-    // Map CSV-labelled values to normalized IDs before querying either source.
+    // Resolve CSV option values to normalized codes so the two market sources
+    // are queried consistently for the selected commodity/state/mandi.
     if (rawCommodity.startsWith('CSV_COMMODITY:')) {
       const canonicalCommodityCode = commodities.find((r: any) => norm(r.name) === norm(commodityName))?.code;
       if (canonicalCommodityCode) extraCanonical.commodity_code = `eq.${canonicalCommodityCode}`;
