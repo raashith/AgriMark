@@ -46,94 +46,125 @@ export default function FarmerDashboardPage() {
 
   const [weatherLocation, setWeatherLocation] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [unavailableSections, setUnavailableSections] = useState<string[]>([]);
+
+  const userId = user?.id ?? null;
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
+
     async function loadData() {
-      if (!user?.id) {
+      if (!userId) {
         setLoading(false);
+        setLoadError(null);
         return;
       }
-      try {
-        setLoadError(null);
-        // Load each dashboard section independently. A missing optional table
-        // (for example farm_tasks on a newly provisioned database) must not
-        // prevent farms, harvest inventory, or marketplace orders from loading.
-        const [farmsResult, cultivationsResult, lotsResult, ordersResult, tasksResult] = await Promise.allSettled([
-          dataService.getFarms(user.id),
-          dataService.getCultivations(undefined, user.id),
-          dataService.getProduceLots(user.id),
-          dataService.getOrders(user.id, 'farmer'),
-          dataService.getTasks(user.id),
-        ]);
 
-        const farms = farmsResult.status === 'fulfilled' ? farmsResult.value : [];
-        const cultivations = cultivationsResult.status === 'fulfilled' ? cultivationsResult.value : [];
-        const lots = lotsResult.status === 'fulfilled' ? lotsResult.value : [];
-        const orders = ordersResult.status === 'fulfilled' ? ordersResult.value : [];
-        const tasks = tasksResult.status === 'fulfilled' ? tasksResult.value : [];
-        const failedSections = [
-          farmsResult.status === 'rejected' ? 'farms' : null,
-          cultivationsResult.status === 'rejected' ? 'cultivations' : null,
-          lotsResult.status === 'rejected' ? 'inventory' : null,
-          ordersResult.status === 'rejected' ? 'orders' : null,
-        ].filter(Boolean);
+      setLoading(true);
+      setLoadError(null);
+      setUnavailableSections([]);
 
-        if (farmsResult.status === 'rejected') console.error('[Farmer dashboard] Farm data failed:', farmsResult.reason);
-        if (cultivationsResult.status === 'rejected') console.error('[Farmer dashboard] Cultivation data failed:', cultivationsResult.reason);
-        if (lotsResult.status === 'rejected') console.error('[Farmer dashboard] Inventory data failed:', lotsResult.reason);
-        if (ordersResult.status === 'rejected') console.error('[Farmer dashboard] Order data failed:', ordersResult.reason);
-        if (tasksResult.status === 'rejected') console.warn('[Farmer dashboard] Optional task data is unavailable:', tasksResult.reason);
+      // Required farm/business sections load independently. Weather and tasks are
+      // optional enrichments and must not turn healthy business data into a page error.
+      const [farmsResult, cultivationsResult, lotsResult, ordersResult] = await Promise.allSettled([
+        dataService.getFarms(userId),
+        dataService.getCultivations(undefined, userId),
+        dataService.getProduceLots(userId),
+        dataService.getOrders(userId, 'farmer'),
+      ]);
 
-        const farmWithCoords = farms.find((f) => f.latitude != null && f.longitude != null);
-        let weather = null;
-        if (farmWithCoords) {
-          try {
-            weather = await dataService.getLiveWeather(Number(farmWithCoords.latitude), Number(farmWithCoords.longitude));
-          } catch (weatherError) {
-            console.warn('[Farmer dashboard] Weather data is unavailable:', weatherError);
-          }
-        }
+      if (!isMounted) return;
 
-        if (!isMounted) return;
-        setLoadError(failedSections.length
-          ? `Some dashboard sections could not load (${failedSections.join(', ')}). Other available data is still shown; refresh or sign in again if needed.`
-          : null);
+      const farms = farmsResult.status === 'fulfilled' ? farmsResult.value : [];
+      const cultivations = cultivationsResult.status === 'fulfilled' ? cultivationsResult.value : [];
+      const lots = lotsResult.status === 'fulfilled' ? lotsResult.value : [];
+      const orders = ordersResult.status === 'fulfilled' ? ordersResult.value : [];
 
-        const totalAcres = farms.reduce((acc, farm) => acc + Number(farm.area_acres ?? 0), 0);
-        const totalStock = lots.reduce((acc, lot) => acc + Number(lot.quantity_kg ?? lot.quantity ?? lot.available_quantity ?? 0), 0);
-        const revenue = orders.filter((order) => order.status === 'delivered' || order.status === 'confirmed' || order.payment_status === 'escrowed').reduce((acc, order) => acc + Number(order.total_price ?? order.total_amount ?? 0), 0);
-        const pendingT = tasks.filter((t) => t.status === 'pending').length;
-        const latestRainfall = Number(weather?.data?.rain_1h_mm || 0);
-        const latestHumidity = Number(weather?.data?.humidity_pct || 0);
-        const latestTemperature = Number(weather?.data?.temperature_c || 0);
+      const failedSections = [
+        farmsResult.status === 'rejected' ? 'farms' : null,
+        cultivationsResult.status === 'rejected' ? 'cultivations' : null,
+        lotsResult.status === 'rejected' ? 'inventory' : null,
+        ordersResult.status === 'rejected' ? 'orders' : null,
+      ].filter((section): section is string => Boolean(section));
 
-        setStats({
-          activeCrops: cultivations.length,
-          totalFarms: farms.length,
-          harvestableKg: totalStock,
-          activeOrders: orders.filter((o) => o.status === 'confirmed' || o.status === 'in_transit').length,
-          revenueInr: revenue,
-          pendingTasks: pendingT,
-          cultivationAcres: totalAcres,
-          avgHealth: Number.isFinite(latestHumidity) ? latestHumidity : 0,
-          latestRainfall: Number.isFinite(latestRainfall) ? latestRainfall : 0,
-          latestHumidity: Number.isFinite(latestHumidity) ? latestHumidity : 0,
-          latestTemperature: Number.isFinite(latestTemperature) ? latestTemperature : 0,
-        });
-        setWeatherLocation(weather?.data?.location_name || null);
-      } catch (error) {
-        console.error('[Farmer dashboard] Unexpected dashboard loading failure:', error);
-        if (isMounted) setLoadError('Dashboard could not be loaded. Check your connection or sign in again, then refresh.');
-      } finally {
-        if (isMounted) setLoading(false);
+      if (farmsResult.status === 'rejected') console.error('[Farmer dashboard] Farm data failed:', farmsResult.reason);
+      if (cultivationsResult.status === 'rejected') console.error('[Farmer dashboard] Cultivation data failed:', cultivationsResult.reason);
+      if (lotsResult.status === 'rejected') console.error('[Farmer dashboard] Inventory data failed:', lotsResult.reason);
+      if (ordersResult.status === 'rejected') console.error('[Farmer dashboard] Order data failed:', ordersResult.reason);
+
+      const farmWithCoords = farms.find((farm) => farm.latitude != null && farm.longitude != null);
+      const [tasksResult, weatherResult] = await Promise.allSettled([
+        dataService.getTasks(userId),
+        farmWithCoords
+          ? dataService.getLiveWeather(Number(farmWithCoords.latitude), Number(farmWithCoords.longitude))
+          : Promise.resolve(null),
+      ]);
+
+      if (!isMounted) return;
+
+      const tasksUnavailable = tasksResult.status === 'rejected';
+      const weatherUnavailable = !farmWithCoords || weatherResult.status === 'rejected';
+      const taskCount = tasksResult.status === 'fulfilled'
+        ? tasksResult.value.filter((task) => task.status === 'pending').length
+        : null;
+      const weather = weatherResult.status === 'fulfilled' ? weatherResult.value : null;
+
+      if (tasksUnavailable) {
+        console.warn('[Farmer dashboard] Optional task data is unavailable:', tasksResult.reason);
       }
+      if (weatherResult.status === 'rejected') {
+        console.warn('[Farmer dashboard] Weather data is unavailable:', weatherResult.reason);
+      }
+
+      const totalAcres = farms.reduce((total, farm) => total + Number(farm.area_acres ?? 0), 0);
+      const totalStock = lots.reduce((total, lot) => total + Number(lot.quantity_kg ?? lot.quantity ?? lot.available_quantity ?? 0), 0);
+      const revenue = orders
+        .filter((order) => order.status === 'delivered' || order.status === 'confirmed' || order.payment_status === 'escrowed')
+        .reduce((total, order) => total + Number(order.total_price ?? order.total_amount ?? 0), 0);
+      const latestRainfall = Number(weather?.data?.rain_1h_mm ?? 0);
+      const latestHumidity = Number(weather?.data?.humidity_pct ?? 0);
+      const latestTemperature = Number(weather?.data?.temperature_c ?? 0);
+
+      setStats({
+        activeCrops: cultivations.length,
+        totalFarms: farms.length,
+        harvestableKg: totalStock,
+        activeOrders: orders.filter((order) => order.status === 'confirmed' || order.status === 'in_transit').length,
+        revenueInr: revenue,
+        pendingTasks: taskCount ?? 0,
+        cultivationAcres: totalAcres,
+        avgHealth: Number.isFinite(latestHumidity) ? latestHumidity : 0,
+        latestRainfall: Number.isFinite(latestRainfall) ? latestRainfall : 0,
+        latestHumidity: Number.isFinite(latestHumidity) ? latestHumidity : 0,
+        latestTemperature: Number.isFinite(latestTemperature) ? latestTemperature : 0,
+      });
+      setWeatherLocation(weather?.data?.location_name || null);
+      setUnavailableSections([
+        ...failedSections,
+        ...(tasksUnavailable ? ['tasks'] : []),
+        ...(weatherUnavailable ? ['weather'] : []),
+      ]);
+      setLoadError(failedSections.length
+        ? `Live data is temporarily unavailable for: ${failedSections.join(', ')}. Other sections are still shown. Use Refresh to try again.`
+        : null);
+      setLoading(false);
     }
-    loadData();
+
+    void loadData().catch((error) => {
+      console.error('[Farmer dashboard] Unexpected dashboard loading failure:', error);
+      if (isMounted) {
+        setLoadError('AgriMark could not refresh the dashboard. Check your connection and retry.');
+        setLoading(false);
+      }
+    });
+
     return () => {
       isMounted = false;
     };
-  }, [user]);
+  }, [userId, refreshVersion]);
+
+  const refreshDashboard = () => setRefreshVersion((version) => version + 1);
 
   return (
     <ProtectedRoute allowedRoles={['farmer', 'fpo', 'admin', 'service_provider']}>
@@ -165,25 +196,30 @@ export default function FarmerDashboardPage() {
             <div className="grid grid-cols-2 gap-3 min-w-[280px]">
               <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-4">
                 <p className="text-[10px] uppercase tracking-wider text-gray-400">Field footprint</p>
-                <p className="mt-1 text-2xl font-black text-white">{stats.cultivationAcres.toFixed(1)} <span className="text-sm font-semibold text-gray-400">ac</span></p>
-                <p className="mt-1 text-[11px] text-emerald-300">{stats.totalFarms} farms configured</p>
+                <p className="mt-1 text-2xl font-black text-white">{unavailableSections.includes('farms') ? '—' : stats.cultivationAcres.toFixed(1)} <span className="text-sm font-semibold text-gray-400">ac</span></p>
+                <p className="mt-1 text-[11px] text-emerald-300">{unavailableSections.includes('farms') ? 'Farm data unavailable' : `${stats.totalFarms} farms configured`}</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-4">
                 <p className="text-[10px] uppercase tracking-wider text-gray-400">Inventory</p>
-                <p className="mt-1 text-2xl font-black text-white">{(stats.harvestableKg / 1000).toFixed(1)} <span className="text-sm font-semibold text-gray-400">t</span></p>
-                <p className="mt-1 text-[11px] text-amber-300">{stats.activeOrders} active orders</p>
+                <p className="mt-1 text-2xl font-black text-white">{unavailableSections.includes('inventory') ? '—' : (stats.harvestableKg / 1000).toFixed(1)} <span className="text-sm font-semibold text-gray-400">t</span></p>
+                <p className="mt-1 text-[11px] text-amber-300">{unavailableSections.includes('orders') ? '— active orders' : `${stats.activeOrders} active orders`}</p>
               </div>
             </div>
           </div>
         </section>
 
+        <div className="flex justify-end">
+          <button type="button" onClick={refreshDashboard} disabled={loading} className="rounded-lg border border-emerald-800/70 px-3 py-2 text-xs font-semibold text-emerald-200 disabled:cursor-not-allowed disabled:opacity-50">
+            {loading ? 'Refreshing…' : 'Refresh dashboard'}
+          </button>
+        </div>
         <section className="grid grid-cols-2 xl:grid-cols-5 gap-3">
           {[
-            { label: 'Active Cultivations', value: `${stats.activeCrops}`, suffix: 'crops', icon: Sprout },
-            { label: 'Produce Stock', value: `${(stats.harvestableKg / 1000).toFixed(1)}`, suffix: 'tons', icon: Layers },
-            { label: 'Revenue', value: `₹${stats.revenueInr.toLocaleString()}`, suffix: 'tracked', icon: TrendingUp },
-            { label: 'Pending Tasks', value: `${stats.pendingTasks}`, suffix: 'actions', icon: CheckSquare },
-            { label: 'Humidity Signal', value: `${stats.avgHealth}`, suffix: '%', icon: Gauge },
+            { label: 'Active Cultivations', value: `${stats.activeCrops}`, section: 'cultivations', suffix: 'crops', icon: Sprout },
+            { label: 'Produce Stock', value: `${(stats.harvestableKg / 1000).toFixed(1)}`, section: 'inventory', suffix: 'tons', icon: Layers },
+            { label: 'Revenue', value: `₹${stats.revenueInr.toLocaleString()}`, section: 'orders', suffix: 'tracked', icon: TrendingUp },
+            { label: 'Pending Tasks', value: `${stats.pendingTasks}`, section: 'tasks', suffix: 'actions', icon: CheckSquare },
+            { label: 'Humidity Signal', value: `${stats.avgHealth}`, section: 'weather', suffix: '%', icon: Gauge },
           ].map((card) => (
             <div key={card.label} className="rounded-2xl border border-white/10 bg-[#0d1914] p-4 shadow-lg">
               <div className="flex items-center justify-between gap-2">
@@ -191,7 +227,7 @@ export default function FarmerDashboardPage() {
                 <card.icon className="h-4 w-4 text-emerald-300" />
               </div>
               <div className="mt-3 flex items-end gap-2">
-                <span className="text-2xl font-black text-white">{loading ? '—' : card.value}</span>
+                <span className="text-2xl font-black text-white">{loading || unavailableSections.includes(card.section) ? '—' : card.value}</span>
                 <span className="pb-1 text-[11px] text-gray-500">{card.suffix}</span>
               </div>
             </div>
@@ -212,17 +248,17 @@ export default function FarmerDashboardPage() {
             <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="rounded-2xl border border-emerald-900/40 bg-emerald-950/20 p-4">
                 <p className="text-xs text-gray-500">Crop activity</p>
-                <p className="mt-2 text-3xl font-black text-emerald-300">{stats.activeCrops}</p>
+                <p className="mt-2 text-3xl font-black text-emerald-300">{unavailableSections.includes('cultivations') ? '—' : stats.activeCrops}</p>
                 <p className="mt-1 text-xs text-gray-400">active cultivations</p>
               </div>
               <div className="rounded-2xl border border-cyan-900/30 bg-cyan-950/10 p-4">
                 <p className="text-xs text-gray-500">Humidity signal</p>
-                <p className="mt-2 text-3xl font-black text-cyan-300">{stats.latestHumidity}%</p>
+                <p className="mt-2 text-3xl font-black text-cyan-300">{unavailableSections.includes('weather') ? '—' : `${stats.latestHumidity}%`}</p>
                 <p className="mt-1 text-xs text-gray-400">latest weather reading</p>
               </div>
               <div className="rounded-2xl border border-sky-900/30 bg-sky-950/10 p-4">
                 <p className="text-xs text-gray-500">Rainfall</p>
-                <p className="mt-2 text-3xl font-black text-sky-300">{stats.latestRainfall} <span className="text-sm">mm</span></p>
+                <p className="mt-2 text-3xl font-black text-sky-300">{unavailableSections.includes('weather') ? '—' : stats.latestRainfall} <span className="text-sm">mm</span></p>
                 <p className="mt-1 text-xs text-gray-400">latest available reading</p>
               </div>
             </div>
@@ -232,8 +268,8 @@ export default function FarmerDashboardPage() {
                 <span>{stats.totalFarms} farm{stats.totalFarms === 1 ? '' : 's'} configured</span>
               </div>
               <div className="mt-4 grid grid-cols-3 gap-3">
-                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3"><p className="text-[10px] uppercase text-gray-500">Area</p><p className="mt-1 font-bold text-white">{stats.cultivationAcres.toFixed(1)} ac</p></div>
-                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3"><p className="text-[10px] uppercase text-gray-500">Temperature</p><p className="mt-1 font-bold text-white">{stats.latestTemperature || '—'}°C</p></div>
+                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3"><p className="text-[10px] uppercase text-gray-500">Area</p><p className="mt-1 font-bold text-white">{unavailableSections.includes('farms') ? '—' : `${stats.cultivationAcres.toFixed(1)} ac`}</p></div>
+                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3"><p className="text-[10px] uppercase text-gray-500">Temperature</p><p className="mt-1 font-bold text-white">{unavailableSections.includes('weather') || !stats.latestTemperature ? '—' : `${stats.latestTemperature}°C`}</p></div>
                 <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3"><p className="text-[10px] uppercase text-gray-500">Weather</p><p className="mt-1 font-bold capitalize text-emerald-300">{weatherLocation || 'GPS required'}</p></div>
               </div>
             </div>
@@ -250,12 +286,12 @@ export default function FarmerDashboardPage() {
             <div className="mt-5 grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-white/5 p-4 border border-white/5">
                 <Droplets className="h-4 w-4 text-cyan-300" />
-                <p className="mt-2 text-2xl font-black text-white">{stats.latestHumidity}%</p>
+                <p className="mt-2 text-2xl font-black text-white">{unavailableSections.includes('weather') ? '—' : `${stats.latestHumidity}%`}</p>
                 <p className="text-xs text-gray-500">humidity</p>
               </div>
               <div className="rounded-2xl bg-white/5 p-4 border border-white/5">
                 <CloudRain className="h-4 w-4 text-sky-300" />
-                <p className="mt-2 text-2xl font-black text-white">{stats.latestRainfall} mm</p>
+                <p className="mt-2 text-2xl font-black text-white">{unavailableSections.includes('weather') ? '—' : `${stats.latestRainfall} mm`}</p>
                 <p className="text-xs text-gray-500">rainfall</p>
               </div>
             </div>
@@ -284,7 +320,7 @@ export default function FarmerDashboardPage() {
           </div>
           <div className="rounded-3xl border border-white/10 bg-[#0b1712] p-5">
             <div className="flex items-center gap-2"><CheckSquare className="h-5 w-5 text-amber-300" /><h3 className="font-bold text-white">Task center</h3></div>
-            <p className="mt-2 text-sm text-gray-400">{stats.pendingTasks} pending farm actions are tracked for your workspace.</p>
+            <p className="mt-2 text-sm text-gray-400">{unavailableSections.includes('tasks') ? 'Task data is currently unavailable.' : `${stats.pendingTasks} pending farm actions are tracked for your workspace.`}</p>
             <Link href="/tasks" className="mt-4 inline-flex items-center gap-2 rounded-xl border border-amber-800/60 bg-amber-950/20 px-3 py-2 text-xs font-semibold text-amber-200">Open tasks <ArrowUpRight className="h-3.5 w-3.5" /></Link>
           </div>
         </section>

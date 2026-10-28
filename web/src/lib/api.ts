@@ -41,7 +41,9 @@ async function parseResponseBody(response: Response): Promise<any> {
   };
 }
 
-const RETRYABLE_STATUS_CODES = new Set([502, 503, 504]);
+// A failed Supabase request can surface as a transient 500 from the API. Retry only
+// safe reads, never writes, so a short Render/PostgREST hiccup doesn't blank the dashboard.
+const RETRYABLE_STATUS_CODES = new Set([500, 502, 503, 504]);
 const MAX_GET_RETRIES = 2;
 const REQUEST_TIMEOUT_MS = 15000;
 
