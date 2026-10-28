@@ -107,6 +107,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     invalid = selected["observation_date"].isna() | selected["modal_price"].isna() | (selected["modal_price"] <= 0)
     invalid_count = int(invalid.sum())
     selected = selected.loc[~invalid].copy()
+    clean_row_count = int(len(selected))
     if selected.empty:
         raise ValueError("No valid positive price observations remain after validation.")
 
@@ -138,7 +139,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     # One-step expanding-window backtest: each prediction sees history only up to t-1.
     model_predictions: list[float] = []
     for pos in test_positions:
-        train_series = daily.iloc[:pos]
         x_train = _features(daily, list(range(14, pos)))
         y_train = daily.iloc[14:pos].to_numpy(dtype=float)
         x_target = _features(daily, [pos])
@@ -175,7 +175,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "version": args.dataset_version,
             "source_url": args.source_url,
             "source_note": "Validate source license, provenance, data units and export timestamp before training or redistribution.",
-            "selected_raw_rows": int(len(selected)),
+            "selected_valid_rows_after_drop": clean_row_count,
             "invalid_rows_dropped": invalid_count,
             "daily_points_after_same_day_median": int(len(daily)),
             "first_date": daily.index.min().date().isoformat(),
