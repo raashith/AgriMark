@@ -46,9 +46,9 @@ export default function FarmerDashboardPage() {
 
   const [weatherLocation, setWeatherLocation] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [unavailableSections, setUnavailableSections] = useState<string[]>([]);
 
   const userId = user?.id ?? null;
-  const userName = typeof user?.full_name === 'string' ? user.full_name.trim().split(/\s+/)[0] : '';
   const [refreshVersion, setRefreshVersion] = useState(0);
 
   useEffect(() => {
@@ -63,6 +63,7 @@ export default function FarmerDashboardPage() {
 
       setLoading(true);
       setLoadError(null);
+      setUnavailableSections([]);
 
       // Required farm/business sections load independently. Weather and tasks are
       // optional enrichments and must not turn healthy business data into a page error.
@@ -95,18 +96,26 @@ export default function FarmerDashboardPage() {
       const farmWithCoords = farms.find((farm) => farm.latitude != null && farm.longitude != null);
       let weather: Awaited<ReturnType<typeof dataService.getLiveWeather>> | null = null;
       let taskCount: number | null = null;
+      let tasksUnavailable = false;
+      let weatherUnavailable = !farmWithCoords;
 
       const optionalLoads: Promise<void>[] = [
         dataService.getTasks(userId)
           .then((tasks) => { taskCount = tasks.filter((task) => task.status === 'pending').length; })
-          .catch((error) => console.warn('[Farmer dashboard] Optional task data is unavailable:', error)),
+          .catch((error) => {
+            tasksUnavailable = true;
+            console.warn('[Farmer dashboard] Optional task data is unavailable:', error);
+          }),
       ];
 
       if (farmWithCoords) {
         optionalLoads.push(
           dataService.getLiveWeather(Number(farmWithCoords.latitude), Number(farmWithCoords.longitude))
             .then((result) => { weather = result; })
-            .catch((error) => console.warn('[Farmer dashboard] Weather data is unavailable:', error)),
+            .catch((error) => {
+              weatherUnavailable = true;
+              console.warn('[Farmer dashboard] Weather data is unavailable:', error);
+            }),
         );
       }
 
@@ -136,6 +145,11 @@ export default function FarmerDashboardPage() {
         latestTemperature: Number.isFinite(latestTemperature) ? latestTemperature : 0,
       });
       setWeatherLocation(weather?.data?.location_name || null);
+      setUnavailableSections([
+        ...failedSections,
+        ...(tasksUnavailable ? ['tasks'] : []),
+        ...(weatherUnavailable ? ['weather'] : []),
+      ]);
       setLoadError(failedSections.length
         ? `Live data is temporarily unavailable for: ${failedSections.join(', ')}. Other sections are still shown. Use Refresh to try again.`
         : null);
@@ -187,13 +201,13 @@ export default function FarmerDashboardPage() {
             <div className="grid grid-cols-2 gap-3 min-w-[280px]">
               <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-4">
                 <p className="text-[10px] uppercase tracking-wider text-gray-400">Field footprint</p>
-                <p className="mt-1 text-2xl font-black text-white">{stats.cultivationAcres.toFixed(1)} <span className="text-sm font-semibold text-gray-400">ac</span></p>
-                <p className="mt-1 text-[11px] text-emerald-300">{stats.totalFarms} farms configured</p>
+                <p className="mt-1 text-2xl font-black text-white">{unavailableSections.includes('farms') ? '—' : stats.cultivationAcres.toFixed(1)} <span className="text-sm font-semibold text-gray-400">ac</span></p>
+                <p className="mt-1 text-[11px] text-emerald-300">{unavailableSections.includes('farms') ? 'Farm data unavailable' : `${stats.totalFarms} farms configured`}</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-4">
                 <p className="text-[10px] uppercase tracking-wider text-gray-400">Inventory</p>
-                <p className="mt-1 text-2xl font-black text-white">{(stats.harvestableKg / 1000).toFixed(1)} <span className="text-sm font-semibold text-gray-400">t</span></p>
-                <p className="mt-1 text-[11px] text-amber-300">{stats.activeOrders} active orders</p>
+                <p className="mt-1 text-2xl font-black text-white">{unavailableSections.includes('inventory') ? '—' : (stats.harvestableKg / 1000).toFixed(1)} <span className="text-sm font-semibold text-gray-400">t</span></p>
+                <p className="mt-1 text-[11px] text-amber-300">{unavailableSections.includes('orders') ? '— active orders' : `${stats.activeOrders} active orders`}</p>
               </div>
             </div>
           </div>
@@ -206,11 +220,11 @@ export default function FarmerDashboardPage() {
         </div>
         <section className="grid grid-cols-2 xl:grid-cols-5 gap-3">
           {[
-            { label: 'Active Cultivations', value: `${stats.activeCrops}`, suffix: 'crops', icon: Sprout },
-            { label: 'Produce Stock', value: `${(stats.harvestableKg / 1000).toFixed(1)}`, suffix: 'tons', icon: Layers },
-            { label: 'Revenue', value: `₹${stats.revenueInr.toLocaleString()}`, suffix: 'tracked', icon: TrendingUp },
-            { label: 'Pending Tasks', value: `${stats.pendingTasks}`, suffix: 'actions', icon: CheckSquare },
-            { label: 'Humidity Signal', value: `${stats.avgHealth}`, suffix: '%', icon: Gauge },
+            { label: 'Active Cultivations', value: `${stats.activeCrops}`, section: 'cultivations', suffix: 'crops', icon: Sprout },
+            { label: 'Produce Stock', value: `${(stats.harvestableKg / 1000).toFixed(1)}`, section: 'inventory', suffix: 'tons', icon: Layers },
+            { label: 'Revenue', value: `₹${stats.revenueInr.toLocaleString()}`, section: 'orders', suffix: 'tracked', icon: TrendingUp },
+            { label: 'Pending Tasks', value: `${stats.pendingTasks}`, section: 'tasks', suffix: 'actions', icon: CheckSquare },
+            { label: 'Humidity Signal', value: `${stats.avgHealth}`, section: 'weather', suffix: '%', icon: Gauge },
           ].map((card) => (
             <div key={card.label} className="rounded-2xl border border-white/10 bg-[#0d1914] p-4 shadow-lg">
               <div className="flex items-center justify-between gap-2">
@@ -218,7 +232,7 @@ export default function FarmerDashboardPage() {
                 <card.icon className="h-4 w-4 text-emerald-300" />
               </div>
               <div className="mt-3 flex items-end gap-2">
-                <span className="text-2xl font-black text-white">{loading ? '—' : card.value}</span>
+                <span className="text-2xl font-black text-white">{loading || unavailableSections.includes(card.section) ? '—' : card.value}</span>
                 <span className="pb-1 text-[11px] text-gray-500">{card.suffix}</span>
               </div>
             </div>
@@ -239,17 +253,17 @@ export default function FarmerDashboardPage() {
             <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="rounded-2xl border border-emerald-900/40 bg-emerald-950/20 p-4">
                 <p className="text-xs text-gray-500">Crop activity</p>
-                <p className="mt-2 text-3xl font-black text-emerald-300">{stats.activeCrops}</p>
+                <p className="mt-2 text-3xl font-black text-emerald-300">{unavailableSections.includes('cultivations') ? '—' : stats.activeCrops}</p>
                 <p className="mt-1 text-xs text-gray-400">active cultivations</p>
               </div>
               <div className="rounded-2xl border border-cyan-900/30 bg-cyan-950/10 p-4">
                 <p className="text-xs text-gray-500">Humidity signal</p>
-                <p className="mt-2 text-3xl font-black text-cyan-300">{stats.latestHumidity}%</p>
+                <p className="mt-2 text-3xl font-black text-cyan-300">{unavailableSections.includes('weather') ? '—' : `${stats.latestHumidity}%`}</p>
                 <p className="mt-1 text-xs text-gray-400">latest weather reading</p>
               </div>
               <div className="rounded-2xl border border-sky-900/30 bg-sky-950/10 p-4">
                 <p className="text-xs text-gray-500">Rainfall</p>
-                <p className="mt-2 text-3xl font-black text-sky-300">{stats.latestRainfall} <span className="text-sm">mm</span></p>
+                <p className="mt-2 text-3xl font-black text-sky-300">{unavailableSections.includes('weather') ? '—' : stats.latestRainfall} <span className="text-sm">mm</span></p>
                 <p className="mt-1 text-xs text-gray-400">latest available reading</p>
               </div>
             </div>
@@ -259,8 +273,8 @@ export default function FarmerDashboardPage() {
                 <span>{stats.totalFarms} farm{stats.totalFarms === 1 ? '' : 's'} configured</span>
               </div>
               <div className="mt-4 grid grid-cols-3 gap-3">
-                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3"><p className="text-[10px] uppercase text-gray-500">Area</p><p className="mt-1 font-bold text-white">{stats.cultivationAcres.toFixed(1)} ac</p></div>
-                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3"><p className="text-[10px] uppercase text-gray-500">Temperature</p><p className="mt-1 font-bold text-white">{stats.latestTemperature || '—'}°C</p></div>
+                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3"><p className="text-[10px] uppercase text-gray-500">Area</p><p className="mt-1 font-bold text-white">{unavailableSections.includes('farms') ? '—' : `${stats.cultivationAcres.toFixed(1)} ac`}</p></div>
+                <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3"><p className="text-[10px] uppercase text-gray-500">Temperature</p><p className="mt-1 font-bold text-white">{unavailableSections.includes('weather') || !stats.latestTemperature ? '—' : `${stats.latestTemperature}°C`}</p></div>
                 <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3"><p className="text-[10px] uppercase text-gray-500">Weather</p><p className="mt-1 font-bold capitalize text-emerald-300">{weatherLocation || 'GPS required'}</p></div>
               </div>
             </div>
@@ -277,12 +291,12 @@ export default function FarmerDashboardPage() {
             <div className="mt-5 grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-white/5 p-4 border border-white/5">
                 <Droplets className="h-4 w-4 text-cyan-300" />
-                <p className="mt-2 text-2xl font-black text-white">{stats.latestHumidity}%</p>
+                <p className="mt-2 text-2xl font-black text-white">{unavailableSections.includes('weather') ? '—' : `${stats.latestHumidity}%`}</p>
                 <p className="text-xs text-gray-500">humidity</p>
               </div>
               <div className="rounded-2xl bg-white/5 p-4 border border-white/5">
                 <CloudRain className="h-4 w-4 text-sky-300" />
-                <p className="mt-2 text-2xl font-black text-white">{stats.latestRainfall} mm</p>
+                <p className="mt-2 text-2xl font-black text-white">{unavailableSections.includes('weather') ? '—' : `${stats.latestRainfall} mm`}</p>
                 <p className="text-xs text-gray-500">rainfall</p>
               </div>
             </div>
@@ -311,7 +325,7 @@ export default function FarmerDashboardPage() {
           </div>
           <div className="rounded-3xl border border-white/10 bg-[#0b1712] p-5">
             <div className="flex items-center gap-2"><CheckSquare className="h-5 w-5 text-amber-300" /><h3 className="font-bold text-white">Task center</h3></div>
-            <p className="mt-2 text-sm text-gray-400">{stats.pendingTasks} pending farm actions are tracked for your workspace.</p>
+            <p className="mt-2 text-sm text-gray-400">{unavailableSections.includes('tasks') ? 'Task data is currently unavailable.' : `${stats.pendingTasks} pending farm actions are tracked for your workspace.`}</p>
             <Link href="/tasks" className="mt-4 inline-flex items-center gap-2 rounded-xl border border-amber-800/60 bg-amber-950/20 px-3 py-2 text-xs font-semibold text-amber-200">Open tasks <ArrowUpRight className="h-3.5 w-3.5" /></Link>
           </div>
         </section>
