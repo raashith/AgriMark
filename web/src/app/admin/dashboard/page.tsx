@@ -16,22 +16,27 @@ export default function AdminDashboardPage() {
   const [activeListingsCount, setActiveListingsCount] = useState<number>(0);
   const [totalOrderVolume, setTotalOrderVolume] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadAdminData() {
       try {
-        const [{ data: profilesData }, listings, orders] = await Promise.all([
+        setLoadError(null);
+        const [{ data: profilesData, error: profilesError }, listings, orders] = await Promise.all([
           supabase.from('profiles').select('*'),
           dataService.getListings(),
           dataService.getOrders(),
         ]);
 
+        if (profilesError) throw profilesError;
         if (profilesData) setUsers(profilesData as UserProfile[]);
-        setActiveListingsCount(listings.length);
+        setActiveListingsCount(listings.filter((listing) => listing.status === 'active').length);
 
         const totalVol = orders.reduce((acc, o) => acc + (o.total_price || o.total_amount || 0), 0);
         setTotalOrderVolume(totalVol);
-      } catch {
+      } catch (error) {
+        console.error('[Admin dashboard] Failed to load live dashboard data:', error);
+        setLoadError('Could not load platform metrics. Check your admin access and service connection, then refresh.');
       } finally {
         setLoading(false);
       }
@@ -52,6 +57,7 @@ export default function AdminDashboardPage() {
   return (
     <ProtectedRoute allowedRoles={['admin']}>
       <div className="space-y-6">
+        {loadError && <div role="alert" className="rounded-xl border border-amber-700/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-100">{loadError}</div>}
         <div className="bg-[#121a16] border border-[#1e2d26] p-6 md:p-8 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xl">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-purple-950/80 border border-purple-800/60 rounded-full text-xs font-mono font-bold text-purple-300">
