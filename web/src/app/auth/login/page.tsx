@@ -130,8 +130,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-[85vh] flex flex-col justify-center items-center px-4 py-8 bg-[#0a0f0d]">
-      <div className="w-full max-w-md bg-[#121a16] border border-[#1e2d26] rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+    <div className="relative min-h-[85vh] flex flex-col justify-center items-center overflow-hidden px-4 py-10 bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.13),transparent_55%),linear-gradient(145deg,#070c0a,#0b1410_55%,#07100c)]">
+      <div className="w-full max-w-md relative rounded-3xl border border-white/10 bg-white/[0.055] p-6 sm:p-8 shadow-[0_24px_90px_rgba(0,0,0,0.42)] backdrop-blur-2xl ring-1 ring-white/[0.035] space-y-6">
         <div className="text-center space-y-2">
           <div className="inline-flex p-3.5 bg-emerald-950/80 border border-emerald-800/60 rounded-2xl shadow-inner text-emerald-400">
             <Sprout className="w-8 h-8 text-emerald-400" />
@@ -168,8 +168,8 @@ export default function LoginPage() {
                   aria-pressed={role === item.id}
                   onClick={() => { setError(''); setRole(item.id); }}
                   className={role === item.id
-                    ? 'p-3 rounded-xl border border-emerald-500 bg-emerald-950/80 text-emerald-300 font-semibold flex items-center justify-between'
-                    : 'p-3 rounded-xl border border-[#1e2d26] bg-[#0a0f0d] text-gray-400 font-semibold flex items-center justify-between hover:border-emerald-800'}
+                    ? 'p-3 rounded-xl border border-emerald-400/70 bg-emerald-400/10 text-emerald-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl font-semibold flex items-center justify-between transition-colors'
+                    : 'p-3 rounded-xl border border-white/10 bg-black/15 text-gray-300 font-semibold flex items-center justify-between backdrop-blur-xl hover:border-emerald-400/40 hover:bg-white/[0.04] transition-colors'}
                 >
                   <span>{item.label}</span>
                   {role === item.id && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
@@ -204,7 +204,7 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className="w-full pl-10 pr-4 py-3.5 bg-[#0a0f0d] border border-[#1e2d26] rounded-2xl text-white focus:border-emerald-500 focus:outline-none"
+                    className="w-full pl-10 pr-4 py-3.5 bg-black/20 border border-white/10 rounded-2xl text-white placeholder:text-slate-400/90 backdrop-blur-xl focus:border-emerald-400/70 focus:bg-white/[0.045] focus:outline-none focus:ring-2 focus:ring-emerald-400/15 transition"
                   />
                 </div>
               </div>
@@ -233,9 +233,9 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading || authLoading}
-                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-950/80 disabled:text-gray-500 text-white font-extrabold rounded-2xl shadow-lg transition flex items-center justify-center gap-2 text-sm"
+                className="w-full py-4 bg-emerald-500/90 hover:bg-emerald-400 disabled:bg-emerald-950/80 disabled:text-gray-500 text-white font-extrabold rounded-2xl border border-emerald-300/30 shadow-[0_12px_28px_rgba(16,185,129,0.17)] backdrop-blur-xl transition flex items-center justify-center gap-2 text-sm"
               >
-                <span>{loading ? 'Signing in…' : 'Sign in as ' + ROLE_LABELS[role]}</span>
+                <span>{loading ? 'Signing in…' : 'Sign in'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 
@@ -249,9 +249,15 @@ export default function LoginPage() {
                 type="button"
                 onClick={google}
                 disabled={loading || authLoading}
-                className="w-full py-4 bg-white hover:bg-gray-100 disabled:bg-gray-300 text-gray-900 font-extrabold rounded-2xl shadow-lg transition flex items-center justify-center gap-2 text-sm"
+                className="w-full py-4 bg-white/[0.94] hover:bg-white disabled:bg-white/50 text-gray-900 font-extrabold rounded-2xl border border-white/60 shadow-[0_10px_30px_rgba(0,0,0,0.16)] backdrop-blur-xl transition flex items-center justify-center gap-3 text-sm"
               >
-                Continue with Google as {ROLE_LABELS[role]}
+                <svg aria-hidden="true" viewBox="0 0 48 48" className="h-5 w-5 shrink-0">
+                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z" transform="translate(0 4) scale(1)"/>
+                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.73 7.18l7.66 5.95c4.47-4.13 7.11-10.2 7.11-17.6Z"/>
+                  <path fill="#FBBC05" d="M10.53 28.59a14.4 14.4 0 0 1 0-9.18l-7.98-6.2a23.98 23.98 0 0 0 0 21.58l7.98-6.2Z"/>
+                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.91-5.85l-7.66-5.95c-2.13 1.43-4.85 2.28-8.25 2.28-6.26 0-11.57-4.22-13.46-9.91l-7.98 6.2C6.51 42.02 14.62 48 24 48Z"/>
+                </svg>
+                <span>Continue with Google</span>
               </button>
             </form>
           )}
