@@ -56,7 +56,10 @@ export default function FarmerDashboardPage() {
       }
       try {
         setLoadError(null);
-        const [farms, cultivations, lots, orders, tasks] = await Promise.all([
+        // Load each dashboard section independently. A missing optional table
+        // (for example farm_tasks on a newly provisioned database) must not
+        // prevent farms, harvest inventory, or marketplace orders from loading.
+        const [farmsResult, cultivationsResult, lotsResult, ordersResult, tasksResult] = await Promise.allSettled([
           dataService.getFarms(user.id),
           dataService.getCultivations(undefined, user.id),
           dataService.getProduceLots(user.id),
@@ -64,12 +67,38 @@ export default function FarmerDashboardPage() {
           dataService.getTasks(user.id),
         ]);
 
+        const farms = farmsResult.status === 'fulfilled' ? farmsResult.value : [];
+        const cultivations = cultivationsResult.status === 'fulfilled' ? cultivationsResult.value : [];
+        const lots = lotsResult.status === 'fulfilled' ? lotsResult.value : [];
+        const orders = ordersResult.status === 'fulfilled' ? ordersResult.value : [];
+        const tasks = tasksResult.status === 'fulfilled' ? tasksResult.value : [];
+        const failedSections = [
+          farmsResult.status === 'rejected' ? 'farms' : null,
+          cultivationsResult.status === 'rejected' ? 'cultivations' : null,
+          lotsResult.status === 'rejected' ? 'inventory' : null,
+          ordersResult.status === 'rejected' ? 'orders' : null,
+        ].filter(Boolean);
+
+        if (farmsResult.status === 'rejected') console.error('[Farmer dashboard] Farm data failed:', farmsResult.reason);
+        if (cultivationsResult.status === 'rejected') console.error('[Farmer dashboard] Cultivation data failed:', cultivationsResult.reason);
+        if (lotsResult.status === 'rejected') console.error('[Farmer dashboard] Inventory data failed:', lotsResult.reason);
+        if (ordersResult.status === 'rejected') console.error('[Farmer dashboard] Order data failed:', ordersResult.reason);
+        if (tasksResult.status === 'rejected') console.warn('[Farmer dashboard] Optional task data is unavailable:', tasksResult.reason);
+
         const farmWithCoords = farms.find((f) => f.latitude != null && f.longitude != null);
-        const weather = farmWithCoords
-          ? await dataService.getLiveWeather(Number(farmWithCoords.latitude), Number(farmWithCoords.longitude))
-          : null;
+        let weather = null;
+        if (farmWithCoords) {
+          try {
+            weather = await dataService.getLiveWeather(Number(farmWithCoords.latitude), Number(farmWithCoords.longitude));
+          } catch (weatherError) {
+            console.warn('[Farmer dashboard] Weather data is unavailable:', weatherError);
+          }
+        }
 
         if (!isMounted) return;
+        setLoadError(failedSections.length
+          ? `Some dashboard sections could not load (${failedSections.join(', ')}). Other available data is still shown; refresh or sign in again if needed.`
+          : null);
 
         const totalAcres = farms.reduce((acc, farm) => acc + Number(farm.area_acres ?? 0), 0);
         const totalStock = lots.reduce((acc, lot) => acc + Number(lot.quantity_kg ?? lot.quantity ?? lot.available_quantity ?? 0), 0);
@@ -94,8 +123,8 @@ export default function FarmerDashboardPage() {
         });
         setWeatherLocation(weather?.data?.location_name || null);
       } catch (error) {
-        console.error('[Farmer dashboard] Failed to load live dashboard data:', error);
-        if (isMounted) setLoadError('Some dashboard values could not be loaded from AgriMark services. Check your connection or sign in again, then refresh.');
+        console.error('[Farmer dashboard] Unexpected dashboard loading failure:', error);
+        if (isMounted) setLoadError('Dashboard could not be loaded. Check your connection or sign in again, then refresh.');
       } finally {
         if (isMounted) setLoading(false);
       }
