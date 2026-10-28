@@ -44,6 +44,7 @@ def test_forecast_evaluation_is_chronological_and_not_promoted(tmp_path):
     assert result["status"] == "EVALUATED_NOT_PROMOTED"
     assert result["promotion"]["eligible"] is False
     assert result["dataset"]["daily_points_after_same_day_median"] == 90
+    assert result["dataset"]["selected_valid_rows_after_drop"] == 91
     assert result["evaluation"]["train_end_date"] < result["evaluation"]["test_start_date"]
     assert result["evaluation"]["test_end_date"] == "2026-03-31"
     assert Path(result["artifacts"]["predictions_csv"]).exists()
