@@ -184,7 +184,7 @@ export default function FarmerDashboardPage() {
                 <Activity className="h-3.5 w-3.5" /> Live Farm Operations
               </div>
               <h1 className="mt-4 text-3xl md:text-5xl font-black tracking-tight text-white">
-                Welcome back, {userName || 'Farmer'}.
+                Welcome back, {(typeof user?.full_name === 'string' ? user.full_name.trim().split(/\s+/)[0] : '') || 'Farmer'}.
               </h1>
               <p className="mt-3 max-w-xl text-sm md:text-base text-gray-300">
                 Your fields, crop health, harvest inventory and market actions are organized in one operating view.
