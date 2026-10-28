@@ -1,0 +1,6 @@
+# Optional dependencies for offline agriculture ML experiments.
+# Install in a research/training environment, not the production API image.
+pandas>=2.2,<3
+numpy>=1.26,<3
+scikit-learn>=1.5,<2
+pytest>=8,<9

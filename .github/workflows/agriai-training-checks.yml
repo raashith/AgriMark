@@ -1,0 +1,38 @@
+name: AgriAI Training Utility Checks
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/data/train_mandi_forecast.py'
+      - 'scripts/data/requirements-agriai-training.txt'
+      - 'backend/tests/test_agriai_mandi_forecast.py'
+      - 'backend/tests/test_agriai_source_registry.py'
+      - 'docs/AGRI_AI_DATA_SOURCE_REGISTRY.json'
+      - '.github/workflows/agriai-training-checks.yml'
+  push:
+    branches:
+      - 'feat/agriai-professional-agriculture-intelligence'
+    paths:
+      - 'scripts/data/train_mandi_forecast.py'
+      - 'scripts/data/requirements-agriai-training.txt'
+      - 'backend/tests/test_agriai_mandi_forecast.py'
+      - 'backend/tests/test_agriai_source_registry.py'
+      - 'docs/AGRI_AI_DATA_SOURCE_REGISTRY.json'
+      - '.github/workflows/agriai-training-checks.yml'
+
+jobs:
+  offline-training-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: scripts/data/requirements-agriai-training.txt
+      - name: Install isolated ML tooling
+        run: python -m pip install -r scripts/data/requirements-agriai-training.txt
+      - name: Run source registry and forecasting utility tests
+        run: python -m pytest -q backend/tests/test_agriai_source_registry.py backend/tests/test_agriai_mandi_forecast.py
