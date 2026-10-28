@@ -30,9 +30,6 @@ export const LandingHeader: React.FC = () => {
             <span className="font-display font-bold text-xl tracking-tight text-white">
               Agri<span className="text-[#E5A93C]">Mark</span>
             </span>
-            <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-mono font-bold tracking-wider bg-[#1B4D3E] text-[#FCE196] rounded-full border border-[#E5A93C]/35">
-              .ai
-            </span>
           </div>
         </a>
 
