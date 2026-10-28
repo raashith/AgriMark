@@ -47,93 +47,115 @@ export default function FarmerDashboardPage() {
   const [weatherLocation, setWeatherLocation] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  const userId = user?.id ?? null;
+  const userName = typeof user?.full_name === 'string' ? user.full_name.trim().split(/\s+/)[0] : '';
+  const [refreshVersion, setRefreshVersion] = useState(0);
+
   useEffect(() => {
     let isMounted = true;
+
     async function loadData() {
-      if (!user?.id) {
+      if (!userId) {
         setLoading(false);
+        setLoadError(null);
         return;
       }
-      try {
-        setLoadError(null);
-        // Load each dashboard section independently. A missing optional table
-        // (for example farm_tasks on a newly provisioned database) must not
-        // prevent farms, harvest inventory, or marketplace orders from loading.
-        const [farmsResult, cultivationsResult, lotsResult, ordersResult, tasksResult] = await Promise.allSettled([
-          dataService.getFarms(user.id),
-          dataService.getCultivations(undefined, user.id),
-          dataService.getProduceLots(user.id),
-          dataService.getOrders(user.id, 'farmer'),
-          dataService.getTasks(user.id),
-        ]);
 
-        const farms = farmsResult.status === 'fulfilled' ? farmsResult.value : [];
-        const cultivations = cultivationsResult.status === 'fulfilled' ? cultivationsResult.value : [];
-        const lots = lotsResult.status === 'fulfilled' ? lotsResult.value : [];
-        const orders = ordersResult.status === 'fulfilled' ? ordersResult.value : [];
-        const tasks = tasksResult.status === 'fulfilled' ? tasksResult.value : [];
-        const failedSections = [
-          farmsResult.status === 'rejected' ? 'farms' : null,
-          cultivationsResult.status === 'rejected' ? 'cultivations' : null,
-          lotsResult.status === 'rejected' ? 'inventory' : null,
-          ordersResult.status === 'rejected' ? 'orders' : null,
-        ].filter(Boolean);
+      setLoading(true);
+      setLoadError(null);
 
-        if (farmsResult.status === 'rejected') console.error('[Farmer dashboard] Farm data failed:', farmsResult.reason);
-        if (cultivationsResult.status === 'rejected') console.error('[Farmer dashboard] Cultivation data failed:', cultivationsResult.reason);
-        if (lotsResult.status === 'rejected') console.error('[Farmer dashboard] Inventory data failed:', lotsResult.reason);
-        if (ordersResult.status === 'rejected') console.error('[Farmer dashboard] Order data failed:', ordersResult.reason);
-        if (tasksResult.status === 'rejected') console.warn('[Farmer dashboard] Optional task data is unavailable:', tasksResult.reason);
+      // Required farm/business sections load independently. Weather and tasks are
+      // optional enrichments and must not turn healthy business data into a page error.
+      const [farmsResult, cultivationsResult, lotsResult, ordersResult] = await Promise.allSettled([
+        dataService.getFarms(userId),
+        dataService.getCultivations(undefined, userId),
+        dataService.getProduceLots(userId),
+        dataService.getOrders(userId, 'farmer'),
+      ]);
 
-        const farmWithCoords = farms.find((f) => f.latitude != null && f.longitude != null);
-        let weather = null;
-        if (farmWithCoords) {
-          try {
-            weather = await dataService.getLiveWeather(Number(farmWithCoords.latitude), Number(farmWithCoords.longitude));
-          } catch (weatherError) {
-            console.warn('[Farmer dashboard] Weather data is unavailable:', weatherError);
-          }
-        }
+      if (!isMounted) return;
 
-        if (!isMounted) return;
-        setLoadError(failedSections.length
-          ? `Some dashboard sections could not load (${failedSections.join(', ')}). Other available data is still shown; refresh or sign in again if needed.`
-          : null);
+      const farms = farmsResult.status === 'fulfilled' ? farmsResult.value : [];
+      const cultivations = cultivationsResult.status === 'fulfilled' ? cultivationsResult.value : [];
+      const lots = lotsResult.status === 'fulfilled' ? lotsResult.value : [];
+      const orders = ordersResult.status === 'fulfilled' ? ordersResult.value : [];
 
-        const totalAcres = farms.reduce((acc, farm) => acc + Number(farm.area_acres ?? 0), 0);
-        const totalStock = lots.reduce((acc, lot) => acc + Number(lot.quantity_kg ?? lot.quantity ?? lot.available_quantity ?? 0), 0);
-        const revenue = orders.filter((order) => order.status === 'delivered' || order.status === 'confirmed' || order.payment_status === 'escrowed').reduce((acc, order) => acc + Number(order.total_price ?? order.total_amount ?? 0), 0);
-        const pendingT = tasks.filter((t) => t.status === 'pending').length;
-        const latestRainfall = Number(weather?.data?.rain_1h_mm || 0);
-        const latestHumidity = Number(weather?.data?.humidity_pct || 0);
-        const latestTemperature = Number(weather?.data?.temperature_c || 0);
+      const failedSections = [
+        farmsResult.status === 'rejected' ? 'farms' : null,
+        cultivationsResult.status === 'rejected' ? 'cultivations' : null,
+        lotsResult.status === 'rejected' ? 'inventory' : null,
+        ordersResult.status === 'rejected' ? 'orders' : null,
+      ].filter((section): section is string => Boolean(section));
 
-        setStats({
-          activeCrops: cultivations.length,
-          totalFarms: farms.length,
-          harvestableKg: totalStock,
-          activeOrders: orders.filter((o) => o.status === 'confirmed' || o.status === 'in_transit').length,
-          revenueInr: revenue,
-          pendingTasks: pendingT,
-          cultivationAcres: totalAcres,
-          avgHealth: Number.isFinite(latestHumidity) ? latestHumidity : 0,
-          latestRainfall: Number.isFinite(latestRainfall) ? latestRainfall : 0,
-          latestHumidity: Number.isFinite(latestHumidity) ? latestHumidity : 0,
-          latestTemperature: Number.isFinite(latestTemperature) ? latestTemperature : 0,
-        });
-        setWeatherLocation(weather?.data?.location_name || null);
-      } catch (error) {
-        console.error('[Farmer dashboard] Unexpected dashboard loading failure:', error);
-        if (isMounted) setLoadError('Dashboard could not be loaded. Check your connection or sign in again, then refresh.');
-      } finally {
-        if (isMounted) setLoading(false);
+      if (farmsResult.status === 'rejected') console.error('[Farmer dashboard] Farm data failed:', farmsResult.reason);
+      if (cultivationsResult.status === 'rejected') console.error('[Farmer dashboard] Cultivation data failed:', cultivationsResult.reason);
+      if (lotsResult.status === 'rejected') console.error('[Farmer dashboard] Inventory data failed:', lotsResult.reason);
+      if (ordersResult.status === 'rejected') console.error('[Farmer dashboard] Order data failed:', ordersResult.reason);
+
+      const farmWithCoords = farms.find((farm) => farm.latitude != null && farm.longitude != null);
+      let weather: Awaited<ReturnType<typeof dataService.getLiveWeather>> | null = null;
+      let taskCount: number | null = null;
+
+      const optionalLoads: Promise<void>[] = [
+        dataService.getTasks(userId)
+          .then((tasks) => { taskCount = tasks.filter((task) => task.status === 'pending').length; })
+          .catch((error) => console.warn('[Farmer dashboard] Optional task data is unavailable:', error)),
+      ];
+
+      if (farmWithCoords) {
+        optionalLoads.push(
+          dataService.getLiveWeather(Number(farmWithCoords.latitude), Number(farmWithCoords.longitude))
+            .then((result) => { weather = result; })
+            .catch((error) => console.warn('[Farmer dashboard] Weather data is unavailable:', error)),
+        );
       }
+
+      await Promise.allSettled(optionalLoads);
+      if (!isMounted) return;
+
+      const totalAcres = farms.reduce((total, farm) => total + Number(farm.area_acres ?? 0), 0);
+      const totalStock = lots.reduce((total, lot) => total + Number(lot.quantity_kg ?? lot.quantity ?? lot.available_quantity ?? 0), 0);
+      const revenue = orders
+        .filter((order) => order.status === 'delivered' || order.status === 'confirmed' || order.payment_status === 'escrowed')
+        .reduce((total, order) => total + Number(order.total_price ?? order.total_amount ?? 0), 0);
+      const latestRainfall = Number(weather?.data?.rain_1h_mm ?? 0);
+      const latestHumidity = Number(weather?.data?.humidity_pct ?? 0);
+      const latestTemperature = Number(weather?.data?.temperature_c ?? 0);
+
+      setStats({
+        activeCrops: cultivations.length,
+        totalFarms: farms.length,
+        harvestableKg: totalStock,
+        activeOrders: orders.filter((order) => order.status === 'confirmed' || order.status === 'in_transit').length,
+        revenueInr: revenue,
+        pendingTasks: taskCount ?? 0,
+        cultivationAcres: totalAcres,
+        avgHealth: Number.isFinite(latestHumidity) ? latestHumidity : 0,
+        latestRainfall: Number.isFinite(latestRainfall) ? latestRainfall : 0,
+        latestHumidity: Number.isFinite(latestHumidity) ? latestHumidity : 0,
+        latestTemperature: Number.isFinite(latestTemperature) ? latestTemperature : 0,
+      });
+      setWeatherLocation(weather?.data?.location_name || null);
+      setLoadError(failedSections.length
+        ? `Live data is temporarily unavailable for: ${failedSections.join(', ')}. Other sections are still shown. Use Refresh to try again.`
+        : null);
+      setLoading(false);
     }
-    loadData();
+
+    void loadData().catch((error) => {
+      console.error('[Farmer dashboard] Unexpected dashboard loading failure:', error);
+      if (isMounted) {
+        setLoadError('AgriMark could not refresh the dashboard. Check your connection and retry.');
+        setLoading(false);
+      }
+    });
+
     return () => {
       isMounted = false;
     };
-  }, [user]);
+  }, [userId, refreshVersion]);
+
+  const refreshDashboard = () => setRefreshVersion((version) => version + 1);
 
   return (
     <ProtectedRoute allowedRoles={['farmer', 'fpo', 'admin', 'service_provider']}>
@@ -148,7 +170,7 @@ export default function FarmerDashboardPage() {
                 <Activity className="h-3.5 w-3.5" /> Live Farm Operations
               </div>
               <h1 className="mt-4 text-3xl md:text-5xl font-black tracking-tight text-white">
-                Welcome back, {(typeof user?.full_name === 'string' ? user.full_name.trim().split(/\s+/)[0] : '') || 'Farmer'}.
+                Welcome back, {userName || 'Farmer'}.
               </h1>
               <p className="mt-3 max-w-xl text-sm md:text-base text-gray-300">
                 Your fields, crop health, harvest inventory and market actions are organized in one operating view.
@@ -177,6 +199,11 @@ export default function FarmerDashboardPage() {
           </div>
         </section>
 
+        <div className="flex justify-end">
+          <button type="button" onClick={refreshDashboard} disabled={loading} className="rounded-lg border border-emerald-800/70 px-3 py-2 text-xs font-semibold text-emerald-200 disabled:cursor-not-allowed disabled:opacity-50">
+            {loading ? 'Refreshing…' : 'Refresh dashboard'}
+          </button>
+        </div>
         <section className="grid grid-cols-2 xl:grid-cols-5 gap-3">
           {[
             { label: 'Active Cultivations', value: `${stats.activeCrops}`, suffix: 'crops', icon: Sprout },
