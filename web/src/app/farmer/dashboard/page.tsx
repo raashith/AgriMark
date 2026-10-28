@@ -94,33 +94,28 @@ export default function FarmerDashboardPage() {
       if (ordersResult.status === 'rejected') console.error('[Farmer dashboard] Order data failed:', ordersResult.reason);
 
       const farmWithCoords = farms.find((farm) => farm.latitude != null && farm.longitude != null);
-      let weather: Awaited<ReturnType<typeof dataService.getLiveWeather>> | null = null;
-      let taskCount: number | null = null;
-      let tasksUnavailable = false;
-      let weatherUnavailable = !farmWithCoords;
+      const [tasksResult, weatherResult] = await Promise.allSettled([
+        dataService.getTasks(userId),
+        farmWithCoords
+          ? dataService.getLiveWeather(Number(farmWithCoords.latitude), Number(farmWithCoords.longitude))
+          : Promise.resolve(null),
+      ]);
 
-      const optionalLoads: Promise<void>[] = [
-        dataService.getTasks(userId)
-          .then((tasks) => { taskCount = tasks.filter((task) => task.status === 'pending').length; })
-          .catch((error) => {
-            tasksUnavailable = true;
-            console.warn('[Farmer dashboard] Optional task data is unavailable:', error);
-          }),
-      ];
-
-      if (farmWithCoords) {
-        optionalLoads.push(
-          dataService.getLiveWeather(Number(farmWithCoords.latitude), Number(farmWithCoords.longitude))
-            .then((result) => { weather = result; })
-            .catch((error) => {
-              weatherUnavailable = true;
-              console.warn('[Farmer dashboard] Weather data is unavailable:', error);
-            }),
-        );
-      }
-
-      await Promise.allSettled(optionalLoads);
       if (!isMounted) return;
+
+      const tasksUnavailable = tasksResult.status === 'rejected';
+      const weatherUnavailable = !farmWithCoords || weatherResult.status === 'rejected';
+      const taskCount = tasksResult.status === 'fulfilled'
+        ? tasksResult.value.filter((task) => task.status === 'pending').length
+        : null;
+      const weather = weatherResult.status === 'fulfilled' ? weatherResult.value : null;
+
+      if (tasksUnavailable) {
+        console.warn('[Farmer dashboard] Optional task data is unavailable:', tasksResult.reason);
+      }
+      if (weatherResult.status === 'rejected') {
+        console.warn('[Farmer dashboard] Weather data is unavailable:', weatherResult.reason);
+      }
 
       const totalAcres = farms.reduce((total, farm) => total + Number(farm.area_acres ?? 0), 0);
       const totalStock = lots.reduce((total, lot) => total + Number(lot.quantity_kg ?? lot.quantity ?? lot.available_quantity ?? 0), 0);
