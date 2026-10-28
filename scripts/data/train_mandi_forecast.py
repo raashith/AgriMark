@@ -108,6 +108,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     invalid_count = int(invalid.sum())
     selected = selected.loc[~invalid].copy()
     clean_row_count = int(len(selected))
+    clean_row_count = int(len(selected))
     if selected.empty:
         raise ValueError("No valid positive price observations remain after validation.")
 
@@ -205,7 +206,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "artifacts": {"predictions_csv": str(predictions_path)},
     }
     report_path = output_dir / "evaluation_report.json"
-    report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     report["artifacts"]["evaluation_report_json"] = str(report_path)
     report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return report
