@@ -46,6 +46,7 @@ export default function FarmerDashboardPage() {
 
   const [weatherLocation, setWeatherLocation] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -109,6 +110,7 @@ export default function FarmerDashboardPage() {
   return (
     <ProtectedRoute allowedRoles={['farmer', 'fpo', 'admin', 'service_provider']}>
       <div className="space-y-6">
+        {loadError && <div role="alert" className="rounded-xl border border-amber-700/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-100">{loadError}</div>}
         {loadError && <div role="alert" className="rounded-xl border border-amber-700/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-100">{loadError}</div>}
         <section className="relative overflow-hidden rounded-[28px] border border-emerald-900/60 bg-[#07130e] min-h-[250px] shadow-[0_20px_70px_rgba(0,0,0,0.32)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_15%,rgba(52,211,153,0.16),transparent_35%),radial-gradient(circle_at_25%_100%,rgba(229,169,60,0.10),transparent_40%)]" />
