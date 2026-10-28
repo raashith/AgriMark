@@ -399,13 +399,13 @@ export const dataService = {
   },
 
   async getTasks(userId?: string): Promise<FarmTask[]> {
-    try {
-      let query = supabase.from('farm_tasks').select('*');
-      if (userId) query = query.eq('user_id', userId);
-      const { data, error } = await query;
-      if (!error && data) return data as FarmTask[];
-    } catch {}
-    return [];
+    // Dashboard task metrics must not silently turn a schema/RLS/network error
+    // into an apparently valid count of zero.
+    let query = supabase.from('farm_tasks').select('*');
+    if (userId) query = query.eq('user_id', userId);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data || []) as FarmTask[];
   },
 
   async createTask(task: Partial<FarmTask>): Promise<FarmTask | null> {
