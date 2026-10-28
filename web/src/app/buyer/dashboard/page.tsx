@@ -11,15 +11,30 @@ export default function BuyerDashboardPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState({ listings: 0, orders: 0 });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([api.getListings().catch(() => []), api.getOrders().catch(() => [])])
-      .then(([listings, orders]) => setStats({
-        listings: listings.filter((x: any) => (x.quantity_available_kg ?? 0) > 0).length,
-        orders: orders.length,
-      }))
-      .finally(() => setLoading(false));
-  }, []);
+    let active = true;
+    async function load() {
+      if (!user?.id) { setLoading(false); return; }
+      try {
+        setLoadError(null);
+        const [listings, orders] = await Promise.all([api.getListings(), api.getOrders()]);
+        if (!active) return;
+        setStats({
+          listings: listings.filter((item: any) => item.status === 'active' && Number(item.quantity_available_kg ?? 0) > 0).length,
+          orders: orders.filter((order: any) => order.buyer_id === user.id).length,
+        });
+      } catch (error) {
+        console.error('[Buyer dashboard] Failed to load live dashboard data:', error);
+        if (active) setLoadError('Could not load live procurement values. Check your connection or sign in again, then refresh.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    void load();
+    return () => { active = false; };
+  }, [user?.id]);
 
   const actions = [
     { title: 'Mandi Prices', text: 'Compare current mandi signals before procurement.', href: '/market-prices', icon: TrendingUp },
@@ -44,6 +59,7 @@ export default function BuyerDashboardPage() {
           </div>
         </div>
       </section>
+      {loadError && <div role="alert" className="rounded-xl border border-amber-700/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-100">{loadError}</div>}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-4"><p className="text-[10px] uppercase tracking-wider text-gray-500">Live listings</p><p className="mt-2 text-2xl font-black text-white">{loading ? '—' : stats.listings}</p></div>
         <div className="rounded-2xl border border-[#1e2d26] bg-[#121a16] p-4"><p className="text-[10px] uppercase tracking-wider text-gray-500">My orders</p><p className="mt-2 text-2xl font-black text-white">{loading ? '—' : stats.orders}</p></div>
