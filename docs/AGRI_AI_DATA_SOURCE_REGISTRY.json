@@ -1,0 +1,206 @@
+{
+  "schema_version": "1.0.0",
+  "updated_at": "2026-10-28",
+  "purpose": "Initial source registry for AgriAI training and evidence retrieval. Candidate is not synonymous with verified or approved for training.",
+  "policy": {
+    "require_original_publisher": true,
+    "require_license_review_before_download": true,
+    "require_training_permission_before_training": true,
+    "require_source_timestamp_for_dynamic_data": true,
+    "prohibit_synthetic_provenance": true,
+    "store_private_farmer_data_in_public_rag": false,
+    "statuses": [
+      "CANDIDATE",
+      "ACCESS_REVIEWED",
+      "LICENSE_APPROVED",
+      "QUALITY_VALIDATED",
+      "APPROVED_FOR_TRAINING",
+      "REJECTED"
+    ]
+  },
+  "sources": [
+    {
+      "id": "india_ogd_agmarknet_daily_mandi_prices",
+      "name": "Current daily price of various commodities from various markets (Mandi)",
+      "provider": "Open Government Data Platform India / Ministry of Agriculture and Farmers Welfare / Directorate of Marketing and Inspection",
+      "url": "https://www.data.gov.in/catalog/current-daily-price-various-commodities-various-markets-mandi",
+      "data_types": [
+        "market_min_price",
+        "market_max_price",
+        "market_modal_price",
+        "commodity",
+        "market",
+        "state",
+        "district",
+        "observation_date",
+        "arrivals_if_present"
+      ],
+      "geography": "India",
+      "temporal_resolution": "Daily (source records may be delayed or missing)",
+      "license_or_terms": "NDSAP designation shown in catalog; review current catalog/API terms and attribution before production use",
+      "status": "ACCESS_REVIEWED",
+      "allowed_initial_use": [
+        "grounding live recorded-market answers",
+        "historical analysis after schema validation"
+      ],
+      "training_approval_required": true,
+      "validation_checks": [
+        "row identity/deduplication",
+        "source date freshness",
+        "currency/unit consistency",
+        "min <= modal <= max when all present",
+        "positive values",
+        "geographic/commodity canonical mapping",
+        "missing-date analysis"
+      ],
+      "notes": "Observed prices are not necessarily live quotes. Forecasts must be stored/displayed separately from observed values."
+    },
+    {
+      "id": "agmarknet_portal",
+      "name": "AGMARKNET portal",
+      "provider": "Directorate of Marketing and Inspection, Government of India",
+      "url": "https://www.agmarknet.gov.in/",
+      "data_types": [
+        "market_prices",
+        "arrivals",
+        "market_reference_information"
+      ],
+      "geography": "India",
+      "temporal_resolution": "Portal-dependent",
+      "license_or_terms": "Review portal terms and underlying dataset terms before bulk ingestion or model training",
+      "status": "CANDIDATE",
+      "training_approval_required": true,
+      "notes": "Use as reference portal. Prefer documented data.gov.in resource/API for repeatable programmatic ingestion."
+    },
+    {
+      "id": "icar_state_agriculture_university_kvk_guidance",
+      "name": "Official agronomy and crop protection guidance",
+      "provider": "ICAR institutes, State Agricultural Universities, Krishi Vigyan Kendras and relevant government agencies",
+      "url": "https://icar.org.in/",
+      "data_types": [
+        "crop_practices",
+        "pest_and_disease_guidance",
+        "nutrient_management",
+        "irrigation",
+        "harvest_storage"
+      ],
+      "geography": "India; exact scope must be captured per document",
+      "temporal_resolution": "Publication or revision date per document",
+      "license_or_terms": "Per-source copyright/license/access terms must be reviewed; public accessibility alone is not a training license",
+      "status": "CANDIDATE",
+      "training_approval_required": true,
+      "required_metadata": [
+        "publisher",
+        "canonical_url",
+        "title",
+        "published_at",
+        "updated_at",
+        "crop_scope",
+        "geography",
+        "stage",
+        "evidence_type",
+        "limitations",
+        "license",
+        "reviewer_status"
+      ]
+    },
+    {
+      "id": "plantvillage_disease_images",
+      "name": "PlantVillage plant-health image dataset",
+      "provider": "Original dataset maintainers / PlantVillage",
+      "url": "https://github.com/spMohanty/plantvillage-dataset",
+      "data_types": [
+        "plant_leaf_images",
+        "crop_labels",
+        "disease_labels"
+      ],
+      "geography": "Research dataset; not necessarily representative of Indian field conditions",
+      "temporal_resolution": "Dataset version",
+      "license_or_terms": "Review original dataset owner's license and share-alike obligations before model training and redistribution",
+      "status": "CANDIDATE",
+      "training_approval_required": true,
+      "required_checks": [
+        "grouped split by source/plant where IDs permit",
+        "external field-photo test set",
+        "label audit",
+        "class imbalance",
+        "license/share-alike compliance",
+        "low-confidence abstention"
+      ]
+    },
+    {
+      "id": "yieldsat_multimodal_crop_yield_benchmark",
+      "name": "YieldSAT multimodal crop-yield benchmark",
+      "provider": "YieldSAT research team",
+      "url": "https://yieldsat.github.io/",
+      "data_types": [
+        "yield_labels",
+        "satellite_time_series",
+        "weather",
+        "soil",
+        "topography"
+      ],
+      "geography": "Argentina, Brazil, Uruguay and Germany described by the dataset; not direct India-ground-truth",
+      "temporal_resolution": "Growing-season series (dataset docs describe 2016-2024)",
+      "license_or_terms": "Verify current data access and license with dataset owners before use",
+      "status": "CANDIDATE",
+      "training_approval_required": true,
+      "notes": "Potential external benchmark/pretraining research only; does not validate accuracy for Indian crops without local evaluation."
+    },
+    {
+      "id": "soilgrids_global_soil_properties",
+      "name": "SoilGrids soil-property maps",
+      "provider": "ISRIC",
+      "url": "https://soilgrids.org/",
+      "data_types": [
+        "soil_ph",
+        "soil_organic_carbon",
+        "texture",
+        "cation_exchange_capacity",
+        "other_soil_properties"
+      ],
+      "geography": "Global gridded estimates",
+      "temporal_resolution": "Versioned geospatial product",
+      "license_or_terms": "Verify current license, API and attribution conditions against the original provider",
+      "status": "CANDIDATE",
+      "training_approval_required": true,
+      "notes": "Map-derived estimates are not equivalent to a current laboratory soil test; preserve spatial resolution and uncertainty."
+    },
+    {
+      "id": "nasa_power_weather",
+      "name": "NASA POWER meteorology and solar data",
+      "provider": "NASA POWER",
+      "url": "https://power.larc.nasa.gov/",
+      "data_types": [
+        "weather_history",
+        "solar_meteorology"
+      ],
+      "geography": "Global",
+      "temporal_resolution": "Variable-dependent",
+      "license_or_terms": "Verify current API usage and citation/attribution instructions",
+      "status": "CANDIDATE",
+      "training_approval_required": true,
+      "notes": "Do not present historical/reanalysis observations as a live forecast."
+    },
+    {
+      "id": "agrimark_first_party_farm_and_harvest_data",
+      "name": "AgriMark first-party farmer, cultivation and harvest records",
+      "provider": "AgriMark Supabase project",
+      "url": "https://agrimark.com/",
+      "data_types": [
+        "farm_profile",
+        "crop_cycle",
+        "sowing_and_harvest",
+        "yield_feedback",
+        "farmer_feedback"
+      ],
+      "geography": "User/farm-specific",
+      "temporal_resolution": "Event-based",
+      "license_or_terms": "Private personal/farm data; explicit purpose and lawful basis/consent, access control, retention policy, and de-identification review required before any model training",
+      "status": "CANDIDATE",
+      "training_approval_required": true,
+      "privacy_class": "PRIVATE_PERSONAL_OR_FARM_DATA",
+      "notes": "Never put private farmer records in public evidence retrieval. Restrict every query to authorized users and purpose."
+    }
+  ]
+}
