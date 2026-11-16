@@ -118,7 +118,7 @@ export default function FarmerDashboardPage() {
       }
 
       const totalAcres = farms.reduce((total, farm) => total + Number(farm.area_acres ?? 0), 0);
-      const totalStock = lots.reduce((total, lot) => total + Number(lot.quantity_kg ?? lot.quantity ?? lot.available_quantity ?? 0), 0);
+      const totalStock = lots.reduce((total, lot) => total + Number(lot.available_quantity ?? lot.quantity_kg ?? lot.quantity ?? 0), 0);
       const revenue = orders
         .filter((order) => order.status === 'delivered' || order.status === 'confirmed' || order.payment_status === 'escrowed')
         .reduce((total, order) => total + Number(order.total_price ?? order.total_amount ?? 0), 0);
@@ -130,7 +130,7 @@ export default function FarmerDashboardPage() {
         activeCrops: cultivations.length,
         totalFarms: farms.length,
         harvestableKg: totalStock,
-        activeOrders: orders.filter((order) => order.status === 'confirmed' || order.status === 'in_transit').length,
+        activeOrders: orders.filter((order) => ['placed', 'pending', 'confirmed', 'accepted', 'processing', 'dispatched', 'in_transit'].includes(String(order.status || '').toLowerCase())).length,
         revenueInr: revenue,
         pendingTasks: taskCount ?? 0,
         cultivationAcres: totalAcres,

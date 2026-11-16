@@ -18,7 +18,7 @@ def test_core_crops_requires_database_credentials(monkeypatch):
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "")
     monkeypatch.setenv("SUPABASE_PUBLISHABLE_KEY", "")
     try:
-        with pytest.raises(RuntimeError, match="No Supabase server credential configured"):
+        with pytest.raises(RuntimeError, match="Supabase publishable key is required for public operations"):
             client.get("/api/v1/core/crops")
     finally:
         get_settings.cache_clear()

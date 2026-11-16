@@ -79,6 +79,7 @@ class ProduceLotResponse(ProduceLotCreate):
     id: UUID
     owner_id: UUID
     status: str
+    crop_name: str | None = None
 
 
 class HarvestBatchCreate(BaseModel):

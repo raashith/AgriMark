@@ -1,65 +1,68 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+
 export const dynamic = 'force-dynamic';
 
+const DEFAULT_API_BASE_URL = 'https://agrimark-api.onrender.com/api/v1';
+
+function getBackendBaseUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  if (!configured || configured.includes('supabase.co')) return DEFAULT_API_BASE_URL;
+  const normalized = configured.replace(/\/+$/, '');
+  return /\/api\/v1$/i.test(normalized) ? normalized : normalized + '/api/v1';
+}
+
 export async function GET(request: Request) {
+  const authorization = request.headers.get('authorization');
+  if (!authorization || !/^Bearer\s+\S+$/i.test(authorization)) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+
   try {
-    const cookieStore = cookies();
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://tsdjtlmrvbspyzgwmccg.supabase.co';
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'ey...';
-
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: { get(name: string) { return cookieStore.get(name)?.value; } },
+    const response = await fetch(getBackendBaseUrl() + '/admin/dashboard-summary', {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: authorization,
+      },
+      cache: 'no-store',
     });
+    const payload = await response.json().catch(() => ({}));
 
-    const { searchParams } = new URL(request.url);
-    const district = searchParams.get('district');
-    const state = searchParams.get('state');
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: payload.detail || 'Unable to load administrator analytics' },
+        { status: response.status },
+      );
+    }
 
-    // Run server-side aggregations across tables
-    const [profilesRes, farmsRes, listingsRes, ordersRes] = await Promise.all([
-      supabase.from('profiles').select('id, role', { count: 'exact' }).eq('role', 'farmer'),
-      supabase.from('farms').select('id, area_acres', { count: 'exact' }),
-      supabase.from('listings').select('id, price_per_kg, quantity_available_kg', { count: 'exact' }).eq('status', 'active'),
-      supabase.from('orders').select('id, total_amount, status', { count: 'exact' }),
-    ]);
-
-    const activeFarmersCount = profilesRes.count || 0;
-    const totalFarmsCount = farmsRes.count || 0;
-    const totalFarmAcres = (farmsRes.data || []).reduce((acc: number, f: any) => acc + (f.area_acres || 0), 0);
-
-    const activeListingsCount = listingsRes.count || 0;
-    const totalAvailableProduceKg = (listingsRes.data || []).reduce((acc: number, l: any) => acc + (l.quantity_available_kg || 0), 0);
-    const avgAskingPriceKg = (listingsRes.data || []).length > 0
-      ? (listingsRes.data || []).reduce((acc: number, l: any) => acc + (l.price_per_kg || 0), 0) / listingsRes.data!.length
-      : 0;
-
-    const totalOrdersCount = ordersRes.count || 0;
-    const completedOrdersCount = (ordersRes.data || []).filter((o: any) => o.status === 'completed' || o.status === 'delivered').length;
-    const grossOrderVolumeInr = (ordersRes.data || []).reduce((acc: number, o: any) => acc + (o.total_amount || 0), 0);
+    const summary = payload.summary || {};
+    const totalOrders = Number(summary.total_orders || 0);
+    const completedOrders = Number(summary.completed_orders || 0);
 
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
-      filter: { district: district || 'All', state: state || 'All' },
+      filter: { district: 'All', state: 'All', filtersApplied: false },
       networkMetrics: {
-        activeFarmers: activeFarmersCount,
-        totalFarms: totalFarmsCount,
-        totalCultivatedAcres: Math.round(totalFarmAcres * 10) / 10,
-        activeListings: activeListingsCount,
-        totalAvailableStockKg: totalAvailableProduceKg,
-        avgAskingPricePerKg: Math.round(avgAskingPriceKg * 100) / 100,
-        totalOrders: totalOrdersCount,
-        completedOrders: completedOrdersCount,
-        fulfillmentRatePct: totalOrdersCount > 0 ? Math.round((completedOrdersCount / totalOrdersCount) * 100) : 100,
-        grossOrderVolumeInr: Math.round(grossOrderVolumeInr * 100) / 100,
+        activeFarmers: Number(summary.farmer_accounts || 0),
+        totalFarms: Number(summary.total_farms || 0),
+        totalCultivatedAcres: Number(summary.total_farm_acres || 0),
+        activeListings: Number(summary.active_listings || 0),
+        totalAvailableStockKg: Number(summary.total_available_stock_kg || 0),
+        avgAskingPricePerKg: Number(summary.average_asking_price_per_unit || 0),
+        totalOrders,
+        completedOrders,
+        fulfillmentRatePct: totalOrders > 0
+          ? Math.round((completedOrders / totalOrders) * 100)
+          : 0,
+        grossOrderVolumeInr: Number(summary.order_volume_inr || 0),
       },
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Server error' }, { status: 500 });
+  } catch (error) {
+    console.error('[Analytics API] Backend request failed:', error);
+    return NextResponse.json(
+      { error: 'AgriMark analytics service is temporarily unavailable.' },
+      { status: 503 },
+    );
   }
 }
-
-
-
