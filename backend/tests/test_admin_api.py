@@ -38,8 +38,8 @@ def test_admin_dashboard_summary_uses_canonical_marketplace_schema(monkeypatch):
             {"id": "00000000-0000-0000-0000-000000000789", "full_name": "Buyer One", "phone": "9000000003", "role": "buyer", "created_at": "2026-11-03"},
         ],
         "listings": [
-            {"id": "listing-1", "price_per_unit": "20"},
-            {"id": "listing-2", "price_per_unit": "25"},
+            {"id": "listing-1", "price_per_unit": "20", "status": "active"},
+            {"id": "listing-2", "price_per_unit": "25", "status": "active"},
         ],
         "marketplace_orders": [
             {"id": "order-1", "total_price": "100.00", "status": "placed"},
