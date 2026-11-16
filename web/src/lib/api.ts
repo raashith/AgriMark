@@ -153,6 +153,30 @@ export const api = {
     body: JSON.stringify(data),
   }),
   getMe: () => request<UserProfile>('/auth/me'),
+
+  getAdminDashboardSummary: () => request<{
+    summary: {
+      registered_users: number;
+      farmer_accounts: number;
+      verified_farmers: number;
+      active_listings: number;
+      total_orders: number;
+      active_orders: number;
+      completed_orders: number;
+      order_volume_inr: number;
+      total_farms: number;
+      total_farm_acres: number;
+      total_available_stock_kg: number;
+      average_asking_price_per_unit: number;
+    };
+    users: Array<{
+      id: string;
+      full_name: string | null;
+      phone: string | null;
+      role: string;
+      document_status: 'verified' | 'pending' | 'rejected' | 'not_submitted';
+    }>;
+  }>('/admin/dashboard-summary'),
   logout: () => request<{ message: string }>('/auth/logout', { method: 'POST' }),
 
   syncFirebaseProfile: (
