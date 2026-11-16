@@ -8,7 +8,7 @@ function getBackendBaseUrl(): string {
   const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
   if (!configured || configured.includes('supabase.co')) return DEFAULT_API_BASE_URL;
   const normalized = configured.replace(/\/+$/, '');
-  return /\/api\/v1$/i.test(normalized) ? normalized : '${normalized}/api/v1';
+  return /\/api\/v1$/i.test(normalized) ? normalized : normalized + '/api/v1';
 }
 
 export async function GET(request: Request) {
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const response = await fetch('${getBackendBaseUrl()}/admin/dashboard-summary', {
+    const response = await fetch(getBackendBaseUrl() + '/admin/dashboard-summary', {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
         totalCultivatedAcres: Number(summary.total_farm_acres || 0),
         activeListings: Number(summary.active_listings || 0),
         totalAvailableStockKg: Number(summary.total_available_stock_kg || 0),
-        averageAskingPricePerUnit: Number(summary.average_asking_price_per_unit || 0),
+        avgAskingPricePerKg: Number(summary.average_asking_price_per_unit || 0),
         totalOrders,
         completedOrders,
         fulfillmentRatePct: totalOrders > 0
