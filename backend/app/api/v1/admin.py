@@ -40,9 +40,9 @@ def _as_decimal(value: Any) -> Decimal:
 
 def _document_status(statuses: list[str]) -> str:
     normalized = {str(value or "").strip().lower() for value in statuses}
-    if "verified" in normalized:
+    if normalized == {"verified"}:
         return "verified"
-    if "rejected" in normalized and not (normalized - {"rejected"}):
+    if "rejected" in normalized:
         return "rejected"
     if normalized:
         return "pending"
