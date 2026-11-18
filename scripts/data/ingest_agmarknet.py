@@ -96,6 +96,23 @@ def number(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
 
+def parse_arrival_quantity(record: dict[str, Any]) -> float | None:
+    """Return an arrival quantity only when the official source supplies one."""
+    for name in (
+        "arrival_quantity",
+        "arrival",
+        "arrivals",
+        "arrival_qty",
+        "quantity_arrived",
+        "arrival_quantity_in_tonnes",
+        "arrivals (tonnes)",
+        "arrivals (qtl)",
+    ):
+        value = number(field(record, name))
+        if value is not None and value >= 0:
+            return value
+    return None
+
 def normalize_record(record: dict[str, Any], source: str) -> dict[str, Any] | None:
     state = str(field(record, "state", "")).strip()
     district = str(field(record, "district", "")).strip()
@@ -207,7 +224,7 @@ def persist_page(client: Client, rows: list[dict[str, Any]]) -> dict[str, int]:
 
     observations = []
     for r in accepted:
-        arrival = number(field(r["raw"], "arrival_quantity", field(r["raw"], "arrival")))
+        arrival = parse_arrival_quantity(r["raw"])
         observations.append({
             "observation_date": r["observation_date"],
             "state_code": r["state_code"],
