@@ -180,7 +180,8 @@ export async function GET(request: NextRequest) {
     const rawCommodity = params.get('commodity')?.trim() || '';
     const rawState = params.get('state')?.trim() || '';
     const rawMandi = params.get('mandi')?.trim() || '';
-    const search = safeSearch(params.get('search') || '');
+    const rawSearch = params.get('search') || '';
+    const search = safeSearch(rawSearch);
 
     const rawLimit = params.get('limit');
     const requestedLimit = rawLimit === null ? DEFAULT_PAGE_SIZE : Number(rawLimit);
@@ -196,8 +197,8 @@ export async function GET(request: NextRequest) {
     }
     const offset = requestedOffset;
 
-    if (search && search.length < 2) {
-      return invalidQuery('Enter at least two characters to search market prices.');
+    if (rawSearch.trim() && search.length < 2) {
+      return invalidQuery('Enter at least two letters or numbers to search market prices.');
     }
 
     const { commodities, states, mandis } = await getMarketMetadata();
