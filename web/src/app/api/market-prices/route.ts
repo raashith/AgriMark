@@ -161,9 +161,9 @@ export async function GET(request: NextRequest) {
         .filter((r) => normalize(r.state_name).includes(term))
         .map((r) => String(r.state_code));
       const clauses = [
-        ...(!rawCommodity && commodityCodes.length ? [`commodity_code.in.(${commodityCodes.join(',')})`] : []),
-        ...(!rawMandi && mandiCodes.length ? [`mandi_code.in.(${mandiCodes.join(',')})`] : []),
-        ...(!rawState && stateCodes.length ? [`state_code.in.(${stateCodes.join(',')})`] : []),
+        ...(commodityCodes.length ? [`commodity_code.in.(${commodityCodes.join(',')})`] : []),
+        ...(mandiCodes.length ? [`mandi_code.in.(${mandiCodes.join(',')})`] : []),
+        ...(stateCodes.length ? [`state_code.in.(${stateCodes.join(',')})`] : []),
         `variety.ilike.*${search}*`,
         `grade.ilike.*${search}*`,
       ];
