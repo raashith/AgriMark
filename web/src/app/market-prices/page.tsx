@@ -148,7 +148,7 @@ export default function MarketPricesPage() {
 
   const resetPage = () => setPage(0);
   const changeAmount = summary?.changeAmount;
-  const changeText = changeAmount == null ? '—' : `${changeAmount > 0 ? '+' : changeAmount < 0 ? '−' : ''}₹${numberFormat.format(Math.abs(changeAmount))}`;
+  const changeText = changeAmount == null ? '—' : `${changeAmount > 0 ? '+' : changeAmount < 0 ? '−' : ''}${money(Math.abs(changeAmount))}`;
   const changeDetail = summary?.previous
     ? `${summary.changePercent == null ? '' : `${summary.changePercent > 0 ? '+' : ''}${summary.changePercent.toFixed(2)}% · `}vs ${dateLabel(summary.previous.observation_date)}`
     : 'No earlier matching observation';
@@ -249,7 +249,7 @@ export default function MarketPricesPage() {
           />
           <MetricCard
             label="Latest arrivals"
-            value={latest?.arrival_quantity == null ? 'N/A' : numberFormat.format(latest.arrival_quantity)}
+            value={latest?.arrival_quantity == null ? 'N/A' : priceFormat.format(latest.arrival_quantity)}
             note={latest?.arrival_quantity == null ? 'Not supplied by source' : `Reported quantity · ${dateLabel(latest.observation_date)}`}
           />
           <MetricCard
@@ -343,7 +343,7 @@ export default function MarketPricesPage() {
                     <td className="numeric">{money(row.min_price)}</td>
                     <td className="numeric price-cell">{money(row.modal_price)}</td>
                     <td className="numeric">{money(row.max_price)}</td>
-                    <td className="numeric">{row.arrival_quantity == null ? 'N/A' : numberFormat.format(row.arrival_quantity)}</td>
+                    <td className="numeric">{row.arrival_quantity == null ? 'N/A' : priceFormat.format(row.arrival_quantity)}</td>
                   </tr>
                 ))}
                 {!rows.length && (
