@@ -64,6 +64,7 @@ export default function MarketPricesPage() {
   const [districts, setDistricts] = useState<Option[]>([]);
   const [mandis, setMandis] = useState<Option[]>([]);
   const metadataLoaded = useRef(false);
+  const metadataLoadedAt = useRef(0);
   const [commodity, setCommodity] = useState('');
   const [state, setState] = useState('');
   const [district, setDistrict] = useState('');
@@ -84,7 +85,7 @@ export default function MarketPricesPage() {
       const params = new URLSearchParams({
         limit: String(pageSize),
         offset: String(page * pageSize),
-        includeMetadata: metadataLoaded.current ? 'false' : 'true',
+        includeMetadata: (!metadataLoaded.current || Date.now() - metadataLoadedAt.current > 300000) ? 'true' : 'false',
       });
       if (commodity) params.set('commodity', commodity);
       if (state) params.set('state', state);
@@ -109,6 +110,7 @@ export default function MarketPricesPage() {
       if (Array.isArray(payload.mandis)) setMandis(payload.mandis);
       if (Array.isArray(payload.commodities) && Array.isArray(payload.states) && Array.isArray(payload.districts) && Array.isArray(payload.mandis)) {
         metadataLoaded.current = true;
+        metadataLoadedAt.current = Date.now();
       }
       setTotal(Number(payload.count) || 0);
       setSummary(payload.summary || null);
@@ -194,7 +196,7 @@ export default function MarketPricesPage() {
         <section className="market-toolbar" aria-label="Market filters">
           <label className="market-filter">
             <Search size={15} />
-            <span className="sr-only">Search commodity or mandi</span>
+            <span className="sr-only">Search commodity, state, district, mandi or variety</span>
             <input value={search} onChange={(event) => { setSearch(event.target.value); resetPage(); }} placeholder="Search commodities, mandis, variety…" />
           </label>
           <label className="market-filter">
@@ -385,7 +387,7 @@ function MetricCard({ label, value, note, accent = false, trend }: {
     <article className="market-kpi">
       <div className="market-kpi__label">{label}</div>
       <div className={`market-kpi__value ${accent ? 'is-accent' : ''} ${trend != null && trend < 0 ? 'is-down' : ''}`}>
-        {trend != null && <TrendIcon size={17} />}
+        {trend != null && trend !== 0 && <TrendIcon size={17} />}
         {value}
       </div>
       <div className="market-kpi__note">{note}</div>
