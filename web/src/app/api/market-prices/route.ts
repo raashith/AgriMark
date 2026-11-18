@@ -6,7 +6,7 @@ export const revalidate = 0;
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
 const METADATA_PAGE_SIZE = 1000;
-const METADATA_REVALIDATE_SECONDS = 3600;
+const METADATA_REVALIDATE_SECONDS = 300;
 const DEFAULT_SUPABASE_URL = 'https://tsdjtlmrvbspyzgwmccg.supabase.co';
 
 type DatabaseRow = Record<string, any>;
