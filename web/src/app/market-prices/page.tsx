@@ -1,7 +1,7 @@
 'use client';
 
 import './market-prices.css';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Activity, ArrowDownRight, ArrowUpRight, BarChart3, BrainCircuit,
@@ -63,7 +63,7 @@ export default function MarketPricesPage() {
   const [states, setStates] = useState<Option[]>([]);
   const [districts, setDistricts] = useState<Option[]>([]);
   const [mandis, setMandis] = useState<Option[]>([]);
-  const [metadataLoaded, setMetadataLoaded] = useState(false);
+  const metadataLoaded = useRef(false);
   const [commodity, setCommodity] = useState('');
   const [state, setState] = useState('');
   const [district, setDistrict] = useState('');
@@ -84,7 +84,7 @@ export default function MarketPricesPage() {
       const params = new URLSearchParams({
         limit: String(pageSize),
         offset: String(page * pageSize),
-        includeMetadata: metadataLoaded ? 'false' : 'true',
+        includeMetadata: metadataLoaded.current ? 'false' : 'true',
       });
       if (commodity) params.set('commodity', commodity);
       if (state) params.set('state', state);
@@ -108,7 +108,7 @@ export default function MarketPricesPage() {
       if (Array.isArray(payload.districts)) setDistricts(payload.districts);
       if (Array.isArray(payload.mandis)) setMandis(payload.mandis);
       if (Array.isArray(payload.commodities) && Array.isArray(payload.states) && Array.isArray(payload.districts) && Array.isArray(payload.mandis)) {
-        setMetadataLoaded(true);
+        metadataLoaded.current = true;
       }
       setTotal(Number(payload.count) || 0);
       setSummary(payload.summary || null);
@@ -119,7 +119,7 @@ export default function MarketPricesPage() {
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, [commodity, state, district, mandi, search, page, pageSize, metadataLoaded]);
+  }, [commodity, state, district, mandi, search, page, pageSize]);
 
   useEffect(() => {
     const controller = new AbortController();
