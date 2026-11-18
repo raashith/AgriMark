@@ -37,6 +37,15 @@ DAILY_RESOURCE_ID = "9ef84268-d588-465a-a308-a864a43d0070"
 OGD_BASE_URL = "https://api.data.gov.in/resource/"
 PAGE_SIZE = 1000
 
+STATE_NAME_ALIASES = {
+    "chattisgarh": "chhattisgarh",
+    "orissa": "odisha",
+    "uttaranchal": "uttarakhand",
+    "nct of delhi": "delhi",
+    "national capital territory of delhi": "delhi",
+    "pondicherry": "puducherry",
+}
+
 STATE_MAPPINGS: dict[str, tuple[str, str]] = {
     "TAMIL NADU": ("TN", "SOUTH"), "MAHARASHTRA": ("MH", "WEST"),
     "KARNATAKA": ("KA", "SOUTH"), "UTTAR PRADESH": ("UP", "NORTH"),
@@ -72,6 +81,10 @@ def slug(value: Any) -> str:
 
 def normalize_name(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", " ", str(value or "").strip().lower()).strip()
+
+def normalize_state_name(value: Any) -> str:
+    normalized = normalize_name(value)
+    return STATE_NAME_ALIASES.get(normalized, normalized)
 
 def unique_by(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
     """Keep one metadata row per Postgres conflict key in a bulk upsert."""
@@ -114,7 +127,7 @@ def load_catalog(client: Client) -> Catalog:
     commodity_rows = fetch_all_table_rows(client, "national_commodities", "code,name", "code")
 
     return {
-        "states": {normalize_name(row["state_name"]): str(row["state_code"]) for row in state_rows},
+        "states": {normalize_state_name(row["state_name"]): str(row["state_code"]) for row in state_rows},
         "districts": {
             (str(row["state_code"]), normalize_name(row["district_name"])): str(row["district_code"])
             for row in district_rows
@@ -171,7 +184,7 @@ def normalize_record(record: dict[str, Any], source: str, catalog: Catalog) -> d
     if minimum < 0 or maximum < minimum or modal < minimum or modal > maximum:
         return None
 
-    state_code = catalog["states"].get(normalize_name(state))
+    state_code = catalog["states"].get(normalize_state_name(state))
     if state_code:
         region = STATE_MAPPINGS.get(state.upper(), ("", "CENTRAL"))[1]
     else:
