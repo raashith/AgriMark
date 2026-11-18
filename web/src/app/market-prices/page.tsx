@@ -118,7 +118,6 @@ export default function MarketPricesPage() {
   }, [load, search]);
 
   const latest = summary?.latest ?? rows[0] ?? null;
-  const previous = summary?.previous ?? null;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const firstRow = total === 0 ? 0 : page * pageSize + 1;
   const lastRow = Math.min((page + 1) * pageSize, total);
