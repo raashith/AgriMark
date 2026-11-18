@@ -9,7 +9,7 @@ import {
   Search, Store, Truck, CloudSun, Bot, Wheat, Layers3,
 } from 'lucide-react';
 
-type Option = { code: string; name: string; state_code?: string };
+type Option = { code: string; name: string; state_code?: string; district_code?: string };
 type PriceRow = {
   id: number;
   commodity_code: string;
@@ -19,6 +19,7 @@ type PriceRow = {
   state_code: string;
   state_name: string;
   district_code?: string | null;
+  district_name?: string | null;
   observation_date: string;
   modal_price: number;
   min_price: number;
@@ -34,13 +35,15 @@ type MarketSummary = {
   changeAmount: number | null;
   changePercent: number | null;
   observedRecords: number;
+  historyDateCount: number | null;
 };
 type MarketPayload = {
   ok: boolean;
   rows: PriceRow[];
-  commodities: Option[];
-  states: Option[];
-  mandis: Option[];
+  commodities?: Option[];
+  states?: Option[];
+  districts?: Option[];
+  mandis?: Option[];
   count: number;
   summary: MarketSummary;
   error?: string;
@@ -48,7 +51,8 @@ type MarketPayload = {
 
 const PAGE_SIZES = [25, 50, 100];
 const numberFormat = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
-const money = (value: number) => `₹${numberFormat.format(value)}`;
+const priceFormat = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const money = (value: number) => `₹${priceFormat.format(value)}`;
 const dateLabel = (value?: string | null) => value
   ? new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
   : 'Date unavailable';
@@ -57,9 +61,12 @@ export default function MarketPricesPage() {
   const [rows, setRows] = useState<PriceRow[]>([]);
   const [commodities, setCommodities] = useState<Option[]>([]);
   const [states, setStates] = useState<Option[]>([]);
+  const [districts, setDistricts] = useState<Option[]>([]);
   const [mandis, setMandis] = useState<Option[]>([]);
+  const [metadataLoaded, setMetadataLoaded] = useState(false);
   const [commodity, setCommodity] = useState('');
   const [state, setState] = useState('');
+  const [district, setDistrict] = useState('');
   const [mandi, setMandi] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
@@ -77,9 +84,11 @@ export default function MarketPricesPage() {
       const params = new URLSearchParams({
         limit: String(pageSize),
         offset: String(page * pageSize),
+        includeMetadata: metadataLoaded ? 'false' : 'true',
       });
       if (commodity) params.set('commodity', commodity);
       if (state) params.set('state', state);
+      if (district) params.set('district', district);
       if (mandi) params.set('mandi', mandi);
       if (search.trim()) params.set('search', search.trim());
 
@@ -94,9 +103,13 @@ export default function MarketPricesPage() {
       }
 
       setRows(Array.isArray(payload.rows) ? payload.rows : []);
-      setCommodities(Array.isArray(payload.commodities) ? payload.commodities : []);
-      setStates(Array.isArray(payload.states) ? payload.states : []);
-      setMandis(Array.isArray(payload.mandis) ? payload.mandis : []);
+      if (Array.isArray(payload.commodities)) setCommodities(payload.commodities);
+      if (Array.isArray(payload.states)) setStates(payload.states);
+      if (Array.isArray(payload.districts)) setDistricts(payload.districts);
+      if (Array.isArray(payload.mandis)) setMandis(payload.mandis);
+      if (Array.isArray(payload.commodities) && Array.isArray(payload.states) && Array.isArray(payload.districts) && Array.isArray(payload.mandis)) {
+        setMetadataLoaded(true);
+      }
       setTotal(Number(payload.count) || 0);
       setSummary(payload.summary || null);
       setUpdatedAt(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
@@ -106,7 +119,7 @@ export default function MarketPricesPage() {
     } finally {
       if (!signal?.aborted) setLoading(false);
     }
-  }, [commodity, state, mandi, search, page, pageSize]);
+  }, [commodity, state, district, mandi, search, page, pageSize, metadataLoaded]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -121,17 +134,30 @@ export default function MarketPricesPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const firstRow = total === 0 ? 0 : page * pageSize + 1;
   const lastRow = Math.min((page + 1) * pageSize, total);
-  const visibleMandis = useMemo(
-    () => mandis.filter((item) => !state || item.state_code === state),
-    [mandis, state],
+  const visibleDistricts = useMemo(
+    () => districts.filter((item) => !state || item.state_code === state),
+    [districts, state],
   );
+  const visibleMandis = useMemo(
+    () => mandis.filter((item) => (!state || item.state_code === state) && (!district || item.district_code === district)),
+    [mandis, state, district],
+  );
+  const sourceAgeDays = latest?.observation_date
+    ? Math.max(0, Math.floor((Date.now() - new Date(`${latest.observation_date}T00:00:00Z`).getTime()) / 86400000))
+    : null;
 
   const resetPage = () => setPage(0);
   const changeAmount = summary?.changeAmount;
   const changeText = changeAmount == null ? '—' : `${changeAmount > 0 ? '+' : changeAmount < 0 ? '−' : ''}₹${numberFormat.format(Math.abs(changeAmount))}`;
-  const changeDetail = summary?.changePercent == null
-    ? 'No comparable previous observation'
-    : `${summary.changePercent > 0 ? '+' : ''}${summary.changePercent.toFixed(2)}% vs previous record`;
+  const changeDetail = summary?.previous
+    ? `${summary.changePercent == null ? '' : `${summary.changePercent > 0 ? '+' : ''}${summary.changePercent.toFixed(2)}% · `}vs ${dateLabel(summary.previous.observation_date)}`
+    : 'No earlier matching observation';
+  const historyDateCount = summary?.historyDateCount ?? null;
+  const forecastStatus = historyDateCount == null
+    ? 'History coverage unavailable'
+    : historyDateCount <= 1
+      ? `Insufficient history · ${historyDateCount} date`
+      : `${numberFormat.format(historyDateCount)} observed dates · model not trained`;
 
   return (
     <main className="market-dashboard">
@@ -140,9 +166,16 @@ export default function MarketPricesPage() {
       <div className="market-dashboard__content">
         <header className="market-heading">
           <div>
-            <div className="market-eyebrow"><span className="market-live-dot" /> AGMARKNET REAL INTELLIGENCE</div>
+            <div className="market-eyebrow"><span className="market-live-dot" /> AGMARKNET MARKET INTELLIGENCE</div>
             <h1>Commodity Prices &amp; Mandi Forecast</h1>
-            <p>Verified market observations, day-over-day price movement, and a clearly labelled short-horizon projection.</p>
+            <p>Verified mandi observations, comparable price movement and transparent historical coverage.</p>
+            {sourceAgeDays != null && (
+              <div className={`market-freshness ${sourceAgeDays > 3 ? 'is-stale' : 'is-current'}`} role="status">
+                <span className="market-freshness__dot" />
+                {sourceAgeDays === 0 ? 'Latest source data: today' : `Source data delayed · ${numberFormat.format(sourceAgeDays)} days old`}
+                <span>· {dateLabel(latest?.observation_date)}</span>
+              </div>
+            )}
           </div>
           <button type="button" className="market-refresh" onClick={() => void load()} disabled={loading}>
             <RefreshCw size={15} className={loading ? 'market-spin' : ''} />
@@ -175,9 +208,17 @@ export default function MarketPricesPage() {
           <label className="market-filter">
             <MapPin size={15} />
             <span className="sr-only">Filter by state</span>
-            <select value={state} onChange={(event) => { setState(event.target.value); setMandi(''); resetPage(); }}>
+            <select value={state} onChange={(event) => { setState(event.target.value); setDistrict(''); setMandi(''); resetPage(); }}>
               <option value="">All states</option>
               {states.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
+            </select>
+          </label>
+          <label className="market-filter">
+            <MapPin size={15} />
+            <span className="sr-only">Filter by district</span>
+            <select value={district} onChange={(event) => { setDistrict(event.target.value); setMandi(''); resetPage(); }}>
+              <option value="">All districts</option>
+              {visibleDistricts.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
             </select>
           </label>
           <label className="market-filter">
@@ -250,10 +291,11 @@ export default function MarketPricesPage() {
           <article className="market-feature-card market-forecast-card">
             <div className="market-card-label"><BarChart3 size={14} /> MANDI FORECAST</div>
             <h2>Next 7 days</h2>
-            <div className="market-forecast-status"><BrainCircuit size={16} /> Baseline only · not trained</div>
+            <div className="market-forecast-status"><BrainCircuit size={16} /> {forecastStatus}</div>
             <p>
-              Reliable day-by-day projections require several distinct official observation dates. The latest real modal price
-              is shown as a reference; mandis reported on the same date are not treated as a time series.
+              This exact commodity, mandi, variety and grade series has {historyDateCount == null ? 'an unknown number of' : numberFormat.format(historyDateCount)} distinct official observation date(s).
+              A seven-day forecast remains withheld until sufficient history is available and a forecasting model has been validated.
+              No synthetic prices are shown.
             </p>
             <div className="market-forecast-reference">
               <span>Latest observed reference</span>
@@ -280,6 +322,7 @@ export default function MarketPricesPage() {
                   <th>Observation date</th>
                   <th>Commodity</th>
                   <th>Market / Mandi</th>
+                  <th>District</th>
                   <th>State</th>
                   <th>Variety / Grade</th>
                   <th className="numeric">Min (₹/Q)</th>
@@ -294,6 +337,7 @@ export default function MarketPricesPage() {
                     <td>{dateLabel(row.observation_date)}</td>
                     <td className="strong-cell">{row.commodity_name}</td>
                     <td>{row.mandi_name}</td>
+                    <td>{row.district_name || '—'}</td>
                     <td>{row.state_name}</td>
                     <td>{[row.variety, row.grade].filter(Boolean).join(' · ') || '—'}</td>
                     <td className="numeric">{money(row.min_price)}</td>
@@ -303,7 +347,7 @@ export default function MarketPricesPage() {
                   </tr>
                 ))}
                 {!rows.length && (
-                  <tr><td colSpan={9} className="market-table-empty">{loading ? 'Loading official observations…' : 'No records match the selected filters.'}</td></tr>
+                  <tr><td colSpan={10} className="market-table-empty">{loading ? 'Loading official observations…' : 'No records match the selected filters.'}</td></tr>
                 )}
               </tbody>
             </table>
@@ -326,7 +370,7 @@ export default function MarketPricesPage() {
 
         <footer className="market-footer">
           <span><Database size={13} /> Supabase · canonical AGMARKNET / DMI observations · CSV staging disabled</span>
-          <span>Updated {updatedAt || '—'} · Latest source date {dateLabel(latest?.observation_date)} · Prices in ₹ per quintal</span>
+          <span>Checked {updatedAt || '—'} · Latest source date {dateLabel(latest?.observation_date)} · Prices in ₹ per quintal</span>
         </footer>
       </div>
     </main>
