@@ -20,7 +20,7 @@ import time
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypedDict
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
@@ -70,6 +70,42 @@ COMMODITY_CATEGORIES: dict[str, str] = {
 def slug(value: Any) -> str:
     return re.sub(r"[^A-Z0-9]+", "_", str(value or "").strip().upper()).strip("_") or "UNKNOWN"
 
+def normalize_name(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(value or "").strip().lower()).strip()
+
+def unique_by(rows: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
+    """Keep one metadata row per Postgres conflict key in a bulk upsert."""
+    unique: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        unique[str(row[key])] = row
+    return list(unique.values())
+
+class Catalog(TypedDict):
+    states: dict[str, str]
+    districts: dict[tuple[str, str], str]
+    mandis: dict[tuple[str, str, str], str]
+    commodities: dict[str, str]
+
+def load_catalog(client: Client) -> Catalog:
+    """Reuse canonical lookup IDs so ingestion never creates duplicate slugs."""
+    state_rows = client.table("national_states").select("state_code,state_name").execute().data or []
+    district_rows = client.table("national_districts").select("district_code,state_code,district_name").execute().data or []
+    mandi_rows = client.table("national_mandis").select("mandi_code,state_code,district_code,mandi_name").execute().data or []
+    commodity_rows = client.table("national_commodities").select("code,name").execute().data or []
+
+    return {
+        "states": {normalize_name(row["state_name"]): str(row["state_code"]) for row in state_rows},
+        "districts": {
+            (str(row["state_code"]), normalize_name(row["district_name"])): str(row["district_code"])
+            for row in district_rows
+        },
+        "mandis": {
+            (str(row["state_code"]), str(row["district_code"]), normalize_name(row["mandi_name"])): str(row["mandi_code"])
+            for row in mandi_rows
+        },
+        "commodities": {normalize_name(row["name"]): str(row["code"]) for row in commodity_rows},
+    }
+
 def field(record: dict[str, Any], name: str, default: Any = None) -> Any:
     wanted = name.lower().replace(" ", "_")
     for key, value in record.items():
@@ -96,7 +132,7 @@ def number(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
 
-def normalize_record(record: dict[str, Any], source: str) -> dict[str, Any] | None:
+def normalize_record(record: dict[str, Any], source: str, catalog: Catalog) -> dict[str, Any] | None:
     state = str(field(record, "state", "")).strip()
     district = str(field(record, "district", "")).strip()
     market = str(field(record, "market", "")).strip()
@@ -115,10 +151,21 @@ def normalize_record(record: dict[str, Any], source: str) -> dict[str, Any] | No
     if minimum < 0 or maximum < minimum or modal < minimum or modal > maximum:
         return None
 
-    state_code, region = STATE_MAPPINGS.get(state.upper(), (slug(state)[:10], "CENTRAL"))
-    district_code = f"{state_code}_{slug(district)}"
-    mandi_code = f"{district_code}_{slug(market)}"
-    commodity_code = slug(commodity)
+    state_code = catalog["states"].get(normalize_name(state))
+    if state_code:
+        region = STATE_MAPPINGS.get(state.upper(), ("", "CENTRAL"))[1]
+    else:
+        state_code, region = STATE_MAPPINGS.get(state.upper(), (slug(state)[:10], "CENTRAL"))
+
+    district_code = catalog["districts"].get((state_code, normalize_name(district)))
+    if not district_code:
+        district_code = f"{state_code}_{slug(district)}"
+
+    mandi_code = catalog["mandis"].get((state_code, district_code, normalize_name(market)))
+    if not mandi_code:
+        mandi_code = f"{district_code}_{slug(market)}"
+
+    commodity_code = catalog["commodities"].get(normalize_name(commodity)) or slug(commodity)
     variant_code = f"{commodity_code}_{slug(variety)}"
     category = next((cat for token, cat in COMMODITY_CATEGORIES.items() if token in commodity.upper()), "CEREALS")
 
@@ -188,27 +235,44 @@ def update_state(client: Client, patch: dict[str, Any]) -> None:
         {**patch, "updated_at": datetime.now(timezone.utc).isoformat()}
     ).eq("id", 1).execute()
 
-def persist_page(client: Client, rows: list[dict[str, Any]]) -> dict[str, int]:
-    accepted = [r for r in rows if r]
-    if not accepted:
-        return {"accepted": 0, "inserted": 0, "duplicates": 0, "rejected": len(rows)}
+def persist_page(client: Client, rows: list[dict[str, Any] | None]) -> dict[str, int]:
+    valid_rows = [row for row in rows if row]
+    rejected = len(rows) - len(valid_rows)
 
-    # Match the production database's actual schema (not the newer canonical
-    # schema used by the first version of this worker).
-    states = [{"state_code": r["state_code"], "state_name": r["state_name"]} for r in accepted]
-    districts = [{"state_code": r["state_code"], "district_code": r["district_code"], "district_name": r["district_name"]} for r in accepted]
-    mandis = [{"state_code": r["state_code"], "district_code": r["district_code"], "mandi_code": r["mandi_code"], "mandi_name": r["mandi_name"]} for r in accepted]
-    commodities = [{"code": r["commodity_code"], "name": r["commodity_name"]} for r in accepted]
+    # A single 1,000-row page can contain thousands of repeated dimension keys.
+    # PostgREST rejects an ON CONFLICT batch that targets the same row twice.
+    states = unique_by(
+        [{"state_code": r["state_code"], "state_name": r["state_name"]} for r in valid_rows],
+        "state_code",
+    )
+    districts = unique_by(
+        [{"state_code": r["state_code"], "district_code": r["district_code"], "district_name": r["district_name"]} for r in valid_rows],
+        "district_code",
+    )
+    mandis = unique_by(
+        [{"state_code": r["state_code"], "district_code": r["district_code"], "mandi_code": r["mandi_code"], "mandi_name": r["mandi_name"]} for r in valid_rows],
+        "mandi_code",
+    )
+    commodities = unique_by(
+        [{"code": r["commodity_code"], "name": r["commodity_name"]} for r in valid_rows],
+        "code",
+    )
 
-    client.table("national_states").upsert(states, on_conflict="state_code").execute()
-    client.table("national_districts").upsert(districts, on_conflict="district_code").execute()
-    client.table("national_mandis").upsert(mandis, on_conflict="mandi_code").execute()
-    client.table("national_commodities").upsert(commodities, on_conflict="code").execute()
+    if states:
+        client.table("national_states").upsert(states, on_conflict="state_code").execute()
+    if districts:
+        client.table("national_districts").upsert(districts, on_conflict="district_code").execute()
+    if mandis:
+        client.table("national_mandis").upsert(mandis, on_conflict="mandi_code").execute()
+    if commodities:
+        client.table("national_commodities").upsert(commodities, on_conflict="code").execute()
 
-    observations = []
-    for r in accepted:
+    # Deduplicate observations inside this page using the database's actual
+    # unique key before sending one upsert request.
+    observations_by_key: dict[tuple[str, str, str, str, str, str], dict[str, Any]] = {}
+    for r in valid_rows:
         arrival = number(field(r["raw"], "arrival_quantity", field(r["raw"], "arrival")))
-        observations.append({
+        observation = {
             "observation_date": r["observation_date"],
             "state_code": r["state_code"],
             "district_code": r["district_code"],
@@ -223,20 +287,48 @@ def persist_page(client: Client, rows: list[dict[str, Any]]) -> dict[str, int]:
             "source": "AGMARKNET",
             "source_record_id": "|".join((r["observation_date"], r["mandi_code"], r["commodity_code"], r["variant_name"], r["grade_name"])),
             "raw_record": r["raw"],
-        })
+        }
+        conflict_key = (
+            observation["observation_date"],
+            observation["mandi_code"],
+            observation["commodity_code"],
+            observation["variety"],
+            observation["grade"],
+            observation["source"],
+        )
+        observations_by_key[conflict_key] = observation
+
+    observations = list(observations_by_key.values())
+    if not observations:
+        return {
+            "accepted": 0,
+            "upserted": 0,
+            "duplicates_in_page": len(valid_rows),
+            "rejected": rejected,
+        }
 
     result = client.table("national_market_price_observations").upsert(
         observations,
         on_conflict="observation_date,mandi_code,commodity_code,variety,grade,source",
-    ).execute()
-    inserted = len(result.data or [])
-    return {"accepted": len(accepted), "inserted": inserted, "duplicates": max(0, len(accepted) - inserted), "rejected": len(rows) - len(accepted)}
+    ).select("id").execute()
+    return {
+        "accepted": len(valid_rows),
+        "upserted": len(result.data or []),
+        "duplicates_in_page": len(valid_rows) - len(observations),
+        "rejected": rejected,
+    }
 
-def ingest_one_page(client: Client, api_key: str, mode: str, offset: int) -> dict[str, Any]:
+def ingest_one_page(
+    client: Client,
+    api_key: str,
+    mode: str,
+    offset: int,
+    catalog: Catalog,
+) -> dict[str, Any]:
     resource_id = HISTORICAL_RESOURCE_ID if mode == "historical" else DAILY_RESOURCE_ID
     source = "AGMARKNET_HISTORICAL" if mode == "historical" else "AGMARKNET_DAILY"
     records, total = fetch_page(api_key, resource_id, offset)
-    normalized = [normalize_record(record, source) for record in records]
+    normalized = [normalize_record(record, source, catalog) for record in records]
     counts = persist_page(client, normalized)
 
     next_offset = offset + len(records)
@@ -253,6 +345,7 @@ def run(mode: str) -> dict[str, Any]:
         raise RuntimeError("DATA_GOV_IN_API_KEY is required. Refusing to generate or ingest synthetic market data.")
 
     client = supabase_client()
+    catalog = load_catalog(client)
     state = get_state(client)
 
     selected_mode = mode
@@ -266,7 +359,7 @@ def run(mode: str) -> dict[str, Any]:
     total_key = "last_historical_total" if selected_mode == "historical" else "last_daily_total"
     offset = int(state.get(offset_key) or 0)
 
-    result = ingest_one_page(client, api_key, selected_mode, offset)
+    result = ingest_one_page(client, api_key, selected_mode, offset, catalog)
     now = datetime.now(timezone.utc).isoformat()
     next_offset = 0 if result["finished"] and selected_mode == "daily" else result["offset_end"]
 
@@ -278,9 +371,9 @@ def run(mode: str) -> dict[str, Any]:
         "last_error": None,
     })
     LOG.info(
-        "%s: offset %s -> %s, fetched=%s accepted=%s inserted=%s rejected=%s total=%s",
+        "%s: offset %s -> %s, fetched=%s accepted=%s upserted=%s duplicates_in_page=%s rejected=%s total=%s",
         selected_mode, offset, result["offset_end"], result["fetched"], result["accepted"],
-        result["inserted"], result["rejected"], result["total"],
+        result["upserted"], result["duplicates_in_page"], result["rejected"], result["total"],
     )
     return result
 
