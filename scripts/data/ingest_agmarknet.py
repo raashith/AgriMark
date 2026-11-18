@@ -86,12 +86,32 @@ class Catalog(TypedDict):
     mandis: dict[tuple[str, str, str], str]
     commodities: dict[str, str]
 
+def fetch_all_table_rows(client: Client, table: str, columns: str, order_column: str) -> list[dict[str, Any]]:
+    """Read every lookup row in stable, bounded PostgREST pages."""
+    rows: list[dict[str, Any]] = []
+    offset = 0
+    while True:
+        page = (
+            client.table(table)
+            .select(columns)
+            .order(order_column)
+            .range(offset, offset + PAGE_SIZE - 1)
+            .execute()
+            .data
+            or []
+        )
+        rows.extend(page)
+        if len(page) < PAGE_SIZE:
+            break
+        offset += len(page)
+    return rows
+
 def load_catalog(client: Client) -> Catalog:
-    """Reuse canonical lookup IDs so ingestion never creates duplicate slugs."""
-    state_rows = client.table("national_states").select("state_code,state_name").execute().data or []
-    district_rows = client.table("national_districts").select("district_code,state_code,district_name").execute().data or []
-    mandi_rows = client.table("national_mandis").select("mandi_code,state_code,district_code,mandi_name").execute().data or []
-    commodity_rows = client.table("national_commodities").select("code,name").execute().data or []
+    """Reuse all canonical lookup IDs so ingestion never creates duplicate slugs."""
+    state_rows = fetch_all_table_rows(client, "national_states", "state_code,state_name", "state_code")
+    district_rows = fetch_all_table_rows(client, "national_districts", "district_code,state_code,district_name", "district_code")
+    mandi_rows = fetch_all_table_rows(client, "national_mandis", "mandi_code,state_code,district_code,mandi_name", "mandi_code")
+    commodity_rows = fetch_all_table_rows(client, "national_commodities", "code,name", "code")
 
     return {
         "states": {normalize_name(row["state_name"]): str(row["state_code"]) for row in state_rows},
