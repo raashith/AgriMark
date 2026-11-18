@@ -13,7 +13,8 @@ on:
           - daily
           - both
   schedule:
-    - cron: "20 1 * * *"
+    # Run after the India morning market-data publishing window.
+    - cron: "30 3 * * *"
 
 permissions:
   contents: read
@@ -34,6 +35,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Validate required GitHub Actions secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in DATA_GOV_IN_API_KEY SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf '::error::Missing required GitHub Actions secrets: %s\n' "${missing[*]}"
+            echo "Configure them in Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          case "$SUPABASE_URL" in
+            https://tsdjtlmrvbspyzgwmccg.supabase.co|https://tsdjtlmrvbspyzgwmccg.supabase.co/)
+              echo "Supabase project URL validated."
+              ;;
+            *)
+              echo "::error::SUPABASE_URL must point to the canonical AgriMark Supabase project."
+              exit 1
+              ;;
+          esac
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -43,35 +67,36 @@ jobs:
       - name: Install ingestion dependencies
         run: python -m pip install --upgrade pip supabase python-dotenv
 
-      - name: Validate required secrets
-        shell: bash
-        run: |
-          test -n "$DATA_GOV_IN_API_KEY" || { echo "::error::Add DATA_GOV_IN_API_KEY to GitHub Actions secrets."; exit 1; }
-          test -n "$SUPABASE_URL" || { echo "::error::Add SUPABASE_URL to GitHub Actions secrets."; exit 1; }
-          test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "::error::Add SUPABASE_SERVICE_ROLE_KEY to GitHub Actions secrets."; exit 1; }
-
-      - name: Backfill official historical data (manual historical/both runs)
+      - name: Backfill official historical data
         if: ${{ github.event_name == 'workflow_dispatch' && (inputs.mode == 'historical' || inputs.mode == 'both') }}
         shell: bash
         run: |
           set -euo pipefail
-          # The existing worker stores its pagination offset in Supabase and
-          # upserts with official source/date keys, so reruns are resumable.
           for page in $(seq 1 250); do
             output="$(python scripts/data/ingest_agmarknet.py --mode historical)"
             echo "$output"
-            finished="$(python -c 'import json,sys; print(str(json.loads(sys.argv[1]).get("finished", False)).lower())' "$output")"
+            finished="$(python -c 'import json,sys; print(str(json.loads(sys.stdin.read()).get("finished", False)).lower())' <<< "$output")"
             if [ "$finished" = "true" ]; then
               echo "Historical AGMARKNET backfill reached the end of the official resource."
               exit 0
             fi
           done
-          echo "Backfill paused after 250 pages; run this workflow again to resume from the stored offset."
+          echo "::error::Historical backfill did not reach the official resource total within 250 pages."
+          exit 1
 
-      - name: Ingest one daily page (scheduled runs and daily dispatch)
-        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'daily') }}
-        run: python scripts/data/ingest_agmarknet.py --mode daily
-
-      - name: Continue ingestion state machine (manual both run)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'both' }}
-        run: python scripts/data/ingest_agmarknet.py --mode daily
+      - name: Ingest all pages of the official daily resource
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.mode == 'daily' || inputs.mode == 'both')) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for page in $(seq 1 250); do
+            output="$(python scripts/data/ingest_agmarknet.py --mode daily)"
+            echo "$output"
+            finished="$(python -c 'import json,sys; print(str(json.loads(sys.stdin.read()).get("finished", False)).lower())' <<< "$output")"
+            if [ "$finished" = "true" ]; then
+              echo "All pages of the current official daily AGMARKNET resource were ingested."
+              exit 0
+            fi
+          done
+          echo "::error::Daily ingestion did not reach the official resource total within 250 pages."
+          exit 1
