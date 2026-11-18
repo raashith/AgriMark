@@ -224,6 +224,8 @@ export default function MarketPricesPage() {
       district_code: latest.district_code || '',
       horizon_days: '7',
     });
+    if (latest.variety) params.set('variety', latest.variety);
+    if (latest.grade) params.set('grade', latest.grade);
     setForecastLoading(true);
     setForecastError('');
 
@@ -531,6 +533,7 @@ function ForecastMiniChart({ points }: { points: ForecastPoint[] }) {
   const x = (index: number) => 12 + (index / Math.max(points.length - 1, 1)) * 276;
   const y = (value: number) => 62 - ((value - low) / range) * 48;
   const line = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${x(index)} ${y(point.predicted_value)}`).join(' ');
+  const hasModelBand = points.some((point) => point.data_type === 'PROJECTED' && point.upper_bound_95 > point.lower_bound_95);
   const upper = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${x(index)} ${y(point.upper_bound_95)}`).join(' ');
   const lower = [...points].reverse().map((point, index) => {
     const originalIndex = points.length - 1 - index;
@@ -540,13 +543,13 @@ function ForecastMiniChart({ points }: { points: ForecastPoint[] }) {
   return (
     <div className="market-forecast-chart">
       <svg viewBox="0 0 300 76" role="img" aria-label="Seven-day mandi price outlook with uncertainty band">
-        <path d={`${upper} ${lower} Z`} className="market-forecast-band" />
+        {hasModelBand && <path d={`${upper} ${lower} Z`} className="market-forecast-band" />}
         <path d={line} className="market-forecast-line" />
         {points.map((point, index) => (
           <circle key={point.target_date} cx={x(index)} cy={y(point.predicted_value)} r="2.8" className="market-forecast-point" />
         ))}
       </svg>
-      <div className="market-forecast-range"><span>Lower / upper source-based range</span><b>{money(low)} – {money(high)}</b></div>
+      <div className="market-forecast-range"><span>{hasModelBand ? 'Model range' : 'Reference point · no confidence band'}</span>{hasModelBand && <b>{money(low)} – {money(high)}</b>}</div>
     </div>
   );
 }
