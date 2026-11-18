@@ -107,7 +107,20 @@ function mapObservation(
   commodityNames: Map<string, string>,
   stateNames: Map<string, string>,
   mandiNames: Map<string, string>,
-) {
+): DatabaseRow & {
+  id: number;
+  commodity_code: string;
+  mandi_code: string;
+  state_code: string;
+  observation_date: string;
+  modal_price: number;
+  min_price: number;
+  max_price: number;
+  arrival_quantity: number | null;
+  commodity_name: string;
+  mandi_name: string;
+  state_name: string;
+} {
   return {
     ...row,
     modal_price: Number(row.modal_price),
