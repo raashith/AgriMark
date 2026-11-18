@@ -129,7 +129,7 @@ export default function MarketPricesPage() {
 
   const resetPage = () => setPage(0);
   const changeAmount = summary?.changeAmount;
-  const changeText = changeAmount == null ? '—' : `${changeAmount > 0 ? '+' : ''}${money(changeAmount)}`;
+  const changeText = changeAmount == null ? '—' : `${changeAmount > 0 ? '+' : changeAmount < 0 ? '−' : ''}₹${numberFormat.format(Math.abs(changeAmount))}`;
   const changeDetail = summary?.changePercent == null
     ? 'No comparable previous observation'
     : `${summary.changePercent > 0 ? '+' : ''}${summary.changePercent.toFixed(2)}% vs previous record`;
@@ -210,7 +210,7 @@ export default function MarketPricesPage() {
           <MetricCard
             label="Latest arrivals"
             value={latest?.arrival_quantity == null ? 'N/A' : numberFormat.format(latest.arrival_quantity)}
-            note={latest?.arrival_quantity == null ? 'Metric tonnes' : `Metric tonnes · ${dateLabel(latest.observation_date)}`}
+            note={latest?.arrival_quantity == null ? 'Not supplied by source' : `Reported quantity · ${dateLabel(latest.observation_date)}`}
           />
           <MetricCard
             label="Observed points"
@@ -253,8 +253,8 @@ export default function MarketPricesPage() {
             <h2>Next 7 days</h2>
             <div className="market-forecast-status"><BrainCircuit size={16} /> Baseline only · not trained</div>
             <p>
-              The canonical dataset currently contains one observation date. That is enough to show verified mandi prices,
-              but not enough to learn a day-by-day trend. A forecast will be enabled when multi-day official history is available.
+              Reliable day-by-day projections require several distinct official observation dates. The latest real modal price
+              is shown as a reference; mandis reported on the same date are not treated as a time series.
             </p>
             <div className="market-forecast-reference">
               <span>Latest observed reference</span>
@@ -286,7 +286,7 @@ export default function MarketPricesPage() {
                   <th className="numeric">Min (₹/Q)</th>
                   <th className="numeric">Modal (₹/Q)</th>
                   <th className="numeric">Max (₹/Q)</th>
-                  <th className="numeric">Arrivals</th>
+                  <th className="numeric">Arrival quantity</th>
                 </tr>
               </thead>
               <tbody>
