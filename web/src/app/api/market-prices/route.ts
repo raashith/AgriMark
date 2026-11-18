@@ -7,6 +7,7 @@ const SUPABASE_URL = 'https://tsdjtlmrvbspyzgwmccg.supabase.co';
 const DEFAULT_ROWS = 100;
 const MAX_ROWS = 300;
 const PAGE_SIZE = 1000;
+const CANONICAL_SCAN_LIMIT = 1000;
 
 function getApiKey() {
   return process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -18,10 +19,6 @@ function getApiKey() {
 
 function norm(value: unknown) {
   return String(value ?? '').trim().toLocaleLowerCase('en-IN').split(/ +/).filter(Boolean).join(' ');
-}
-
-function parseSynthetic(value: string, prefix: string) {
-  return value.startsWith(prefix) ? value.slice(prefix.length).trim() : '';
 }
 
 async function queryTable(
@@ -60,6 +57,7 @@ async function queryTable(
   }
   return rows;
 }
+
 export async function GET(request: NextRequest) {
   try {
     const params = request.nextUrl.searchParams;
@@ -78,56 +76,23 @@ export async function GET(request: NextRequest) {
     const commodityNameByCode = new Map(commodities.map((r: any) => [String(r.code), String(r.name)]));
     const stateNameByCode = new Map(states.map((r: any) => [String(r.state_code), String(r.state_name)]));
     const mandiByCode = new Map(mandis.map((r: any) => [String(r.mandi_code), r]));
-    const optionValue = (value: string, prefix: string) => value.startsWith(prefix) ? value.slice(prefix.length).trim() : '';
-    const commodityName = optionValue(rawCommodity, 'CSV_COMMODITY:') || commodityNameByCode.get(rawCommodity) || rawCommodity;
-    const stateName = optionValue(rawState, 'CSV_STATE:') || stateNameByCode.get(rawState) || rawState;
 
-    let selectedMandiName = '';
-    let selectedMandiState = '';
-    if (rawMandi.startsWith('CSV_MANDI:')) {
-      const pair = rawMandi.slice('CSV_MANDI:'.length).split('|');
-      selectedMandiName = (pair[0] || '').trim();
-      selectedMandiState = (pair[1] || '').trim();
-    } else if (rawMandi) {
-      const selected = mandiByCode.get(rawMandi);
-      selectedMandiName = String(selected?.mandi_name || rawMandi);
-      selectedMandiState = String(stateNameByCode.get(String(selected?.state_code || '')) || '');
-    }
-    const effectiveStateName = stateName || selectedMandiState;
+    // The market page intentionally reads ONLY normalized AGMARKNET observations.
+    // public.agmarknet_csv_import_staging remains untouched and is not queried.
+    const canonicalFilters: Record<string, string> = {};
+    if (rawCommodity) canonicalFilters.commodity_code = `eq.${rawCommodity}`;
+    if (rawState) canonicalFilters.state_code = `eq.${rawState}`;
+    if (rawMandi) canonicalFilters.mandi_code = `eq.${rawMandi}`;
 
-    const extraCanonical: Record<string, string> = {};
-    const extraImported: Record<string, string> = {}; // CSV source paused for this diagnostic.
-    if (rawCommodity && !rawCommodity.startsWith('CSV_COMMODITY:')) extraCanonical.commodity_code = `eq.${rawCommodity}`;
-    if (rawState && !rawState.startsWith('CSV_STATE:')) extraCanonical.state_code = `eq.${rawState}`;
-    if (rawMandi && !rawMandi.startsWith('CSV_MANDI:')) extraCanonical.mandi_code = `eq.${rawMandi}`;
-
-    // Resolve CSV option values to normalized codes so the two market sources
-    // are queried consistently for the selected commodity/state/mandi.
-    if (rawCommodity.startsWith('CSV_COMMODITY:')) {
-      const canonicalCommodityCode = commodities.find((r: any) => norm(r.name) === norm(commodityName))?.code;
-      if (canonicalCommodityCode) extraCanonical.commodity_code = `eq.${canonicalCommodityCode}`;
-    }
-    if (rawState.startsWith('CSV_STATE:') || rawMandi.startsWith('CSV_MANDI:')) {
-      const canonicalStateCode = states.find((r: any) => norm(r.state_name) === norm(effectiveStateName))?.state_code;
-      if (canonicalStateCode) extraCanonical.state_code = `eq.${canonicalStateCode}`;
-    }
-
-    if (rawCommodity) extraImported.commodity_name = `eq.${commodityName}`;
-    if (effectiveStateName) extraImported.state_name = `eq.${effectiveStateName}`;
-    if (selectedMandiName) extraImported.mandi_name = `eq.${selectedMandiName}`;
-
-    // Diagnostic snapshot: use ONLY canonical observations from 2026-10-16.
-    // Keep this query bounded to avoid serially paging through the full table
-    // on every dashboard request (which can time out before cards render).
-    extraCanonical.observation_date = 'eq.2026-10-16';
+    // Read the newest canonical observations without pinning the page to a
+    // hard-coded date. This lets the cards follow the latest date in Supabase.
     const canonicalRows = await queryTable(
       'national_market_price_observations',
       'id,commodity_code,mandi_code,state_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source,variety,grade',
       'observation_date.desc,id.desc',
-      1000,
-      extraCanonical,
+      CANONICAL_SCAN_LIMIT,
+      canonicalFilters,
     );
-    const importedRows: any[] = [];
 
     const canonical = canonicalRows.map((r: any) => ({
       ...r,
@@ -138,87 +103,40 @@ export async function GET(request: NextRequest) {
       commodity_name: commodityNameByCode.get(String(r.commodity_code)) || String(r.commodity_code || ''),
       mandi_name: mandiByCode.get(String(r.mandi_code))?.mandi_name || String(r.mandi_code || 'Mandi unavailable'),
       state_name: stateNameByCode.get(String(r.state_code)) || String(r.state_code || 'India'),
-      imported_csv: false,
-    }));
-
-    const imported = importedRows.map((r: any) => ({
-      ...r,
-      id: 'csv-' + String(r.id),
-      commodity_code: 'CSV_COMMODITY:' + String(r.commodity_name || '').trim(),
-      state_code: 'CSV_STATE:' + String(r.state_name || '').trim(),
-      mandi_code: 'CSV_MANDI:' + String(r.mandi_name || '').trim() + '|' + String(r.state_name || '').trim(),
-      modal_price: Number(r.modal_price) || 0,
-      min_price: Number(r.min_price) || 0,
-      max_price: Number(r.max_price) || 0,
-      arrival_quantity: null,
-      commodity_name: String(r.commodity_name || '').trim(),
-      mandi_name: String(r.mandi_name || '').trim(),
-      state_name: String(r.state_name || '').trim(),
-      source: r.source || 'AGMARKNET',
-      imported_csv: true,
-    }));
-
-    const wantedCommodity = rawCommodity ? norm(commodityName) : '';
-    const wantedState = (rawState || selectedMandiState) ? norm(effectiveStateName) : '';
-    const wantedMandi = rawMandi ? norm(selectedMandiName) : '';
-
-    const matches = (row: any) =>
+    })).filter((row: any) =>
       Number.isFinite(row.modal_price) && row.modal_price > 0
-      && (!wantedCommodity || norm(row.commodity_name) === wantedCommodity)
-      && (!wantedState || norm(row.state_name) === wantedState)
-      && (!wantedMandi || norm(row.mandi_name) === wantedMandi)
-      && (!search || [row.commodity_name, row.mandi_name, row.state_name, row.district_name].some((v: unknown) => norm(v).includes(search)));
+      && (!search || [row.commodity_name, row.mandi_name, row.state_name, row.variety, row.grade].some((value: unknown) => norm(value).includes(search))),
+    );
 
-    // Prefer canonical normalized rows for duplicates, but retain newer imported
-    // observations. Neither source is replaced with synthetic/demo values.
-    const merged = new Map<string, any>();
-    for (const row of [...imported.filter(matches), ...canonical.filter(matches)]) {
-      const key = [row.observation_date, norm(row.commodity_name), norm(row.mandi_name), norm(row.state_name), row.modal_price].join('|');
-      const previous = merged.get(key);
-      if (!previous || (!row.imported_csv && previous.imported_csv)) merged.set(key, row);
-    }
-    const allMatching = [...merged.values()].sort((a, b) =>
+    const allMatching = canonical.sort((a: any, b: any) =>
       String(b.observation_date).localeCompare(String(a.observation_date))
-      || String(b.id).localeCompare(String(a.id), undefined, { numeric: true }),
+      || Number(b.id) - Number(a.id),
     );
     const rows = allMatching.slice(0, limit);
-
-    const commodityOptions = new Map<string, any>();
-    for (const r of commodities) commodityOptions.set(String(r.code), { code: String(r.code), name: String(r.name) });
-    for (const r of importedRows) {
-      const name = String(r.commodity_name || '').trim();
-      if (name) commodityOptions.set('CSV_COMMODITY:' + name, { code: 'CSV_COMMODITY:' + name, name });
-    }
-    const stateOptions = new Map<string, any>();
-    for (const r of states) stateOptions.set(String(r.state_code), { state_code: String(r.state_code), state_name: String(r.state_name) });
-    for (const r of importedRows) {
-      const name = String(r.state_name || '').trim();
-      if (name) stateOptions.set('CSV_STATE:' + name, { state_code: 'CSV_STATE:' + name, state_name: name });
-    }
-    const mandiOptions = new Map<string, any>();
-    for (const r of mandis) mandiOptions.set(String(r.mandi_code), { mandi_code: String(r.mandi_code), mandi_name: String(r.mandi_name), state_code: String(r.state_code || '') });
-    for (const r of importedRows) {
-      const name = String(r.mandi_name || '').trim();
-      const state = String(r.state_name || '').trim();
-      if (name && state) {
-        const code = 'CSV_MANDI:' + name + '|' + state;
-        mandiOptions.set(code, { mandi_code: code, mandi_name: name, state_code: 'CSV_STATE:' + state });
-      }
-    }
+    const latest = rows[0] ?? null;
+    const observationDates = new Set(allMatching.map((row: any) => row.observation_date)).size;
 
     return NextResponse.json({
       ok: true,
       rows,
-      commodities: [...commodityOptions.values()].sort((a, b) => a.name.localeCompare(b.name)),
-      states: [...stateOptions.values()].sort((a, b) => a.state_name.localeCompare(b.state_name)),
-      mandis: [...mandiOptions.values()].sort((a, b) => a.mandi_name.localeCompare(b.mandi_name)),
+      commodities: commodities.map((r: any) => ({ code: String(r.code), name: String(r.name) })),
+      states: states.map((r: any) => ({ code: String(r.state_code), name: String(r.state_name) })),
+      mandis: mandis.map((r: any) => ({ code: String(r.mandi_code), name: String(r.mandi_name), state_code: String(r.state_code || '') })),
+      summary: {
+        latest,
+        observedRecords: rows.length,
+        observationDates: new Set(rows.map((row: any) => row.observation_date)).size,
+      },
       warnings: [],
-      count: rows.length,
+      count: allMatching.length,
+      loaded_count: rows.length,
       primary_count: canonicalRows.length,
-      imported_csv_count: importedRows.length,
-      capped: allMatching.length > limit,
-      latest_observation_date: rows[0]?.observation_date ?? null,
-      source: 'Supabase public.national_market_price_observations · snapshot 2026-10-16 only',
+      imported_csv_count: 0,
+      csv_staging_enabled: false,
+      capped: allMatching.length > limit || canonicalRows.length >= CANONICAL_SCAN_LIMIT,
+      latest_observation_date: latest?.observation_date ?? null,
+      observation_dates_available: observationDates,
+      source: 'Supabase public.national_market_price_observations · canonical only · CSV staging disabled',
       applied_filters: { commodity: rawCommodity || null, state: rawState || null, mandi: rawMandi || null, search: search || null },
     }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (error) {
