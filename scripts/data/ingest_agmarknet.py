@@ -173,7 +173,7 @@ def fetch_page(api_key: str, resource_id: str, offset: int) -> tuple[list[dict[s
     raise RuntimeError(f"AGMARKNET fetch failed: {last_error}")
 
 def supabase_client() -> Client:
-    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "https://xrcqzpnstdbbtafhcwbb.supabase.co"
+    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "https://tsdjtlmrvbspyzgwmccg.supabase.co"
     key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_SECRET_KEY")
     if not key:
         raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY is required")

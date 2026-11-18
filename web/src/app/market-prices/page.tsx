@@ -2,132 +2,358 @@
 
 import './market-prices.css';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, ArrowUpRight, BarChart3, BrainCircuit, CalendarDays, ChevronDown, Database, Globe2, Landmark, MapPin, RefreshCw, Search, ShieldCheck, Sprout, TrendingUp, Wheat } from 'lucide-react';
+import Link from 'next/link';
+import {
+  Activity, ArrowDownRight, ArrowUpRight, BarChart3, BrainCircuit,
+  CalendarDays, ChevronLeft, ChevronRight, Database, MapPin, RefreshCw,
+  Search, Store, Truck, CloudSun, Bot, Wheat, Layers3,
+} from 'lucide-react';
 
-type Opt={code:string;name:string;state_code?:string};
-type Row={id:number;commodity_code:string;mandi_code:string|null;state_code:string|null;observation_date:string;modal_price:number;min_price:number;max_price:number;arrival_quantity:number|null;source:string|null;commodity_name:string;mandi_name:string;state_name:string};
-type MarketPriceSummary={latest:Row|null;observedRecords:number;observationDates:number};
-const nf=new Intl.NumberFormat('en-IN',{maximumFractionDigits:0}); const ru=(n:number)=>'₹'+nf.format(n); const dt=(s:string)=>s?new Date(s+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short'}):'—';
-export default function MarketPricesPage(){
- const requestSequence=React.useRef(0);
- const activeController=React.useRef<AbortController|null>(null);
- const [rows,S]=useState<Row[]>([]),[commodities,SC]=useState<Opt[]>([]),[states,SS]=useState<Opt[]>([]),[mandis,SM]=useState<Opt[]>([]),[commodity,C]=useState(''),[state,T]=useState(''),[mandi,M]=useState(''),[search,Q]=useState(''),[loading,L]=useState(true),[error,E]=useState(''),[updated,U]=useState(''),[page,P]=useState(1),[pageSize,PS]=useState(25),[apiCapped,setApiCapped]=useState(false),[summary,setSummary]=useState<MarketPriceSummary|null>(null);
- const load=useCallback(async()=>{
-  const requestId=++requestSequence.current;
-  L(true);E('');
-  activeController.current?.abort();
-  const controller=new AbortController();
-  activeController.current=controller;
-  const timeout=window.setTimeout(()=>controller.abort(),30000);
-  try{
-   const params=new URLSearchParams();if(commodity)params.set('commodity',commodity);if(state)params.set('state',state);if(mandi)params.set('mandi',mandi);if(search.trim())params.set('search',search.trim());params.set('limit','25');
-   const requestUrl='/api/market-prices'+(params.size?'?'+params.toString():'');
-   let response=await fetch(requestUrl,{cache:'no-store',signal:controller.signal,headers:{Accept:'application/json'}});
-   let responseText=await response.text();
-   let payload={ok:false,rows:[],commodities:[],states:[],mandis:[],error:'Market data returned an unreadable response.'} as {ok?:boolean;rows?:any[];commodities?:any[];states?:any[];mandis?:any[];error?:string;warnings?:string[];capped?:boolean;latest_observation_date?:string|null;summary?:MarketPriceSummary};
-   try{payload=JSON.parse(responseText)}catch{}
-   if(response.ok&&payload.ok&&(!Array.isArray(payload.rows)||payload.rows.length===0)&&!commodity&&!state&&!mandi&&!search.trim()){
-    // Retry the unfiltered first page once if an edge cache or transient response returned an empty payload.
-    response=await fetch('/api/market-prices?limit=25&retry='+Date.now(),{cache:'no-store',signal:controller.signal,headers:{Accept:'application/json'}});
-    responseText=await response.text();
-    try{payload=JSON.parse(responseText)}catch{}
-   }
-   if(!response.ok||!payload.ok)throw new Error(payload.error||`Market data API failed (HTTP ${response.status}).`);
-   if(requestId!==requestSequence.current)return;
-   const rawRows=Array.isArray(payload.rows)?payload.rows:[];
-   S(rawRows as Row[]);
-   setSummary(payload.summary??{latest:(rawRows[0] as Row)||null,observedRecords:rawRows.length,observationDates:new Set(rawRows.map((row:any)=>row.observation_date)).size});
-   setApiCapped(Boolean(payload.capped));
-   const commodityOptions=(payload.commodities||[]).map((r:any)=>({code:r.code,name:r.name}));
-   const stateOptions=(payload.states||[]).map((r:any)=>({code:r.state_code||r.code,name:r.state_name||r.name}));
-   const mandiOptions=(payload.mandis||[]).map((r:any)=>({code:r.mandi_code||r.code,name:r.mandi_name||r.name,state_code:r.state_code}));
-   SC([...new Map(commodityOptions.map((r:Opt)=>[r.code,r])).values()]);
-   SS([...new Map(stateOptions.map((r:Opt)=>[r.code,r])).values()]);
-   SM([...new Map(mandiOptions.map((r:Opt)=>[r.code,r])).values()]);
-   U(new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
-   if(payload.warnings?.length)E(payload.warnings.join(' '));
-  }catch(e){
-   if(requestId!==requestSequence.current)return;
-   const err=e as {message?:string;name?:string};
-   E(err.name==='AbortError'?'Market data request timed out after 30 seconds. Please retry.':err.message||'Could not load market observations. Please retry.');
-   // Preserve the last successful rows during transient API failures.
-  }finally{
-   window.clearTimeout(timeout);if(requestId===requestSequence.current)L(false);
-  }
- },[commodity,state,mandi,search]);
- useEffect(()=>{
-  void load();
-  return ()=>{requestSequence.current+=1;activeController.current?.abort();activeController.current=null;};
- },[load]);
- const filtered=rows;
- const totalPages=Math.max(1,Math.ceil(filtered.length/pageSize));
- const pageRows=useMemo(()=>filtered.slice((page-1)*pageSize,page*pageSize),[filtered,page,pageSize]);
- useEffect(()=>{P(1)},[commodity,state,mandi,search,pageSize]);
- const dates=[...new Set(filtered.map(r=>r.observation_date))].sort();
- const latest=summary?.latest??[...filtered].sort((a,b)=>b.observation_date.localeCompare(a.observation_date)||Number(b.id)-Number(a.id))[0];
- const latestDateLabel = latest?.observation_date ? dt(latest.observation_date) : 'No observations';
- // Forecast history is only meaningful for one chosen commodity. Never blend
- // prices from unrelated crops into a single time series.
- const forecastRows=useMemo(()=>commodity?filtered:[],[filtered,commodity]);
- const history=useMemo(()=>{const m=new Map<string,number[]>();forecastRows.forEach(r=>{if(!m.has(r.observation_date))m.set(r.observation_date,[]);m.get(r.observation_date)!.push(r.modal_price)});return [...m.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([date,values])=>({date,price:values.sort((a,b)=>a-b)[Math.floor(values.length/2)]}));},[forecastRows]);
- const barData=useMemo(()=>{const groups=new Map<string,{label:string;prices:number[];rows:Row[]}>();for(const r of filtered){const key=commodity?(r.mandi_code||r.mandi_name):(r.commodity_code||r.commodity_name);const label=commodity?r.mandi_name:r.commodity_name;const item=groups.get(key)||{label,prices:[],rows:[]};item.prices.push(r.modal_price);item.rows.push(r);groups.set(key,item);}return [...groups.values()].map(g=>({label:g.label,price:g.prices.sort((a,b)=>a-b)[Math.floor(g.prices.length/2)],min:Math.min(...g.rows.map(r=>r.min_price)),max:Math.max(...g.rows.map(r=>r.max_price)),date:g.rows.map(r=>r.observation_date).sort().at(-1)||''})).sort((a,b)=>b.price-a.price).slice(0,8);},[filtered,commodity]);
- type ForecastPoint={target_date:string;forecast_horizon_days:number;predicted_value:number;lower_bound_95:number;upper_bound_95:number;data_type?:string};
+type Option = { code: string; name: string; state_code?: string };
+type PriceRow = {
+  id: number;
+  commodity_code: string;
+  commodity_name: string;
+  mandi_code: string;
+  mandi_name: string;
+  state_code: string;
+  state_name: string;
+  district_code?: string | null;
+  observation_date: string;
+  modal_price: number;
+  min_price: number;
+  max_price: number;
+  arrival_quantity: number | null;
+  source: string | null;
+  variety?: string | null;
+  grade?: string | null;
+};
+type MarketSummary = {
+  latest: PriceRow | null;
+  previous: PriceRow | null;
+  changeAmount: number | null;
+  changePercent: number | null;
+  observedRecords: number;
+};
+type MarketPayload = {
+  ok: boolean;
+  rows: PriceRow[];
+  commodities: Option[];
+  states: Option[];
+  mandis: Option[];
+  count: number;
+  summary: MarketSummary;
+  error?: string;
+};
 
- const [forecast,setForecast]=useState<{cur:number;expected:number;change:number;points:number[];details:ForecastPoint[];modelName:string|null;observedCount:number;trainingStatus:string}|null>(null);
- const [forecastLoading,setForecastLoading]=useState(false),[forecastMessage,setForecastMessage]=useState('Choose a commodity to calculate a seven-day trend from saved Supabase observations.');
- const [fallbackForecast,setFallbackForecast]=useState<{value:number;label:string}|null>(null);
- // Calculate the forecast directly from the Supabase-backed rows already loaded on this page.
- // This keeps the forecast tied to canonical observations only.
- const latestPrice = latest && Number.isFinite(Number(latest.modal_price)) ? Number(latest.modal_price) : null;
- const loadedCount = summary?.observedRecords ?? filtered.length;
- const observedDateCount = summary?.observationDates ?? dates.length;
- useEffect(()=>{setForecast(null);setFallbackForecast(null);if(!commodity){setForecastLoading(false);setFallbackForecast(latestPrice===null?null:{value:latestPrice,label:'Latest observed-price baseline · select a crop for forecast'});setForecastMessage('Showing the latest real price stored in Supabase. Select a crop to calculate a seven-day trend from its saved observations.');return;}if(history.length===0){setForecastLoading(false);setForecastMessage('No stored observations match this crop and filter selection.');return;}setForecastLoading(true);setForecastMessage('Calculating a seven-day forecast from saved Supabase observations…');try{const series=history.slice(-30);const last=series[series.length-1];const baseDate=last.date;const baseline=last.price;const trained=series.length>=5;let slope=0;let intercept=baseline;let residualStd=0;if(trained){const xs=series.map((_,i)=>i);const meanX=xs.reduce((a,b)=>a+b,0)/xs.length;const meanY=series.reduce((a,p)=>a+p.price,0)/series.length;const denominator=xs.reduce((sum,x)=>sum+(x-meanX)**2,0);slope=denominator?xs.reduce((sum,x,i)=>sum+(x-meanX)*(series[i].price-meanY),0)/denominator:0;intercept=meanY-slope*meanX;const residuals=series.map((p,i)=>p.price-(intercept+slope*i));residualStd=Math.sqrt(residuals.reduce((sum,v)=>sum+v*v,0)/Math.max(1,residuals.length-2));}const points:ForecastPoint[]=Array.from({length:7},(_,i)=>{const horizon=i+1;const predicted=Math.max(0,trained?intercept+slope*(series.length-1+horizon):baseline);const uncertainty=trained?Math.max(residualStd,baseline*0.02)*1.96:Math.max(last.price*0.03,0);const target=new Date(baseDate+'T00:00:00.000Z');target.setUTCDate(target.getUTCDate()+horizon);return{target_date:target.toISOString().slice(0,10),forecast_horizon_days:horizon,predicted_value:Math.round(predicted*100)/100,lower_bound_95:Math.max(0,Math.round((predicted-uncertainty)*100)/100),upper_bound_95:Math.round((predicted+uncertainty)*100)/100,data_type:trained?'LOCAL_TREND_FROM_SUPABASE':'BASELINE_NOT_TRAINED'};});const expected=points[6].predicted_value;setForecast({cur:baseline,expected,change:(expected-baseline)/Math.max(baseline,1)*100,points:points.map(p=>p.predicted_value),details:points,modelName:trained?'Local linear trend · Supabase data':null,observedCount:series.length,trainingStatus:trained?'LOCAL_TREND':'BASELINE_ONLY'});setForecastMessage(trained?'Seven-day indicative trend calculated locally from the saved Supabase modal prices. No external forecasting API is called.':'Fewer than five distinct observation dates are available. Showing a flat reference baseline from the latest real Supabase price, not a trained prediction.');}catch{setForecastLoading(false);setForecastMessage('Could not calculate a trend from the stored observations.');return;}finally{setForecastLoading(false)}},[commodity,history,latestPrice]);
- const visibleMandis=mandis.filter(m=>!state||m.state_code===state); const allChart=[...history.slice(-7).map(x=>x.price),...(forecast?.points||[])];
- return <main className="mandi-page min-h-screen bg-[#03110f] text-white selection:bg-emerald-300 selection:text-[#04100b]">
- <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true"><div className="absolute -left-48 top-1/3 h-[34rem] w-[34rem] rounded-full bg-emerald-500/10 blur-[140px]"/><div className="absolute -right-48 top-1/4 h-[30rem] w-[30rem] rounded-full bg-teal-400/10 blur-[140px]"/></div>
+const PAGE_SIZES = [25, 50, 100];
+const numberFormat = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
+const money = (value: number) => `₹${numberFormat.format(value)}`;
+const dateLabel = (value?: string | null) => value
+  ? new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+  : 'Date unavailable';
 
- <div className="relative z-10 min-w-0">
+export default function MarketPricesPage() {
+  const [rows, setRows] = useState<PriceRow[]>([]);
+  const [commodities, setCommodities] = useState<Option[]>([]);
+  const [states, setStates] = useState<Option[]>([]);
+  const [mandis, setMandis] = useState<Option[]>([]);
+  const [commodity, setCommodity] = useState('');
+  const [state, setState] = useState('');
+  const [mandi, setMandi] = useState('');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+  const [total, setTotal] = useState(0);
+  const [summary, setSummary] = useState<MarketSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [updatedAt, setUpdatedAt] = useState('');
 
-  <section className="mandi-hero relative mx-3 mt-3 overflow-hidden rounded-3xl border p-5 md:mx-6 md:mt-5 md:p-8 xl:mx-8">
-   <div className="relative z-10 flex flex-col justify-between gap-7 xl:flex-row xl:items-end"><div className="max-w-3xl"><div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-300/25 bg-[#05251e]/65 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[.18em] text-emerald-200 backdrop-blur"><span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_12px_#34d399]"/> AGMARKNET · verified market data</div><h1 className="text-4xl font-black tracking-tight text-white drop-shadow md:text-5xl xl:text-6xl">Mandi Prices</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200 md:text-base">Real market observations from agricultural mandis. Compare min, modal and max prices with every value shown in <b>₹ per quintal</b>.</p><div className="mt-5 flex flex-wrap items-center gap-3 text-xs text-emerald-50/80"><span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/20 px-3 py-1.5"><Database size={14}/> Supabase · AGMARKNET / DMI</span><span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/20 px-3 py-1.5"><CalendarDays size={14}/> Canonical observations · CSV staging paused</span></div></div><div className="grid grid-cols-3 gap-2 xl:min-w-[330px]"><div className="market-proof"><Database size={19} className="mb-1 text-emerald-300"/><b>Verified data</b><span>Stored observations</span></div><div className="market-proof"><CalendarDays size={19} className="mb-1 text-emerald-300"/><b>{latestDateLabel}</b><span>Source date</span></div><div className="market-proof"><TrendingUp size={19} className="mb-1 text-emerald-300"/><b>Evidence-led</b><span>Not sample data</span></div></div></div>
-  </section>
-  <div className="space-y-5 px-3 py-5 md:px-6 md:py-6 xl:px-8">
-   <section className="market-filters grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(200px,1.25fr)_minmax(150px,.95fr)_minmax(135px,.85fr)_minmax(150px,.95fr)_minmax(145px,.85fr)_auto]">
-    <label className="market-select"><Search size={18} className="shrink-0 text-emerald-300"/><span><small>SEARCH</small><input value={search} onChange={e=>Q(e.target.value)} placeholder="Commodity or mandi name…" className="w-full min-w-0 bg-transparent text-sm font-bold text-white outline-none placeholder:font-normal placeholder:text-slate-500"/></span></label>
-    <Picker label="Commodity" value={commodity} change={C} opts={commodities} icon={<Wheat size={18}/>}/>
-    <Picker label="State" value={state} change={v=>{T(v);M('')}} opts={states} icon={<MapPin size={18}/>}/>
-    <Picker label="Mandi" value={mandi} change={M} opts={visibleMandis} icon={<Landmark size={18}/>}/><div className="market-select" aria-label="Source snapshot date"><CalendarDays size={18} className="shrink-0 text-emerald-300"/><span><small>LATEST OBSERVATION</small><b className="text-sm font-bold text-white">{latestDateLabel}</b></span><ShieldCheck size={14} className="text-emerald-400" aria-hidden="true"/></div>
-    <button onClick={()=>void load()} disabled={loading} className="flex min-h-[54px] items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-300 via-emerald-400 to-teal-300 px-5 text-sm font-black text-[#052016] shadow-[0_8px_28px_rgba(16,185,129,.22)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-60"><Search size={17}/>{loading?'Loading…':error?'Retry':'Get Prices'}</button>
-   </section>
-   {error&&<div role="alert" className="rounded-xl border border-rose-800 bg-rose-950/50 p-4 text-sm text-rose-100">Market data could not load: {error}</div>}
-   {apiCapped&&<div className="rounded-xl border border-amber-800 bg-amber-950/30 p-3 text-xs text-amber-100">Showing a small, recent window of records for performance. Use the filters to narrow results.</div>}
-   <section className="grid grid-cols-2 gap-3 2xl:grid-cols-4"><Metric label="Latest modal price (₹/quintal)" value={latestPrice===null?'—':ru(latestPrice)} detail={latest?latest.commodity_name+' · '+latest.mandi_name+' · '+dt(latest.observation_date):'No matching observed price'} icon={<span className="text-2xl font-black">₹</span>}/><Metric label="7-day price forecast" value={forecast?ru(forecast.expected):fallbackForecast?ru(fallbackForecast.value):'—'} detail={forecast?(forecast.trainingStatus==='BASELINE_ONLY'?'Baseline only · not trained':(forecast.change>=0?'+':'')+forecast.change.toFixed(1)+'% estimated movement'):fallbackForecast?'Reference only · select a crop':'Choose a commodity'} icon={<ArrowUpRight/>}/><Metric label="Latest arrivals" value={latest?.arrival_quantity==null?'N/A':nf.format(latest.arrival_quantity)} detail={latest?.arrival_quantity==null?'Arrival quantity not supplied by source':'Recorded quantity · '+dt(latest.observation_date)} icon={<Landmark/>}/><Metric label="Observed records" value={nf.format(loadedCount)} detail={nf.format(loadedCount)+' loaded · '+observedDateCount+' date(s) after filters'} icon={<Database/>}/></section>
-   {loading&&!rows.length?<div className="market-panel p-8 text-center text-slate-300"><RefreshCw className="mx-auto mb-3 animate-spin text-emerald-300"/>Loading official AGMARKNET records…</div>:!filtered.length&&!loading?<div className="rounded-2xl border border-amber-800 bg-amber-950/30 p-8 text-center">No observations match these filters. Clear a filter and try again.</div>:<><section className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.65fr)_minmax(330px,.8fr)]">
-    <div className="market-panel overflow-hidden"><div className="flex flex-wrap items-start justify-between gap-3 p-5 md:p-6"><div><div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[.15em] text-emerald-300"><TrendingUp size={16}/> Price trend & distribution</div><h2 className="text-2xl font-black">{commodity?commodities.find(x=>x.code===commodity)?.name||latest?.commodity_name||'Selected commodity': 'Market price overview'}</h2><p className="mt-1 flex items-center gap-2 text-sm text-emerald-200"><MapPin size={15}/>{latest?.mandi_name||'Matching mandis'}{latest?.state_name?', '+latest.state_name:''}</p></div><div className="rounded-xl border border-emerald-900 bg-[#061a16] px-3 py-2 text-xs text-slate-300"><CalendarDays size={14} className="mr-2 inline text-emerald-300"/>{dates.length?dt(dates[dates.length-1]):'No date'}</div></div><div className="border-y border-emerald-900/70 px-5 py-3 text-xs text-slate-400">ACTUAL MODAL PRICES <span className="mx-3 text-emerald-300">●</span> OBSERVED ONLY · ₹ / QUINTAL</div><div className="p-3 md:p-5"><MandiBarChart data={barData} selectedCommodity={commodity} selectedMandi={mandi} dates={dates.length}/>{commodity&&history.length>1?<div className="mt-4"><div className="mb-3 text-xs font-bold uppercase tracking-wider text-emerald-300">Historical trend · selected commodity</div><Chart history={history} future={forecast?.points||[]} values={allChart}/></div>:<div className="mt-3 rounded-xl border border-dashed border-emerald-900 bg-[#06140e] p-3 text-xs leading-5 text-slate-400">{commodity?'Historical line trend needs at least two distinct dates in this source snapshot.':'Select a commodity to inspect the dated trend and the seven-day indicative forecast.'} This page never invents historical prices.</div>}<div className="mt-3 flex justify-center gap-5 text-xs text-slate-300"><span><i className="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-emerald-400"/>Actual observed price</span><span><i className="mr-2 inline-block h-2.5 w-2.5 rounded-full bg-amber-400"/>Indicative estimate</span></div></div></div>
-    <aside className="market-panel p-5 md:p-6"><div className="flex items-center gap-3"><span className="rounded-xl border border-emerald-700 bg-emerald-950 p-3 text-emerald-300"><BrainCircuit size={24}/></span><div><div className="text-xs font-black uppercase tracking-widest text-emerald-300">Mandi forecast</div><h2 className="mt-1 text-2xl font-black">Next 7 days</h2></div></div><p className="mt-4 text-sm leading-6 text-slate-300">Calculated from stored observations only. The canonical source is used exclusively while CSV staging is paused. Forecast values remain reference-only when there are too few distinct observation dates.</p>{forecastLoading?<div className="mt-5 flex items-center gap-3 rounded-2xl border border-emerald-900 bg-[#071711] p-5 text-sm text-slate-300"><RefreshCw size={18} className="animate-spin text-emerald-300"/>Calculating trend…</div>:forecast?<><div className="mt-5 rounded-2xl border border-amber-700/50 bg-amber-950/25 p-4"><div className="text-xs text-slate-400">{forecast.trainingStatus==='BASELINE_ONLY'?'Reference baseline · day 7':'Estimated modal price in 7 days'}</div><div className="mt-2 text-3xl font-black text-amber-300">{ru(forecast.expected)}<span className="ml-1 text-xs font-normal text-slate-300">/quintal</span></div><div className="mt-2 text-sm font-bold text-emerald-300">{forecast.trainingStatus==='BASELINE_ONLY'?'Flat reference baseline · no trained trend':(forecast.change>=0?'+':'')+forecast.change.toFixed(1)+'% estimated movement'}</div><div className="mt-2 text-xs text-slate-400">{forecast.trainingStatus==='BASELINE_ONLY'?'Not a trained model':(forecast.modelName||'Local trend')} · {forecast.observedCount} distinct date(s)</div><div className="mt-3 space-y-2">{forecast.details.map((p,i)=><div key={p.target_date} className="forecast-row"><span className="text-xs text-slate-300">Day {i+1} · {dt(p.target_date)}</span><span className="h-2 overflow-hidden rounded-full bg-emerald-950"><span className="block h-full rounded-full bg-emerald-400" style={{width:`${Math.max(5,Math.min(100,(p.predicted_value/Math.max(forecast.expected,1))*100))}%`}}/></span><b className="text-sm text-white">{ru(p.predicted_value)}</b></div>)}</div></div></>:<div className="mt-5 rounded-2xl border border-dashed border-emerald-800 bg-[#071711] p-5"><div className="mb-2 flex items-center gap-2 font-bold text-amber-300"><Activity size={18}/>{forecastMessage.startsWith('Choose')?'Select a commodity':'Forecast not available'}</div><p className="text-sm leading-6 text-slate-300">{forecastMessage}</p></div>}<div className="mt-4 flex items-start gap-2 rounded-xl bg-black/20 p-3 text-xs leading-5 text-slate-400"><ShieldCheck size={16} className="mt-0.5 shrink-0 text-emerald-400"/>CSV staging is paused. Actual prices and estimates stay separate; a trained trend requires enough dated canonical observations.</div></aside>
-   </section>
-   <section className="grid grid-cols-1 gap-4 xl:grid-cols-[.8fr_1.2fr]"><div className="market-panel p-5"><div className="flex items-center gap-2"><span className="rounded-xl bg-amber-950 p-2 text-amber-300"><BrainCircuit size={20}/></span><div><h2 className="text-lg font-black">Market insights</h2><p className="text-xs text-slate-400">Derived from observed records</p></div></div><p className="mt-4 text-sm leading-6 text-slate-200">{forecast?'Observed data support a '+(forecast.change>1?'rising':forecast.change< -1?'falling':'broadly stable')+' indicative baseline.':'More historical dates are needed before a trustworthy market direction can be calculated.'}</p><div className="mt-4 grid grid-cols-3 gap-2">{[['Trend',forecast?(forecast.change>1?'Bullish':forecast.change< -1?'Bearish':'Stable'):'Pending'],['Volatility',history.length>1?'Measured':'Unknown'],['Confidence',forecast?'Indicative':'Insufficient']].map(([a,b])=><div key={a} className="insight-chip"><small>{a}</small><b>{b}</b></div>)}</div></div><div className="market-panel overflow-hidden"><div className="flex items-center justify-between border-b border-emerald-900 p-5"><div><h2 className="text-lg font-black">Latest mandi prices</h2><p className="text-xs text-slate-400">Modal price per quintal, by mandi</p></div><span className="rounded-full border border-emerald-800 px-3 py-1 text-xs text-emerald-300">{new Set(filtered.map(r=>r.mandi_code).filter(Boolean)).size} mandis</span></div><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-[#061713] text-xs text-slate-400"><tr><th className="px-4 py-3">#</th><th className="px-4 py-3">Mandi</th><th className="px-4 py-3">State</th><th className="px-4 py-3 text-right">Modal price (₹/quintal)</th></tr></thead><tbody>{[...new Map(filtered.map(r=>[r.mandi_code||r.mandi_name,r])).values()].slice(0,6).map((r,i)=><tr key={r.id} className="border-t border-emerald-950 hover:bg-emerald-950/40"><td className="px-4 py-3 text-emerald-300">{i+1}</td><td className="px-4 py-3 font-semibold">{r.mandi_name}</td><td className="px-4 py-3 text-slate-400">{r.state_name}</td><td className="px-4 py-3 text-right font-black text-emerald-300">{ru(r.modal_price)}</td></tr>)}</tbody></table></div></div></section>
-   <section className="market-panel overflow-hidden"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-900 p-5"><div><h2 className="text-xl font-black">Mandi price records</h2><p className="mt-1 text-xs text-slate-400">Source: AGMARKNET / DMI · latest available observations · all prices ₹ per quintal</p></div><div className="flex items-center gap-2"><span className="hidden rounded-xl border border-emerald-900 bg-[#061a16] px-3 py-2 text-xs text-slate-400 sm:inline">Search filters above</span><button onClick={()=>void load()} className="flex items-center gap-2 rounded-xl border border-emerald-800 px-3 py-2 text-sm font-bold text-emerald-300 transition hover:bg-emerald-950"><RefreshCw size={15}/> Refresh · {updated||'—'}</button></div></div><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="bg-[#061713] text-xs uppercase text-slate-400"><tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">State</th><th className="px-4 py-3">Mandi</th><th className="px-4 py-3">Commodity</th><th className="px-4 py-3">Variety</th><th className="px-4 py-3 text-right">Min price (₹/Q)</th><th className="px-4 py-3 text-right">Modal price (₹/Q)</th><th className="px-4 py-3 text-right">Max price (₹/Q)</th><th className="px-4 py-3">Source</th><th className="px-4 py-3">Action</th></tr></thead><tbody>{pageRows.map(r=><tr key={r.id} className="border-t border-emerald-950 hover:bg-emerald-950/30"><td className="px-4 py-3 text-slate-400">{r.observation_date}</td><td className="px-4 py-3 text-slate-300">{r.state_name}</td><td className="px-4 py-3 font-semibold">{r.mandi_name}</td><td className="px-4 py-3">{r.commodity_name}</td><td className="px-4 py-3 text-slate-300">{(r as any).variety||'—'}</td><td className="px-4 py-3 text-right">{ru(r.min_price)}</td><td className="px-4 py-3 text-right font-black text-emerald-300">{ru(r.modal_price)}</td><td className="px-4 py-3 text-right">{ru(r.max_price)}</td><td className="px-4 py-3 text-xs text-slate-400">{r.source||'AGMARKNET'}</td><td className="px-4 py-3"><button onClick={()=>{C(r.commodity_code);T(r.state_code||'');M(r.mandi_code||'')}} className="rounded-lg border border-emerald-800 bg-emerald-950/70 px-3 py-1.5 text-xs font-bold text-emerald-300">View ↗</button></td></tr>)}</tbody></table></div><div className="flex flex-wrap items-center justify-between gap-3 border-t border-emerald-900 px-5 py-3 text-xs text-slate-400"><span>Showing {filtered.length?((page-1)*pageSize+1):0}–{Math.min(page*pageSize,filtered.length)} of {nf.format(filtered.length)} matching records · {nf.format(rows.length)} loaded</span><div className="flex flex-wrap items-center gap-2"><label className="flex items-center gap-2">Rows <select value={pageSize} onChange={e=>PS(Number(e.target.value))} className="rounded-lg border border-emerald-800 bg-[#071711] px-2 py-1 text-slate-200"><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select></label><button disabled={page<=1} onClick={()=>P(p=>Math.max(1,p-1))} className="rounded-lg border border-emerald-800 px-3 py-1.5 font-bold text-emerald-300 disabled:opacity-40">Previous</button><span>Page {page} / {totalPages}</span><button disabled={page>=totalPages} onClick={()=>P(p=>Math.min(totalPages,p+1))} className="rounded-lg border border-emerald-800 px-3 py-1.5 font-bold text-emerald-300 disabled:opacity-40">Next</button></div></div></section></>}
-   <footer className="flex flex-wrap items-center justify-between gap-3 pb-6 text-xs text-slate-500"><span className="flex items-center gap-2"><ShieldCheck size={14} className="text-emerald-400"/> Data source: canonical AGMARKNET / DMI observations via Supabase · CSV staging paused</span><span>Updated {updated||'when records load'} · Latest observation: {latestDateLabel} · Prices in ₹ per quintal</span></footer>
-  </div>
- </div>
-</main>;
+  const load = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true);
+    setError('');
+    try {
+      const params = new URLSearchParams({
+        limit: String(pageSize),
+        offset: String(page * pageSize),
+      });
+      if (commodity) params.set('commodity', commodity);
+      if (state) params.set('state', state);
+      if (mandi) params.set('mandi', mandi);
+      if (search.trim()) params.set('search', search.trim());
+
+      const response = await fetch(`/api/market-prices?${params.toString()}`, {
+        cache: 'no-store',
+        signal,
+        headers: { Accept: 'application/json' },
+      });
+      const payload = await response.json() as MarketPayload;
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || `Market data request failed (HTTP ${response.status}).`);
+      }
+
+      setRows(Array.isArray(payload.rows) ? payload.rows : []);
+      setCommodities(Array.isArray(payload.commodities) ? payload.commodities : []);
+      setStates(Array.isArray(payload.states) ? payload.states : []);
+      setMandis(Array.isArray(payload.mandis) ? payload.mandis : []);
+      setTotal(Number(payload.count) || 0);
+      setSummary(payload.summary || null);
+      setUpdatedAt(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
+    } catch (cause) {
+      if ((cause as Error)?.name === 'AbortError') return;
+      setError(cause instanceof Error ? cause.message : 'Unable to load mandi prices.');
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, [commodity, state, mandi, search, page, pageSize]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => void load(controller.signal), search ? 300 : 0);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [load, search]);
+
+  const latest = summary?.latest ?? rows[0] ?? null;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const firstRow = total === 0 ? 0 : page * pageSize + 1;
+  const lastRow = Math.min((page + 1) * pageSize, total);
+  const visibleMandis = useMemo(
+    () => mandis.filter((item) => !state || item.state_code === state),
+    [mandis, state],
+  );
+
+  const resetPage = () => setPage(0);
+  const changeAmount = summary?.changeAmount;
+  const changeText = changeAmount == null ? '—' : `${changeAmount > 0 ? '+' : changeAmount < 0 ? '−' : ''}₹${numberFormat.format(Math.abs(changeAmount))}`;
+  const changeDetail = summary?.changePercent == null
+    ? 'No comparable previous observation'
+    : `${summary.changePercent > 0 ? '+' : ''}${summary.changePercent.toFixed(2)}% vs previous record`;
+
+  return (
+    <main className="market-dashboard">
+      <div className="market-dashboard__glow" aria-hidden="true" />
+
+      <div className="market-dashboard__content">
+        <header className="market-heading">
+          <div>
+            <div className="market-eyebrow"><span className="market-live-dot" /> AGMARKNET REAL INTELLIGENCE</div>
+            <h1>Commodity Prices &amp; Mandi Forecast</h1>
+            <p>Verified market observations, day-over-day price movement, and a clearly labelled short-horizon projection.</p>
+          </div>
+          <button type="button" className="market-refresh" onClick={() => void load()} disabled={loading}>
+            <RefreshCw size={15} className={loading ? 'market-spin' : ''} />
+            {loading ? 'Refreshing' : 'Refresh'}
+          </button>
+        </header>
+
+        <nav className="market-sector-links" aria-label="AgriMark sectors">
+          <Link href="/marketplace"><Store size={14} /> Marketplace</Link>
+          <Link href="/farmer/harvest"><Layers3 size={14} /> Harvest &amp; Lots</Link>
+          <Link href="/weather"><CloudSun size={14} /> Weather</Link>
+          <Link href="/logistics"><Truck size={14} /> Logistics</Link>
+          <Link href="/ai-assistant"><Bot size={14} /> AgriAI</Link>
+        </nav>
+
+        <section className="market-toolbar" aria-label="Market filters">
+          <label className="market-filter">
+            <Search size={15} />
+            <span className="sr-only">Search commodity or mandi</span>
+            <input value={search} onChange={(event) => { setSearch(event.target.value); resetPage(); }} placeholder="Search commodities, mandis, variety…" />
+          </label>
+          <label className="market-filter">
+            <Wheat size={15} />
+            <span className="sr-only">Filter by commodity</span>
+            <select value={commodity} onChange={(event) => { setCommodity(event.target.value); resetPage(); }}>
+              <option value="">All commodities</option>
+              {commodities.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
+            </select>
+          </label>
+          <label className="market-filter">
+            <MapPin size={15} />
+            <span className="sr-only">Filter by state</span>
+            <select value={state} onChange={(event) => { setState(event.target.value); setMandi(''); resetPage(); }}>
+              <option value="">All states</option>
+              {states.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
+            </select>
+          </label>
+          <label className="market-filter">
+            <Store size={15} />
+            <span className="sr-only">Filter by mandi</span>
+            <select value={mandi} onChange={(event) => { setMandi(event.target.value); resetPage(); }}>
+              <option value="">All mandis</option>
+              {visibleMandis.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
+            </select>
+          </label>
+          <div className="market-source"><Database size={14} /><span>Source: AGMARKNET / DMI</span></div>
+        </section>
+
+        {error && <div className="market-error" role="alert">{error}</div>}
+
+        <section className="market-kpis" aria-label="Market price summary">
+          <MetricCard
+            label="Latest modal"
+            value={latest ? money(latest.modal_price) : loading ? 'Loading…' : '—'}
+            note={latest ? 'per quintal' : 'No matching price'}
+            accent
+          />
+          <MetricCard
+            label="Change vs previous"
+            value={changeText}
+            note={changeDetail}
+            trend={changeAmount}
+          />
+          <MetricCard
+            label="Latest arrivals"
+            value={latest?.arrival_quantity == null ? 'N/A' : numberFormat.format(latest.arrival_quantity)}
+            note={latest?.arrival_quantity == null ? 'Not supplied by source' : `Reported quantity · ${dateLabel(latest.observation_date)}`}
+          />
+          <MetricCard
+            label="Observed points"
+            value={numberFormat.format(total)}
+            note="Records in current filter selection"
+          />
+        </section>
+
+        <section className="market-feature-grid">
+          <article className="market-feature-card market-latest-card">
+            <div className="market-feature-card__top">
+              <div>
+                <div className="market-card-label"><Activity size={14} /> LATEST MARKET OBSERVATION</div>
+                <h2>{latest?.commodity_name || (loading ? 'Loading market data…' : 'No matching record')}</h2>
+                <p className="market-location"><MapPin size={13} /> {latest ? `${latest.mandi_name}, ${latest.state_name}` : 'Select a commodity or mandi to explore prices'}</p>
+              </div>
+              <span className="market-date"><CalendarDays size={13} /> {dateLabel(latest?.observation_date)}</span>
+            </div>
+            {latest ? (
+              <>
+                <div className="market-hero-price">{money(latest.modal_price)}<small> / quintal</small></div>
+                <div className="market-price-range">
+                  <PriceRange label="Minimum" value={latest.min_price} />
+                  <PriceRange label="Modal" value={latest.modal_price} primary />
+                  <PriceRange label="Maximum" value={latest.max_price} />
+                </div>
+                <div className="market-observation-meta">
+                  <span>Variety <b>{latest.variety || '—'}</b></span>
+                  <span>Grade <b>{latest.grade || '—'}</b></span>
+                  <span>Source <b>{latest.source || 'AGMARKNET'}</b></span>
+                </div>
+              </>
+            ) : (
+              <div className="market-empty">{loading ? 'Reading observations from Supabase…' : 'No prices are available for these filters.'}</div>
+            )}
+          </article>
+
+          <article className="market-feature-card market-forecast-card">
+            <div className="market-card-label"><BarChart3 size={14} /> MANDI FORECAST</div>
+            <h2>Next 7 days</h2>
+            <div className="market-forecast-status"><BrainCircuit size={16} /> Baseline only · not trained</div>
+            <p>
+              Reliable day-by-day projections require several distinct official observation dates. The latest real modal price
+              is shown as a reference; mandis reported on the same date are not treated as a time series.
+            </p>
+            <div className="market-forecast-reference">
+              <span>Latest observed reference</span>
+              <b>{latest ? money(latest.modal_price) : '—'}</b>
+            </div>
+            <div className="market-forecast-foot"><CalendarDays size={13} /> Based on real observations only · no generated price history</div>
+          </article>
+        </section>
+
+        <section className="market-data-panel">
+          <div className="market-table-heading">
+            <div>
+              <div className="market-card-label"><Database size={14} /> CANONICAL OBSERVATIONS</div>
+              <h2>All Mandi Prices</h2>
+              <p>Browse every matching record using server-side pagination. No fixed first-page dataset limit.</p>
+            </div>
+            <div className="market-table-total">{numberFormat.format(total)} records</div>
+          </div>
+
+          <div className="market-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Observation date</th>
+                  <th>Commodity</th>
+                  <th>Market / Mandi</th>
+                  <th>State</th>
+                  <th>Variety / Grade</th>
+                  <th className="numeric">Min (₹/Q)</th>
+                  <th className="numeric">Modal (₹/Q)</th>
+                  <th className="numeric">Max (₹/Q)</th>
+                  <th className="numeric">Arrival quantity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id}>
+                    <td>{dateLabel(row.observation_date)}</td>
+                    <td className="strong-cell">{row.commodity_name}</td>
+                    <td>{row.mandi_name}</td>
+                    <td>{row.state_name}</td>
+                    <td>{[row.variety, row.grade].filter(Boolean).join(' · ') || '—'}</td>
+                    <td className="numeric">{money(row.min_price)}</td>
+                    <td className="numeric price-cell">{money(row.modal_price)}</td>
+                    <td className="numeric">{money(row.max_price)}</td>
+                    <td className="numeric">{row.arrival_quantity == null ? 'N/A' : numberFormat.format(row.arrival_quantity)}</td>
+                  </tr>
+                ))}
+                {!rows.length && (
+                  <tr><td colSpan={9} className="market-table-empty">{loading ? 'Loading official observations…' : 'No records match the selected filters.'}</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="market-pagination">
+            <span>Showing <b>{numberFormat.format(firstRow)}–{numberFormat.format(lastRow)}</b> of <b>{numberFormat.format(total)}</b></span>
+            <div className="market-pagination-controls">
+              <label>Rows
+                <select value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(0); }}>
+                  {PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+                </select>
+              </label>
+              <button type="button" onClick={() => setPage((value) => Math.max(0, value - 1))} disabled={page === 0 || loading} aria-label="Previous page"><ChevronLeft size={16} /></button>
+              <span>Page {numberFormat.format(page + 1)} / {numberFormat.format(totalPages)}</span>
+              <button type="button" onClick={() => setPage((value) => Math.min(totalPages - 1, value + 1))} disabled={page + 1 >= totalPages || loading} aria-label="Next page"><ChevronRight size={16} /></button>
+            </div>
+          </div>
+        </section>
+
+        <footer className="market-footer">
+          <span><Database size={13} /> Supabase · canonical AGMARKNET / DMI observations · CSV staging disabled</span>
+          <span>Updated {updatedAt || '—'} · Latest source date {dateLabel(latest?.observation_date)} · Prices in ₹ per quintal</span>
+        </footer>
+      </div>
+    </main>
+  );
 }
-function Picker({label,value,change,opts,icon}:{label:string;value:string;change:(v:string)=>void;opts:Opt[];icon:React.ReactNode}){return <label className="flex min-h-12 min-w-0 items-center gap-2 rounded-xl border border-emerald-900 bg-[#071711] px-3"><span className="text-emerald-300">{icon}</span><span className="sr-only">{label}</span><select value={value} onChange={e=>change(e.target.value)} className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none"><option value="" className="bg-[#071711]">All {label.toLowerCase()}s</option>{opts.map(o=><option key={o.code} value={o.code} className="bg-[#071711]">{o.name}</option>)}</select></label>}
-function Metric({label,value,detail,icon}:{label:string;value:string;detail:string;icon:React.ReactNode}){return <div className="min-w-0 rounded-2xl border border-emerald-800/70 bg-gradient-to-br from-[#132c20] to-[#08170f] p-4 shadow-lg shadow-black/10 transition duration-300 hover:-translate-y-1 hover:border-emerald-400/40 hover:shadow-[0_16px_38px_rgba(16,185,129,.10)] md:p-5"><div className="flex items-center justify-between gap-2"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 md:text-xs">{label}</span><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-950 text-emerald-300">{icon}</span></div><div className="mt-3 break-words text-2xl font-black md:text-3xl">{value}</div><div className="mt-1 text-xs text-slate-400">{detail}</div></div>}
-function MandiBarChart({data,selectedCommodity,selectedMandi,dates}:{data:{label:string;price:number;min:number;max:number;date:string}[];selectedCommodity:string;selectedMandi:string;dates:number}) {
- if(!data.length)return <div className="flex min-h-[260px] items-center justify-center rounded-2xl border border-dashed border-emerald-900 bg-[#06140e] p-6 text-center text-sm text-slate-400">No actual mandi price records match these filters.</div>;
- const max=Math.max(...data.map(d=>d.price),1);
- const chartHeight=250, left=46, right=18, top=24, bottom=68, plotWidth=790-left-right, plotHeight=chartHeight-top-bottom;
- const barWidth=Math.min(54,Math.max(18,plotWidth/data.length*.52));
- const label=(s:string)=>s.length>17?s.slice(0,16)+'…':s;
- return <div className="overflow-hidden rounded-2xl border border-emerald-950 bg-[#06140e] p-2 md:p-4">
-  <div className="mb-3 flex flex-wrap items-center justify-between gap-2 px-2"><div><div className="font-bold text-white">{selectedCommodity?(selectedMandi?'Selected mandi modal price':'Modal price by mandi'):'Modal price by commodity'}</div><div className="mt-1 text-xs text-slate-400">Actual AGMARKNET values · ₹ per quintal · {dates} observed date(s)</div></div><span className="rounded-full border border-emerald-800 px-3 py-1 text-xs text-emerald-300">{data.length} bars</span></div>
-  <svg viewBox={`0 0 790 ${chartHeight}`} className="w-full" role="img" aria-label="Bar chart of actual AgriMark mandi modal prices">
-   {[0,1,2,3,4].map(i=>{const value=max*(1-i/4),yy=top+i*plotHeight/4;return <g key={i}><line x1={left} y1={yy} x2={790-right} y2={yy} stroke="#17372a" strokeDasharray="3 5"/><text x={left-8} y={yy+4} fill="#8aa497" textAnchor="end" fontSize="10">{nf.format(value)}</text></g>})}
-   {data.map((d,i)=>{const step=plotWidth/data.length,cx=left+step*i+step/2,bh=Math.max(2,d.price/max*plotHeight),yy=top+plotHeight-bh;return <g key={d.label}><rect x={cx-barWidth/2} y={yy} width={barWidth} height={bh} rx="5" fill="#23e3b0" fillOpacity=".78" stroke="#52f5ca" strokeWidth="1"/><text x={cx} y={Math.max(top+12,yy-7)} fill="#eafff7" textAnchor="middle" fontSize="10" fontWeight="700">{nf.format(d.price)}</text><text transform={`translate(${cx} ${top+plotHeight+14}) rotate(-32)`} fill="#9bb2a6" textAnchor="end" fontSize="10">{label(d.label)}</text></g>})}
-  </svg>
-  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-2 text-xs text-slate-400"><span><i className="mr-2 inline-block h-2.5 w-2.5 rounded-sm bg-emerald-400"/>Observed modal price</span><span>Bars ranked highest to lowest</span><span>Source: stored AGMARKNET observations</span></div>
- </div>;
+
+function MetricCard({ label, value, note, accent = false, trend }: {
+  label: string; value: string; note: string; accent?: boolean; trend?: number | null;
+}) {
+  const TrendIcon = trend != null && trend < 0 ? ArrowDownRight : ArrowUpRight;
+  return (
+    <article className="market-kpi">
+      <div className="market-kpi__label">{label}</div>
+      <div className={`market-kpi__value ${accent ? 'is-accent' : ''} ${trend != null && trend < 0 ? 'is-down' : ''}`}>
+        {trend != null && <TrendIcon size={17} />}
+        {value}
+      </div>
+      <div className="market-kpi__note">{note}</div>
+    </article>
+  );
 }
-function Chart({history,future,values}:{history:{date:string;price:number}[];future:number[];values:number[]}){const min=Math.min(...values)*.9,max=Math.max(...values)*1.1,total=history.length+future.length,x=(i:number)=>44+i/Math.max(total-1,1)*720,y=(v:number)=>18+(1-(v-min)/Math.max(max-min,1))*205,actual=history.map((p,i)=>(i?'L':'M')+' '+x(i)+' '+y(p.price)).join(' '),projected=[history[history.length-1]?.price||0,...future].map((v,i)=>(i?'L':'M')+' '+x(history.length-1+i)+' '+y(v)).join(' ');return <div className="overflow-hidden rounded-2xl border border-emerald-950 bg-[#06140e] p-2 md:p-4"><svg viewBox="0 0 790 270" className="w-full" role="img" aria-label="Historical mandi prices and forecast">{[0,1,2,3,4].map(i=><g key={i}><line x1="44" y1={18+i*51} x2="764" y2={18+i*51} stroke="#17372a" strokeDasharray="3 5"/><text x="37" y={22+i*51} fill="#8aa497" textAnchor="end" fontSize="10">{nf.format(max-(max-min)*i/4)}</text></g>)}{history.length>1&&<path d={actual} fill="none" stroke="#23e3b0" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>}{history.map((p,i)=><circle key={p.date} cx={x(i)} cy={y(p.price)} r="4" fill="#23e3b0"/>)}{future.length>0&&<><path d={projected} fill="none" stroke="#ffc63b" strokeWidth="3" strokeDasharray="7 6"/>{future.map((v,i)=><circle key={i} cx={x(history.length+i)} cy={y(v)} r="4" fill="#ffc63b"/>)}</>}{history.map((p,i)=>(i===0||i===history.length-1)?<text key={p.date} x={x(i)} y="251" fill="#9bb2a6" textAnchor={i===0?'start':'end'} fontSize="11">{dt(p.date)}</text>:null)}{future.length>0&&<text x="764" y="251" fill="#ffc63b" textAnchor="end" fontSize="11">Next 7 days</text>}</svg></div>}
+
+function PriceRange({ label, value, primary = false }: { label: string; value: number; primary?: boolean }) {
+  return (
+    <div className={`market-range-item ${primary ? 'is-primary' : ''}`}>
+      <span>{label}</span>
+      <b>{money(value)}</b>
+    </div>
+  );
+}
