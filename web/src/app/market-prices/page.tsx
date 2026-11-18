@@ -5,9 +5,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Activity, ArrowDownRight, ArrowUpRight, BarChart3, BrainCircuit,
-  CalendarDays, ChevronLeft, ChevronRight, Database, ExternalLink,
-  Leaf, MapPin, RefreshCw, Search, Sprout, Store, Truck, CloudSun, Bot,
-  Wheat, Layers3,
+  CalendarDays, ChevronLeft, ChevronRight, Database, MapPin, RefreshCw,
+  Search, Store, Truck, CloudSun, Bot, Wheat, Layers3,
 } from 'lucide-react';
 
 type Option = { code: string; name: string; state_code?: string };
