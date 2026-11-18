@@ -28,8 +28,8 @@ jobs:
     timeout-minutes: 180
     env:
       DATA_GOV_IN_API_KEY: ${{ secrets.DATA_GOV_IN_API_KEY }}
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_URL: https://tsdjtlmrvbspyzgwmccg.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SECRET_KEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -46,32 +46,37 @@ jobs:
       - name: Validate required secrets
         shell: bash
         run: |
-          test -n "$DATA_GOV_IN_API_KEY" || { echo "::error::Add DATA_GOV_IN_API_KEY to GitHub Actions secrets."; exit 1; }
-          test -n "$SUPABASE_URL" || { echo "::error::Add SUPABASE_URL to GitHub Actions secrets."; exit 1; }
-          test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "::error::Add SUPABASE_SERVICE_ROLE_KEY to GitHub Actions secrets."; exit 1; }
+          test -n "$DATA_GOV_IN_API_KEY" || { echo "::error::Add DATA_GOV_IN_API_KEY to GitHub Actions repository secrets."; exit 1; }
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "::error::Add SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY) to GitHub Actions repository secrets."; exit 1; }
 
       - name: Backfill official historical data (manual historical/both runs)
         if: ${{ github.event_name == 'workflow_dispatch' && (inputs.mode == 'historical' || inputs.mode == 'both') }}
         shell: bash
         run: |
           set -euo pipefail
-          # The existing worker stores its pagination offset in Supabase and
-          # upserts with official source/date keys, so reruns are resumable.
           for page in $(seq 1 250); do
             output="$(python scripts/data/ingest_agmarknet.py --mode historical)"
             echo "$output"
-            finished="$(python -c 'import json,sys; print(str(json.loads(sys.argv[1]).get("finished", False)).lower())' "$output")"
+            finished="$(python -c 'import json,sys; print(str(json.loads(sys.stdin.read()).get("finished", False)).lower())' <<< "$output")"
             if [ "$finished" = "true" ]; then
               echo "Historical AGMARKNET backfill reached the end of the official resource."
               exit 0
             fi
           done
-          echo "Backfill paused after 250 pages; run this workflow again to resume from the stored offset."
+          echo "::warning::Historical backfill paused after 250 pages. Its offset is saved; dispatch this workflow again to resume."
 
-      - name: Ingest one daily page (scheduled runs and daily dispatch)
-        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'daily') }}
-        run: python scripts/data/ingest_agmarknet.py --mode daily
-
-      - name: Continue ingestion state machine (manual both run)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'both' }}
-        run: python scripts/data/ingest_agmarknet.py --mode daily
+      - name: Ingest daily official records (scheduled runs and daily/both dispatch)
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.mode == 'daily' || inputs.mode == 'both')) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for page in $(seq 1 40); do
+            output="$(python scripts/data/ingest_agmarknet.py --mode daily)"
+            echo "$output"
+            finished="$(python -c 'import json,sys; print(str(json.loads(sys.stdin.read()).get("finished", False)).lower())' <<< "$output")"
+            if [ "$finished" = "true" ]; then
+              echo "All available pages in the official daily AGMARKNET resource have been ingested."
+              exit 0
+            fi
+          done
+          echo "::warning::Daily ingestion paused after 40 pages. The next scheduled run will resume from the saved offset."

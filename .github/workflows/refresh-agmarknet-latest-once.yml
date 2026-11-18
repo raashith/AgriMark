@@ -1,23 +1,29 @@
-name: One-time AGMARKNET latest data refresh
+name: Manual AGMARKNET latest data refresh
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/refresh-agmarknet-latest-once.yml
-      - scripts/data/ingest_agmarknet.py
+  workflow_dispatch:
+    inputs:
+      max_pages:
+        description: "Maximum daily resource pages to process (1,000 records per page)"
+        required: true
+        default: "40"
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: agrimark-agmarknet-ingestion
+  cancel-in-progress: false
+
 jobs:
   refresh-latest-market-data:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     env:
       DATA_GOV_IN_API_KEY: ${{ secrets.DATA_GOV_IN_API_KEY }}
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_URL: https://tsdjtlmrvbspyzgwmccg.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SECRET_KEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,9 +31,8 @@ jobs:
       - name: Validate ingestion credentials
         shell: bash
         run: |
-          test -n "$DATA_GOV_IN_API_KEY" || { echo "::error::DATA_GOV_IN_API_KEY GitHub Actions secret is missing."; exit 1; }
-          test -n "$SUPABASE_URL" || { echo "::error::SUPABASE_URL GitHub Actions secret is missing."; exit 1; }
-          test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "::error::SUPABASE_SERVICE_ROLE_KEY GitHub Actions secret is missing."; exit 1; }
+          test -n "$DATA_GOV_IN_API_KEY" || { echo "::error::Add DATA_GOV_IN_API_KEY to GitHub Actions repository secrets."; exit 1; }
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "::error::Add SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY) to GitHub Actions repository secrets."; exit 1; }
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -37,19 +42,21 @@ jobs:
       - name: Install ingestion dependencies
         run: python -m pip install --upgrade pip supabase python-dotenv
 
-      - name: Ingest every page of the official daily AGMARKNET resource
+      - name: Ingest every page available for the daily AGMARKNET resource
         shell: bash
+        env:
+          MAX_PAGES: ${{ inputs.max_pages }}
         run: |
           set -euo pipefail
-          for page in $(seq 1 40); do
-            echo "Starting official AGMARKNET daily page $page"
+          [[ "$MAX_PAGES" =~ ^[0-9]+$ ]] && [ "$MAX_PAGES" -ge 1 ] && [ "$MAX_PAGES" -le 250 ] || { echo "::error::max_pages must be between 1 and 250"; exit 1; }
+          for page in $(seq 1 "$MAX_PAGES"); do
+            echo "Starting official AGMARKNET daily page $page/$MAX_PAGES"
             result="$(python scripts/data/ingest_agmarknet.py --mode daily)"
             echo "$result"
             finished="$(python -c 'import json,sys; print(str(json.loads(sys.stdin.read()).get("finished", False)).lower())' <<< "$result")"
             if [ "$finished" = "true" ]; then
-              echo "All pages for the current daily resource have been ingested."
+              echo "All available pages in the official daily AGMARKNET resource have been ingested."
               exit 0
             fi
           done
-          echo "::error::Stopped after 40 pages without reaching the official resource total."
-          exit 1
+          echo "::warning::Stopped after $MAX_PAGES pages. The Supabase offset is saved and this workflow can be run again to resume."
