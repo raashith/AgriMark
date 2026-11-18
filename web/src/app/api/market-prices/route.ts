@@ -102,12 +102,7 @@ async function fetchAllMetadata(table: string, select: string, order: string) {
   return rows;
 }
 
-function mapObservation(
-  row: DatabaseRow,
-  commodityNames: Map<string, string>,
-  stateNames: Map<string, string>,
-  mandiNames: Map<string, string>,
-): DatabaseRow & {
+type MappedObservation = DatabaseRow & {
   id: number;
   commodity_code: string;
   mandi_code: string;
@@ -120,7 +115,14 @@ function mapObservation(
   commodity_name: string;
   mandi_name: string;
   state_name: string;
-} {
+};
+
+function mapObservation(
+  row: DatabaseRow,
+  commodityNames: Map<string, string>,
+  stateNames: Map<string, string>,
+  mandiNames: Map<string, string>,
+): MappedObservation {
   return {
     ...row,
     modal_price: Number(row.modal_price),
@@ -130,7 +132,7 @@ function mapObservation(
     commodity_name: commodityNames.get(String(row.commodity_code)) || String(row.commodity_code || ''),
     mandi_name: mandiNames.get(String(row.mandi_code)) || String(row.mandi_code || 'Mandi unavailable'),
     state_name: stateNames.get(String(row.state_code)) || String(row.state_code || 'India'),
-  };
+  } as MappedObservation;
 }
 
 export async function GET(request: NextRequest) {
