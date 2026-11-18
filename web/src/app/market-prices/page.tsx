@@ -1,12 +1,12 @@
 'use client';
 
 import './market-prices.css';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Activity, ArrowDownRight, ArrowUpRight, BarChart3, BrainCircuit,
   CalendarDays, ChevronLeft, ChevronRight, Database, MapPin, RefreshCw,
-  Search, Store, Truck, CloudSun, Bot, Wheat, Layers3,
+  Search, Store, Truck, CloudSun, Bot, Wheat, Layers3, X,
 } from 'lucide-react';
 
 type Option = { code: string; name: string; state_code?: string };
@@ -35,6 +35,25 @@ type MarketSummary = {
   changePercent: number | null;
   observedRecords: number;
 };
+type ForecastPoint = {
+  target_date: string;
+  forecast_horizon_days: number;
+  predicted_value: number;
+  lower_bound_95: number;
+  upper_bound_95: number;
+  data_type: string;
+};
+type ForecastPayload = {
+  ok: boolean;
+  training_status?: 'BASELINE_ONLY' | 'MODEL_READY';
+  message?: string;
+  source_date?: string;
+  forecast_base_date?: string;
+  days_since_last_observation?: number;
+  distinct_observation_dates?: number;
+  forecast?: ForecastPoint[];
+  error?: string;
+};
 type MarketPayload = {
   ok: boolean;
   rows: PriceRow[];
@@ -42,16 +61,36 @@ type MarketPayload = {
   states: Option[];
   mandis: Option[];
   count: number;
-  summary: MarketSummary;
+  summary?: MarketSummary;
+  latest_observation_date?: string | null;
   error?: string;
 };
 
 const PAGE_SIZES = [25, 50, 100];
 const numberFormat = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
-const money = (value: number) => `₹${numberFormat.format(value)}`;
+const priceFormat = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const money = (value: number) => `₹${priceFormat.format(value)}`;
 const dateLabel = (value?: string | null) => value
-  ? new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+  ? new Date(`${value}T00:00:00Z`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })
   : 'Date unavailable';
+
+function indiaToday() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function ageInDays(date?: string | null) {
+  if (!date) return null;
+  const current = indiaToday();
+  const start = Date.parse(`${date}T00:00:00Z`);
+  const end = Date.parse(`${current}T00:00:00Z`);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  return Math.max(0, Math.floor((end - start) / 86400000));
+}
 
 export default function MarketPricesPage() {
   const [rows, setRows] = useState<PriceRow[]>([]);
@@ -69,10 +108,18 @@ export default function MarketPricesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [updatedAt, setUpdatedAt] = useState('');
+  const [forecast, setForecast] = useState<ForecastPayload | null>(null);
+  const [forecastLoading, setForecastLoading] = useState(false);
+  const [forecastError, setForecastError] = useState('');
+  const activeRequest = useRef<AbortController | null>(null);
 
-  const load = useCallback(async (signal?: AbortSignal) => {
+  const load = useCallback(async () => {
+    activeRequest.current?.abort();
+    const controller = new AbortController();
+    activeRequest.current = controller;
     setLoading(true);
     setError('');
+
     try {
       const params = new URLSearchParams({
         limit: String(pageSize),
@@ -85,7 +132,7 @@ export default function MarketPricesPage() {
 
       const response = await fetch(`/api/market-prices?${params.toString()}`, {
         cache: 'no-store',
-        signal,
+        signal: controller.signal,
         headers: { Accept: 'application/json' },
       });
       const payload = await response.json() as MarketPayload;
@@ -98,22 +145,38 @@ export default function MarketPricesPage() {
       setStates(Array.isArray(payload.states) ? payload.states : []);
       setMandis(Array.isArray(payload.mandis) ? payload.mandis : []);
       setTotal(Number(payload.count) || 0);
-      setSummary(payload.summary || null);
-      setUpdatedAt(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
+      // Page two onward intentionally omits the summary query; preserve the
+      // page-one summary cards instead of replacing them with blank values.
+      if (payload.summary) setSummary(payload.summary);
+      setUpdatedAt(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }));
     } catch (cause) {
       if ((cause as Error)?.name === 'AbortError') return;
       setError(cause instanceof Error ? cause.message : 'Unable to load mandi prices.');
     } finally {
-      if (!signal?.aborted) setLoading(false);
+      if (activeRequest.current === controller) {
+        activeRequest.current = null;
+        setLoading(false);
+      }
     }
   }, [commodity, state, mandi, search, page, pageSize]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => void load(controller.signal), search ? 300 : 0);
+    const trimmed = search.trim();
+    if (trimmed.length === 1) {
+      activeRequest.current?.abort();
+      setRows([]);
+      setSummary(null);
+      setTotal(0);
+      setError('Enter at least two characters to search market prices.');
+      setLoading(false);
+      setForecast(null);
+      return;
+    }
+
+    const timer = window.setTimeout(() => void load(), trimmed ? 300 : 0);
     return () => {
       window.clearTimeout(timer);
-      controller.abort();
+      activeRequest.current?.abort();
     };
   }, [load, search]);
 
@@ -125,13 +188,76 @@ export default function MarketPricesPage() {
     () => mandis.filter((item) => !state || item.state_code === state),
     [mandis, state],
   );
+  const hasActiveFilters = Boolean(search.trim() || commodity || state || mandi);
+  const sourceAge = ageInDays(latest?.observation_date);
+  const sourceIsStale = sourceAge != null && sourceAge > 2;
 
   const resetPage = () => setPage(0);
+  const clearFilters = () => {
+    setSearch('');
+    setCommodity('');
+    setState('');
+    setMandi('');
+    setPage(0);
+  };
+
   const changeAmount = summary?.changeAmount;
-  const changeText = changeAmount == null ? '—' : `${changeAmount > 0 ? '+' : changeAmount < 0 ? '−' : ''}₹${numberFormat.format(Math.abs(changeAmount))}`;
+  const changeText = changeAmount == null
+    ? '—'
+    : `${changeAmount > 0 ? '+' : changeAmount < 0 ? '−' : ''}${money(Math.abs(changeAmount))}`;
   const changeDetail = summary?.changePercent == null
-    ? 'No comparable previous observation'
-    : `${summary.changePercent > 0 ? '+' : ''}${summary.changePercent.toFixed(2)}% vs previous record`;
+    ? 'No earlier matching observation date'
+    : `${summary.changePercent > 0 ? '+' : ''}${summary.changePercent.toFixed(2)}% vs prior date`;
+
+  useEffect(() => {
+    if (!latest) {
+      setForecast(null);
+      setForecastError('');
+      return;
+    }
+
+    const controller = new AbortController();
+    const params = new URLSearchParams({
+      commodity_code: latest.commodity_code,
+      mandi_code: latest.mandi_code,
+      state_code: latest.state_code,
+      district_code: latest.district_code || '',
+      horizon_days: '7',
+    });
+    if (latest.variety) params.set('variety', latest.variety);
+    if (latest.grade) params.set('grade', latest.grade);
+    setForecastLoading(true);
+    setForecastError('');
+
+    fetch(`/api/v1/mandi/forecast?${params.toString()}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+      headers: { Accept: 'application/json' },
+    })
+      .then(async (response) => {
+        const payload = await response.json() as ForecastPayload;
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error || `Forecast request failed (HTTP ${response.status}).`);
+        }
+        setForecast(payload);
+      })
+      .catch((cause) => {
+        if ((cause as Error)?.name !== 'AbortError') {
+          setForecast(null);
+          setForecastError(cause instanceof Error ? cause.message : 'Forecast is unavailable.');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setForecastLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [latest?.commodity_code, latest?.mandi_code, latest?.state_code, latest?.district_code]);
+
+  const forecastPoints = forecast?.forecast ?? [];
+  const forecastStatus = forecast?.training_status === 'MODEL_READY'
+    ? 'Model-based projection'
+    : 'Reference baseline · not trained';
 
   return (
     <main className="market-dashboard">
@@ -140,9 +266,9 @@ export default function MarketPricesPage() {
       <div className="market-dashboard__content">
         <header className="market-heading">
           <div>
-            <div className="market-eyebrow"><span className="market-live-dot" /> AGMARKNET REAL INTELLIGENCE</div>
+            <div className="market-eyebrow"><span className="market-live-dot" /> AGMARKNET MARKET INTELLIGENCE</div>
             <h1>Commodity Prices &amp; Mandi Forecast</h1>
-            <p>Verified market observations, day-over-day price movement, and a clearly labelled short-horizon projection.</p>
+            <p>Official mandi observations, transparent price movement, and a seven-day outlook based on available history.</p>
           </div>
           <button type="button" className="market-refresh" onClick={() => void load()} disabled={loading}>
             <RefreshCw size={15} className={loading ? 'market-spin' : ''} />
@@ -162,7 +288,12 @@ export default function MarketPricesPage() {
           <label className="market-filter">
             <Search size={15} />
             <span className="sr-only">Search commodity or mandi</span>
-            <input value={search} onChange={(event) => { setSearch(event.target.value); resetPage(); }} placeholder="Search commodities, mandis, variety…" />
+            <input
+              value={search}
+              onChange={(event) => { setSearch(event.target.value); resetPage(); }}
+              placeholder="Search commodities, mandis, variety…"
+              aria-label="Search commodities, mandis, variety or grade"
+            />
           </label>
           <label className="market-filter">
             <Wheat size={15} />
@@ -188,33 +319,49 @@ export default function MarketPricesPage() {
               {visibleMandis.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
             </select>
           </label>
-          <div className="market-source"><Database size={14} /><span>Source: AGMARKNET / DMI</span></div>
+          <div className="market-source"><Database size={14} /><span>Source: {latest?.source || 'AGMARKNET'}</span></div>
         </section>
+
+        <div className="market-toolbar-status" aria-live="polite">
+          <div className={`market-freshness ${sourceIsStale ? 'is-stale' : ''}`}>
+            <span className="market-live-dot" />
+            {latest
+              ? sourceAge === 0 ? `Source date: ${dateLabel(latest.observation_date)} · today`
+                : `Source date: ${dateLabel(latest.observation_date)} · ${sourceAge} day${sourceAge === 1 ? '' : 's'} old`
+              : loading ? 'Checking official source date…' : 'No source date for this selection'}
+          </div>
+          {hasActiveFilters && (
+            <button type="button" className="market-clear-filters" onClick={clearFilters} disabled={loading}>
+              <X size={13} /> Clear filters
+            </button>
+          )}
+          {loading && <span className="market-loading-note">Updating market prices…</span>}
+        </div>
 
         {error && <div className="market-error" role="alert">{error}</div>}
 
-        <section className="market-kpis" aria-label="Market price summary">
+        <section className="market-kpis" aria-label="Market price summary" aria-busy={loading}>
           <MetricCard
-            label="Latest modal"
+            label="Latest modal price"
             value={latest ? money(latest.modal_price) : loading ? 'Loading…' : '—'}
-            note={latest ? 'per quintal' : 'No matching price'}
+            note={latest ? '₹ per quintal' : 'No matching price'}
             accent
           />
           <MetricCard
-            label="Change vs previous"
+            label="Change vs prior date"
             value={changeText}
             note={changeDetail}
             trend={changeAmount}
           />
           <MetricCard
-            label="Latest arrivals"
+            label="Arrivals"
             value={latest?.arrival_quantity == null ? 'N/A' : numberFormat.format(latest.arrival_quantity)}
-            note={latest?.arrival_quantity == null ? 'Not supplied by source' : `Reported quantity · ${dateLabel(latest.observation_date)}`}
+            note={latest?.arrival_quantity == null ? 'Not supplied in this source record' : `Reported · ${dateLabel(latest.observation_date)}`}
           />
           <MetricCard
-            label="Observed points"
+            label="Observed records"
             value={numberFormat.format(total)}
-            note="Records in current filter selection"
+            note="Records in the current filter selection"
           />
         </section>
 
@@ -247,33 +394,53 @@ export default function MarketPricesPage() {
             )}
           </article>
 
-          <article className="market-feature-card market-forecast-card">
+          <article className="market-feature-card market-forecast-card" aria-busy={forecastLoading}>
             <div className="market-card-label"><BarChart3 size={14} /> MANDI FORECAST</div>
             <h2>Next 7 days</h2>
-            <div className="market-forecast-status"><BrainCircuit size={16} /> Baseline only · not trained</div>
-            <p>
-              Reliable day-by-day projections require several distinct official observation dates. The latest real modal price
-              is shown as a reference; mandis reported on the same date are not treated as a time series.
-            </p>
-            <div className="market-forecast-reference">
-              <span>Latest observed reference</span>
-              <b>{latest ? money(latest.modal_price) : '—'}</b>
+            <div className={`market-forecast-status ${forecast?.training_status === 'MODEL_READY' ? 'is-model' : ''}`}>
+              <BrainCircuit size={16} />
+              {forecastLoading ? 'Building outlook…' : forecast ? forecastStatus : 'Waiting for price data'}
             </div>
-            <div className="market-forecast-foot"><CalendarDays size={13} /> Based on real observations only · no generated price history</div>
+            {forecastError ? (
+              <p className="market-forecast-message" role="status">{forecastError}</p>
+            ) : forecast ? (
+              <>
+                <p className="market-forecast-message">
+                  {forecast.message || 'Projection based on the latest available official observations.'}
+                </p>
+                {forecast.source_date && (
+                  <div className="market-forecast-source">Latest training observation: {dateLabel(forecast.source_date)}</div>
+                )}
+                <ForecastMiniChart points={forecastPoints} />
+                <div className="market-forecast-values">
+                  {forecastPoints.map((point) => (
+                    <div key={point.target_date}>
+                      <span>{dateLabel(point.target_date)}</span>
+                      <b>{money(point.predicted_value)}</b>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="market-forecast-message">
+                {forecastLoading ? 'Loading verified history for this commodity and mandi…' : 'Select a market observation to calculate a seven-day outlook.'}
+              </p>
+            )}
+            <div className="market-forecast-foot"><CalendarDays size={13} /> Forecast dates start from today · no historical prices are fabricated</div>
           </article>
         </section>
 
-        <section className="market-data-panel">
+        <section className="market-data-panel" aria-busy={loading}>
           <div className="market-table-heading">
             <div>
               <div className="market-card-label"><Database size={14} /> CANONICAL OBSERVATIONS</div>
               <h2>All Mandi Prices</h2>
-              <p>Browse every matching record using server-side pagination. No fixed first-page dataset limit.</p>
+              <p>Complete matching result set, loaded a page at a time from Supabase.</p>
             </div>
             <div className="market-table-total">{numberFormat.format(total)} records</div>
           </div>
 
-          <div className="market-table-wrap">
+          <div className={`market-table-wrap ${loading ? 'is-loading' : ''}`}>
             <table>
               <thead>
                 <tr>
@@ -318,15 +485,15 @@ export default function MarketPricesPage() {
                 </select>
               </label>
               <button type="button" onClick={() => setPage((value) => Math.max(0, value - 1))} disabled={page === 0 || loading} aria-label="Previous page"><ChevronLeft size={16} /></button>
-              <span>Page {numberFormat.format(page + 1)} / {numberFormat.format(totalPages)}</span>
+              <span>Page {numberFormat.format(Math.min(page + 1, totalPages))} / {numberFormat.format(totalPages)}</span>
               <button type="button" onClick={() => setPage((value) => Math.min(totalPages - 1, value + 1))} disabled={page + 1 >= totalPages || loading} aria-label="Next page"><ChevronRight size={16} /></button>
             </div>
           </div>
         </section>
 
         <footer className="market-footer">
-          <span><Database size={13} /> Supabase · canonical AGMARKNET / DMI observations · CSV staging disabled</span>
-          <span>Updated {updatedAt || '—'} · Latest source date {dateLabel(latest?.observation_date)} · Prices in ₹ per quintal</span>
+          <span><Database size={13} /> Supabase · official AGMARKNET canonical observations · CSV staging disabled</span>
+          <span>Read at {updatedAt || '—'} · Source date {dateLabel(latest?.observation_date)} · Prices in ₹ per quintal</span>
         </footer>
       </div>
     </main>
@@ -354,6 +521,35 @@ function PriceRange({ label, value, primary = false }: { label: string; value: n
     <div className={`market-range-item ${primary ? 'is-primary' : ''}`}>
       <span>{label}</span>
       <b>{money(value)}</b>
+    </div>
+  );
+}
+
+function ForecastMiniChart({ points }: { points: ForecastPoint[] }) {
+  if (!points.length) return null;
+  const low = Math.min(...points.map((point) => point.lower_bound_95));
+  const high = Math.max(...points.map((point) => point.upper_bound_95));
+  const range = Math.max(high - low, 1);
+  const x = (index: number) => 12 + (index / Math.max(points.length - 1, 1)) * 276;
+  const y = (value: number) => 62 - ((value - low) / range) * 48;
+  const line = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${x(index)} ${y(point.predicted_value)}`).join(' ');
+  const hasModelBand = points.some((point) => point.data_type === 'PROJECTED' && point.upper_bound_95 > point.lower_bound_95);
+  const upper = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${x(index)} ${y(point.upper_bound_95)}`).join(' ');
+  const lower = [...points].reverse().map((point, index) => {
+    const originalIndex = points.length - 1 - index;
+    return `L ${x(originalIndex)} ${y(point.lower_bound_95)}`;
+  }).join(' ');
+
+  return (
+    <div className="market-forecast-chart">
+      <svg viewBox="0 0 300 76" role="img" aria-label="Seven-day mandi price outlook with uncertainty band">
+        {hasModelBand && <path d={`${upper} ${lower} Z`} className="market-forecast-band" />}
+        <path d={line} className="market-forecast-line" />
+        {points.map((point, index) => (
+          <circle key={point.target_date} cx={x(index)} cy={y(point.predicted_value)} r="2.8" className="market-forecast-point" />
+        ))}
+      </svg>
+      <div className="market-forecast-range"><span>{hasModelBand ? 'Model range' : 'Reference point · no confidence band'}</span>{hasModelBand && <b>{money(low)} – {money(high)}</b>}</div>
     </div>
   );
 }

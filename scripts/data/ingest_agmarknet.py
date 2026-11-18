@@ -70,11 +70,18 @@ COMMODITY_CATEGORIES: dict[str, str] = {
 def slug(value: Any) -> str:
     return re.sub(r"[^A-Z0-9]+", "_", str(value or "").strip().upper()).strip("_") or "UNKNOWN"
 
+def normalize_field_name(value: Any) -> str:
+    normalized = str(value or "").strip().lower()
+    # data.gov.in encodes spaces in JSON field names, e.g. Min_x0020_Price.
+    normalized = re.sub(r"_x0020_", "_", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\\s+", "_", normalized)
+    return re.sub(r"_+", "_", normalized).strip("_")
+
+
 def field(record: dict[str, Any], name: str, default: Any = None) -> Any:
-    wanted = name.lower().replace(" ", "_")
+    wanted = normalize_field_name(name)
     for key, value in record.items():
-        normalized = str(key).strip().lower().replace(" ", "_")
-        if normalized == wanted:
+        if normalize_field_name(key) == wanted:
             return value
     return default
 
@@ -95,6 +102,23 @@ def number(value: Any) -> float | None:
         return float(cleaned)
     except (TypeError, ValueError):
         return None
+
+def parse_arrival_quantity(record: dict[str, Any]) -> float | None:
+    """Return an arrival quantity only when the official source supplies one."""
+    for name in (
+        "arrival_quantity",
+        "arrival",
+        "arrivals",
+        "arrival_qty",
+        "quantity_arrived",
+        "arrival_quantity_in_tonnes",
+        "arrivals (tonnes)",
+        "arrivals (qtl)",
+    ):
+        value = number(field(record, name))
+        if value is not None and value >= 0:
+            return value
+    return None
 
 def normalize_record(record: dict[str, Any], source: str) -> dict[str, Any] | None:
     state = str(field(record, "state", "")).strip()
@@ -207,7 +231,7 @@ def persist_page(client: Client, rows: list[dict[str, Any]]) -> dict[str, int]:
 
     observations = []
     for r in accepted:
-        arrival = number(field(r["raw"], "arrival_quantity", field(r["raw"], "arrival")))
+        arrival = parse_arrival_quantity(r["raw"])
         observations.append({
             "observation_date": r["observation_date"],
             "state_code": r["state_code"],

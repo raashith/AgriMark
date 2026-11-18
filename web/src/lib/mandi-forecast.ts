@@ -54,13 +54,27 @@ export class MandiForecastEngine {
     const cutoffTime = baseDate.getTime();
 
     // 1. Strict Temporal Leakage Guard: Exclude any observations past cutoffTime
-    const validHistory = observations
+    const eligibleHistory = observations
       .filter((obs) => {
         const obsTime = new Date(obs.observed_at).getTime();
-        return !isNaN(obsTime) && obsTime <= cutoffTime && obs.commodity_code === commodityCode;
+        const price = Number(obs.modal_price);
+        return Number.isFinite(obsTime)
+          && obsTime <= cutoffTime
+          && Number.isFinite(price)
+          && price > 0
+          && obs.commodity_code === commodityCode;
       })
       .sort((a, b) => new Date(a.observed_at).getTime() - new Date(b.observed_at).getTime());
 
+    // Keep the advertised 30-day feature window anchored to the last observed
+    // date, not today's date. This still works when the source is stale.
+    const latestHistoryTime = eligibleHistory.length
+      ? new Date(eligibleHistory[eligibleHistory.length - 1].observed_at).getTime()
+      : cutoffTime;
+    const historyStartTime = latestHistoryTime - 30 * 86400000;
+    const validHistory = eligibleHistory.filter(
+      (obs) => new Date(obs.observed_at).getTime() >= historyStartTime,
+    );
     const numPoints = validHistory.length;
 
     // No fabricated fallback price: an empty history is reported as unavailable
@@ -106,7 +120,7 @@ export class MandiForecastEngine {
 
     for (let day = 1; day <= horizonDays; day++) {
       const targetTime = new Date(baseDate);
-      targetTime.setDate(targetTime.getDate() + day);
+      targetTime.setUTCDate(targetTime.getUTCDate() + day);
       const targetDateStr = targetTime.toISOString().split('T')[0];
 
       // Projected point estimate
@@ -120,7 +134,7 @@ export class MandiForecastEngine {
         target_date: targetDateStr,
         forecast_horizon_days: day,
         predicted_value: predictedVal,
-        lower_bound_95: Math.max(50, Math.round((predictedVal - margin95) * 100) / 100),
+        lower_bound_95: Math.max(0, Math.round((predictedVal - margin95) * 100) / 100),
         upper_bound_95: Math.round((predictedVal + margin95) * 100) / 100,
         data_type: 'PROJECTED',
       });

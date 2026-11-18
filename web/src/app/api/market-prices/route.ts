@@ -5,10 +5,20 @@ export const revalidate = 0;
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
+const MAX_OFFSET = 2_147_483_647;
 const METADATA_PAGE_SIZE = 1000;
+const METADATA_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_SUPABASE_URL = 'https://tsdjtlmrvbspyzgwmccg.supabase.co';
 
 type DatabaseRow = Record<string, any>;
+type MarketMetadata = {
+  commodities: DatabaseRow[];
+  states: DatabaseRow[];
+  mandis: DatabaseRow[];
+};
+
+let metadataCache: { value: MarketMetadata; expiresAt: number } | null = null;
+let metadataRequest: Promise<MarketMetadata> | null = null;
 
 function getSupabaseUrl() {
   return (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL).replace(/\/$/, '');
@@ -32,6 +42,13 @@ function safeSearch(value: string) {
     .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function invalidQuery(message: string, status = 400) {
+  return NextResponse.json({ ok: false, rows: [], error: message }, {
+    status,
+    headers: { 'Cache-Control': 'no-store, max-age=0' },
+  });
 }
 
 async function fetchRows(
@@ -102,6 +119,28 @@ async function fetchAllMetadata(table: string, select: string, order: string) {
   return rows;
 }
 
+async function getMarketMetadata(): Promise<MarketMetadata> {
+  if (metadataCache && metadataCache.expiresAt > Date.now()) return metadataCache.value;
+  if (metadataRequest) return metadataRequest;
+
+  const pending = Promise.all([
+    fetchAllMetadata('national_commodities', 'code,name', 'name.asc'),
+    fetchAllMetadata('national_states', 'state_code,state_name', 'state_name.asc'),
+    fetchAllMetadata('national_mandis', 'mandi_code,mandi_name,state_code', 'mandi_name.asc'),
+  ]).then(([commodities, states, mandis]) => {
+    const value = { commodities, states, mandis };
+    metadataCache = { value, expiresAt: Date.now() + METADATA_TTL_MS };
+    return value;
+  });
+
+  metadataRequest = pending;
+  try {
+    return await pending;
+  } finally {
+    if (metadataRequest === pending) metadataRequest = null;
+  }
+}
+
 type MappedObservation = DatabaseRow & {
   id: number;
   commodity_code: string;
@@ -141,24 +180,32 @@ export async function GET(request: NextRequest) {
     const rawCommodity = params.get('commodity')?.trim() || '';
     const rawState = params.get('state')?.trim() || '';
     const rawMandi = params.get('mandi')?.trim() || '';
-    const search = safeSearch(params.get('search') || '');
-    const requestedLimit = Number(params.get('limit')) || DEFAULT_PAGE_SIZE;
-    const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, Math.floor(requestedLimit)));
-    const requestedOffset = Number(params.get('offset')) || 0;
-    const offset = Math.max(0, Math.floor(requestedOffset));
+    const rawSearch = params.get('search') || '';
+    const search = safeSearch(rawSearch);
 
-    const [commodities, states, mandis] = await Promise.all([
-      fetchAllMetadata('national_commodities', 'code,name', 'name.asc'),
-      fetchAllMetadata('national_states', 'state_code,state_name', 'state_name.asc'),
-      fetchAllMetadata('national_mandis', 'mandi_code,mandi_name,state_code', 'mandi_name.asc'),
-    ]);
+    const rawLimit = params.get('limit');
+    const requestedLimit = rawLimit === null ? DEFAULT_PAGE_SIZE : Number(rawLimit);
+    if (!Number.isSafeInteger(requestedLimit) || requestedLimit < 1) {
+      return invalidQuery('The limit must be a positive whole number between 1 and 100.');
+    }
+    const limit = Math.min(MAX_PAGE_SIZE, requestedLimit);
 
+    const rawOffset = params.get('offset');
+    const requestedOffset = rawOffset === null ? 0 : Number(rawOffset);
+    if (!Number.isSafeInteger(requestedOffset) || requestedOffset < 0 || requestedOffset > MAX_OFFSET) {
+      return invalidQuery(`The offset must be a whole number between 0 and ${MAX_OFFSET.toLocaleString('en-IN')}.`);
+    }
+    const offset = requestedOffset;
+
+    if (rawSearch.trim() && search.length < 2) {
+      return invalidQuery('Enter at least two letters or numbers to search market prices.');
+    }
+
+    const { commodities, states, mandis } = await getMarketMetadata();
     const commodityNames = new Map(commodities.map((r) => [String(r.code), String(r.name)]));
     const stateNames = new Map(states.map((r) => [String(r.state_code), String(r.state_name)]));
     const mandiNames = new Map(mandis.map((r) => [String(r.mandi_code), String(r.mandi_name)]));
 
-    // Read the normalized canonical AGMARKNET table only. The CSV staging table
-    // is deliberately not queried or modified.
     const filters: Record<string, string> = { modal_price: 'gt.0' };
     if (rawCommodity) filters.commodity_code = `eq.${rawCommodity}`;
     if (rawState) filters.state_code = `eq.${rawState}`;
@@ -175,6 +222,7 @@ export async function GET(request: NextRequest) {
       const stateCodes = states
         .filter((r) => normalize(r.state_name).includes(term))
         .map((r) => String(r.state_code));
+
       const clauses = [
         ...(commodityCodes.length ? [`commodity_code.in.(${commodityCodes.join(',')})`] : []),
         ...(mandiCodes.length ? [`mandi_code.in.(${mandiCodes.join(',')})`] : []),
@@ -182,9 +230,15 @@ export async function GET(request: NextRequest) {
         `variety.ilike.*${search}*`,
         `grade.ilike.*${search}*`,
       ];
-      filters.or = `(${clauses.join(',')})`;
+      const searchExpression = `(${clauses.join(',')})`;
+      if (searchExpression.length > 7000) {
+        return invalidQuery('This search is too broad. Add more letters or use the commodity, state, or mandi filters.');
+      }
+      filters.or = searchExpression;
     }
 
+    // CSV staging is intentionally excluded. All counts and rows come from the
+    // normalized official-observation table and are paged directly in Postgres.
     const selected = await fetchRows('national_market_price_observations',
       'id,commodity_code,mandi_code,state_code,district_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source,variety,grade',
       {
@@ -196,36 +250,63 @@ export async function GET(request: NextRequest) {
       });
 
     const count = selected.total ?? 0;
-    const rawLatest = offset === 0
-      ? selected.rows[0] ?? null
-      : (await fetchRows('national_market_price_observations',
-        'id,commodity_code,mandi_code,state_code,district_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source,variety,grade',
-        { order: 'observation_date.desc,id.desc', limit: 1, filters })).rows[0] ?? null;
-
-    const rows = selected.rows.map((row) => mapObservation(row, commodityNames, stateNames, mandiNames));
-    const latest = rawLatest ? mapObservation(rawLatest, commodityNames, stateNames, mandiNames) : null;
-
-    let previous: ReturnType<typeof mapObservation> | null = null;
-    if (latest) {
-      const previousFilters = {
-        modal_price: 'gt.0',
-        commodity_code: `eq.${latest.commodity_code}`,
-        mandi_code: `eq.${latest.mandi_code}`,
-        state_code: `eq.${latest.state_code}`,
-        observation_date: `lt.${latest.observation_date}`,
-      };
-      const previousRow = (await fetchRows('national_market_price_observations',
-        'id,commodity_code,mandi_code,state_code,district_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source,variety,grade',
-        { order: 'observation_date.desc,id.desc', limit: 1, filters: previousFilters })).rows[0] ?? null;
-      previous = previousRow ? mapObservation(previousRow, commodityNames, stateNames, mandiNames) : null;
+    if (offset > 0 && offset >= count) {
+      return invalidQuery(count === 0
+        ? 'No records match the selected filters.'
+        : `The requested offset is outside the result set. The last available page starts at offset ${Math.floor((count - 1) / limit) * limit}.`, 416);
     }
 
-    const changeAmount = latest && previous
-      ? Number((latest.modal_price - previous.modal_price).toFixed(2))
-      : null;
-    const changePercent = latest && previous && previous.modal_price !== 0
-      ? Number((changeAmount! / previous.modal_price * 100).toFixed(2))
-      : null;
+    const rows = selected.rows.map((row) => mapObservation(row, commodityNames, stateNames, mandiNames));
+    let summary: {
+      latest: MappedObservation | null;
+      previous: MappedObservation | null;
+      changeAmount: number | null;
+      changePercent: number | null;
+      observedRecords: number;
+    } | undefined;
+    let latestObservationDate: string | null = null;
+
+    // Summary cards are calculated once on page one. Later page requests only
+    // retrieve their rows and exact count, avoiding two redundant price queries.
+    if (offset === 0) {
+      const rawLatest = selected.rows[0] ?? null;
+      const latest = rawLatest ? mapObservation(rawLatest, commodityNames, stateNames, mandiNames) : null;
+      let previous: MappedObservation | null = null;
+
+      if (latest) {
+        const previousFilters: Record<string, string> = {
+          modal_price: 'gt.0',
+          commodity_code: `eq.${latest.commodity_code}`,
+          mandi_code: `eq.${latest.mandi_code}`,
+          state_code: `eq.${latest.state_code}`,
+          observation_date: `lt.${latest.observation_date}`,
+        };
+        if (latest.variety) previousFilters.variety = `eq.${latest.variety}`;
+        if (latest.grade) previousFilters.grade = `eq.${latest.grade}`;
+        if (latest.source) previousFilters.source = `eq.${latest.source}`;
+
+        const previousRow = (await fetchRows('national_market_price_observations',
+          'id,commodity_code,mandi_code,state_code,district_code,observation_date,modal_price,min_price,max_price,arrival_quantity,source,variety,grade',
+          { order: 'observation_date.desc,id.desc', limit: 1, filters: previousFilters })).rows[0] ?? null;
+        previous = previousRow ? mapObservation(previousRow, commodityNames, stateNames, mandiNames) : null;
+      }
+
+      const changeAmount = latest && previous
+        ? Number((latest.modal_price - previous.modal_price).toFixed(2))
+        : null;
+      const changePercent = latest && previous && previous.modal_price !== 0
+        ? Number((changeAmount! / previous.modal_price * 100).toFixed(2))
+        : null;
+
+      summary = {
+        latest,
+        previous,
+        changeAmount,
+        changePercent,
+        observedRecords: count,
+      };
+      latestObservationDate = latest?.observation_date ?? null;
+    }
 
     const totalPages = Math.ceil(count / limit);
     return NextResponse.json({
@@ -234,20 +315,15 @@ export async function GET(request: NextRequest) {
       commodities: commodities.map((r) => ({ code: String(r.code), name: String(r.name) })),
       states: states.map((r) => ({ code: String(r.state_code), name: String(r.state_name) })),
       mandis: mandis.map((r) => ({ code: String(r.mandi_code), name: String(r.mandi_name), state_code: String(r.state_code || '') })),
-      summary: {
-        latest,
-        previous,
-        changeAmount,
-        changePercent,
-        observedRecords: count,
-      },
+      summary,
       count,
       loaded_count: rows.length,
       imported_csv_count: 0,
       csv_staging_enabled: false,
       capped: false,
-      latest_observation_date: latest?.observation_date ?? null,
+      latest_observation_date: latestObservationDate,
       source: 'Supabase public.national_market_price_observations · exact count · CSV staging disabled',
+      metadata_cached_for_seconds: Math.max(0, Math.floor(((metadataCache?.expiresAt ?? Date.now()) - Date.now()) / 1000)),
       pagination: {
         limit,
         offset,
